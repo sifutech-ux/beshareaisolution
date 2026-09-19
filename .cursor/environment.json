@@ -1,0 +1,17 @@
+{
+  "name": "BeShare AI Solution",
+  "install": "npm ci",
+  "terminals": [
+    {
+      "name": "dev-server",
+      "command": "npm run dev",
+      "description": "Vite dev server for the BeShare AI Solution app (http://localhost:5173)."
+    }
+  ],
+  "ports": [
+    {
+      "name": "Vite dev server",
+      "port": 5173
+    }
+  ]
+}
