@@ -1,0 +1,9 @@
+{
+  "name": "BeShare AI Solution",
+  "terminals": [
+    {
+      "name": "static-server",
+      "command": "python3 -m http.server 8000"
+    }
+  ]
+}
