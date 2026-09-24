@@ -5,7 +5,8 @@ Tapak gerbang (portal) statik untuk penyelesaian AI BeShare.
 ## Gerbang
 
 - **WhatsApp AI** — automasi jualan dalam WhatsApp _(akan datang)_
-- **IPO** — bot analisis IPO — https://beshare-ipo-bot.onrender.com
+- **IPO** — meja kerja (radar, HATA, portfolio, analisis) — https://beshare-ipo-bot.onrender.com
+  Telegram kekal sebagai loceng: amaran harga, notis BELI, dan digest.
 - **AI Video Studio** — penciptaan video berkuasa AI _(akan datang)_
 
 ## Struktur
