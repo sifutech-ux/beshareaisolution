@@ -1,0 +1,328 @@
+.hero .hero__title {
+  max-width: 16em;
+}
+
+.topbar {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.topbar__links {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.topbar__links a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.85rem 1.2rem;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  color: #0a0f1f;
+  background: var(--whatsapp);
+}
+
+.btn--ghost {
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--card-border);
+}
+
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 1.5rem 3rem;
+}
+
+.section-title {
+  text-align: center;
+  margin: 3.5rem 0 1.25rem;
+}
+
+.section-title h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  background: linear-gradient(90deg, #cdd7ff, #b28bff 60%, #ff9ecb);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.section-title p {
+  color: var(--muted);
+  margin: 0.6rem auto 0;
+  max-width: 52ch;
+  line-height: 1.6;
+}
+
+.panel {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  padding: 1.5rem;
+  overflow: hidden;
+}
+
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--whatsapp);
+}
+
+.panel h2,
+.panel h3 {
+  margin: 0.4rem 0;
+}
+
+.muted {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #0a0f1f;
+  background: var(--whatsapp);
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+}
+
+.checks {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.checks li {
+  padding: 0.75rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.proof {
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  width: 100%;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.compare {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.compare th,
+.compare td {
+  text-align: left;
+  padding: 0.9rem 0.8rem;
+  border-bottom: 1px solid var(--card-border);
+  vertical-align: top;
+}
+
+.compare th {
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.bad {
+  color: #ffb4c8;
+}
+
+.good {
+  color: #b7f7cf;
+}
+
+.plans {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.price {
+  font-size: 2.4rem;
+  margin: 0.8rem 0 0.2rem;
+}
+
+.plan--pick {
+  box-shadow: 0 18px 40px -18px rgba(37, 211, 102, 0.65);
+}
+
+.form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.form input,
+.form select,
+.form textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 0.8rem 0.9rem;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.actions .btn {
+  flex: 1;
+}
+
+.bank {
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.chat-launcher {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 20;
+}
+
+.chat-box {
+  display: none;
+  position: absolute;
+  right: 0;
+  bottom: 3.6rem;
+  width: min(360px, calc(100vw - 2rem));
+  height: 460px;
+  flex-direction: column;
+  background: #131734;
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.chat-box header,
+.chat-box form {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.8rem;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.chat-box form {
+  border-bottom: 0;
+  border-top: 1px solid var(--card-border);
+}
+
+.chat-box input {
+  flex: 1;
+  font: inherit;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+}
+
+#chat-messages {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.9rem;
+}
+
+.bubble {
+  max-width: 85%;
+  padding: 0.7rem 0.85rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border);
+}
+
+.bubble--me {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--whatsapp) 22%, transparent);
+}
+
+.login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.login form {
+  width: min(420px, 100%);
+}
+
+@media (max-width: 800px) {
+  .split,
+  .plans,
+  .pair {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

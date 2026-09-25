@@ -3,22 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Masuk dashboard — BeShare WhatsApp AI</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Masuk dashboard — BeShare AI Solution</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="landing.css">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center px-4">
-    <form method="post" action="/masuk" onsubmit="event.preventDefault(); document.getElementById('nota').hidden = false;" class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-        <h1 class="text-xl font-extrabold">Dashboard pelanggan</h1>
-        <p class="text-sm text-slate-400">Gunakan nombor WhatsApp yang didaftarkan pada tempahan, dan kata laluan yang BeShare hantar selepas tempahan disahkan.</p>
-        <p id="nota" hidden class="text-sm text-amber-200">Log masuk dashboard diproses oleh enjin WhatsApp. Alamat awam enjin belum disambung ke domain ini, jadi kata laluan belum boleh disemak dari laman ini.</p>
-        <label class="block text-sm">Nombor WhatsApp
-            <input name="phone" required class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2">
-        </label>
-        <label class="block text-sm">Kata laluan
-            <input name="password" type="password" required class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2">
-        </label>
-        <button class="w-full bg-blue-600 rounded-xl py-3 font-bold">Masuk meja saya</button>
-        <a href="./" class="block text-center text-sm text-slate-400">Kembali ke gerbang tempahan</a>
-    </form>
+<body>
+    <div class="bg-glow" aria-hidden="true"></div>
+    <main class="login">
+        <form class="panel form" method="post" action="/masuk" onsubmit="event.preventDefault(); document.getElementById('nota').hidden = false;">
+            <a class="brand" href="../" style="margin:0; text-decoration:none; color:inherit;">
+                <span class="brand__name">BeShare<span class="brand__accent"> AI Solution</span></span>
+            </a>
+            <h1>Dashboard pelanggan</h1>
+            <p class="muted">Gunakan nombor WhatsApp pada tempahan, dan kata laluan yang BeShare hantar selepas tempahan disahkan.</p>
+            <p id="nota" hidden class="muted">Log masuk diproses oleh enjin WhatsApp. Alamat awam enjin belum disambung ke domain ini.</p>
+            <label>Nombor WhatsApp
+                <input name="phone" required>
+            </label>
+            <label>Kata laluan
+                <input name="password" type="password" required>
+            </label>
+            <button class="btn" type="submit">Masuk meja saya</button>
+            <a href="./">Kembali ke tempahan</a>
+        </form>
+    </main>
 </body>
 </html>
