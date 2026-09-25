@@ -1,397 +1,261 @@
 <!DOCTYPE html>
-<html lang="ms" class="scroll-smooth">
+<html lang="ms">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BeShare Ai Solution - Automasi WhatsApp AI Enterprise</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome CDN -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
+    <title>WhatsApp AI — BeShare AI Solution</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="landing.css">
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans antialiased selection:bg-blue-500 selection:text-white">
+<body>
+    <div class="bg-glow" aria-hidden="true"></div>
 
-    <!-- Navbar -->
-    <nav class="border-b border-slate-800 bg-slate-950/90 backdrop-blur fixed w-full z-50 px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center space-x-3 max-w-6xl mx-auto w-full justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/20">
-                    <i class="fa-solid fa-robot"></i>
-                </div>
-                <span class="font-extrabold text-xl text-white tracking-tight">BeShare<span class="text-blue-500">.ai</span></span>
-            </div>
-            <div class="flex items-center space-x-3">
-                <button onclick="toggleWebChat()" class="hidden sm:inline-flex items-center bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs md:text-sm font-semibold px-4 py-2 rounded-xl border border-slate-800 transition">
-                    <i class="fa-solid fa-comment-dots text-blue-400 mr-2"></i>Tanya AI
-                </button>
-                <a href="masuk.html" class="hidden sm:inline-flex items-center text-slate-300 text-xs md:text-sm font-semibold px-3 py-2">Masuk dashboard</a>
-                <a href="#form-section" class="bg-blue-600 hover:bg-blue-500 text-white text-xs md:text-sm font-bold uppercase tracking-wider px-4 py-2 rounded-xl transition shadow-lg shadow-blue-600/30">
-                    Dapatkan Sistem
-                </a>
-            </div>
+    <div class="topbar">
+        <a class="brand" href="../" style="margin:0; text-decoration:none; color:inherit;">
+            <span class="brand__mark" aria-hidden="true">
+                <svg viewBox="0 0 32 32" width="34" height="34">
+                    <defs>
+                        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" stop-color="#7c9cff"></stop>
+                            <stop offset="1" stop-color="#b28bff"></stop>
+                        </linearGradient>
+                    </defs>
+                    <rect width="32" height="32" rx="8" fill="#131734"></rect>
+                    <path d="M8 9h16l-8 15z" fill="url(#g)"></path>
+                </svg>
+            </span>
+            <span class="brand__name">BeShare<span class="brand__accent"> AI Solution</span></span>
+        </a>
+        <div class="topbar__links">
+            <a href="masuk.html">Masuk dashboard</a>
+            <a class="btn" href="#form-section">Dapatkan sistem</a>
         </div>
-    </nav>
+    </div>
 
-    <!-- Hero Section -->
-    <section class="pt-32 pb-16 px-6 max-w-5xl mx-auto text-center relative overflow-hidden">
-        <div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-blue-600/15 rounded-full blur-[100px] pointer-events-none"></div>
-
-        <div class="relative z-10 space-y-6">
-            <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                <i class="fa-brands fa-meta text-blue-400"></i>
-                <span>100% Meta Cloud API Official Partner Infrastructure</span>
-            </div>
-            <h1 class="text-3xl md:text-5xl font-extrabold text-white leading-tight">
-                Tukar Leads FB Ads Jadi Jualan <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">24/7 Tanpa Staf</span>
-            </h1>
-            <p class="text-slate-400 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-                Hentikan pembaziran iklan akibat *leads* lambat dibalas. Enjin AI Pintar **BeShare Ai Solution** faham bahasa pasar, pandai memujuk, hantar gambar produk/QR Bank automatik, dan dilengkapi sistem pemulihan *Abandoned Cart*.
-            </p>
-            <div class="flex flex-col sm:flex-row justify-center gap-4 pt-2">
-                <a href="#form-section" class="bg-blue-600 hover:bg-blue-500 text-white font-extrabold px-8 py-4 rounded-xl transition shadow-lg shadow-blue-600/30 flex items-center justify-center">
-                    Tempah Pemasangan (Done-For-You) <i class="fa-solid fa-arrow-right ml-2"></i>
-                </a>
-                <a href="#bukti-legit" class="bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold px-6 py-4 rounded-xl border border-slate-800 transition flex items-center justify-center">
-                    <i class="fa-solid fa-certificate text-amber-400 mr-2"></i> Bukti Kelulusan Meta
-                </a>
-            </div>
+    <header class="hero">
+        <p class="pill">Meta Cloud API</p>
+        <h1 class="hero__title">Tukar leads jadi jualan 24/7 tanpa staf</h1>
+        <p class="hero__subtitle">
+            Enjin WhatsApp AI BeShare membalas bahasa pasar, menghantar gambar produk dan QR bank,
+            dan memulihkan troli yang tertinggal. Pemasangan dibuat secara done-for-you.
+        </p>
+        <div class="actions" style="justify-content:center; margin-top:1.5rem;">
+            <a class="btn" href="#form-section">Tempah pemasangan</a>
+            <a class="btn btn--ghost" href="#bukti-legit">Bukti kelulusan Meta</a>
         </div>
-    </section>
+    </header>
 
-    <!-- BAHAGIAN 1: BUKTI PENGESAHAN META CLOUD API -->
-    <section id="bukti-legit" class="py-12 px-6 max-w-5xl mx-auto">
-        <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 md:p-8 shadow-2xl relative overflow-hidden">
-            <div class="flex flex-col lg:flex-row items-center justify-between gap-8">
-                <div class="lg:w-5/12">
-                    <span class="text-xs font-bold uppercase tracking-wider text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
-                        <i class="fa-solid fa-shield-halved mr-1"></i> Jaminan Sifar Risiko Banned
-                    </span>
-                    <h2 class="text-2xl md:text-3xl font-extrabold text-white mt-4 mb-3">
-                        Integrasi Direct Meta Business Cloud API
-                    </h2>
-                    <p class="text-slate-400 text-sm leading-relaxed mb-4">
-                        Sistem kami didaftarkan secara rasmi melalui portal **Meta for Developers**. Kami tidak menggunakan kaedah lapuk *Scan QR Code* atau *Web Scraping* yang sering menyebabkan nombor perniagaan diharamkan (banned).
-                    </p>
-                    <div class="grid grid-cols-1 gap-3 text-xs text-slate-300">
-                        <div class="flex items-center bg-slate-950 p-3 rounded-xl border border-slate-800">
-                            <i class="fa-solid fa-circle-check text-emerald-400 mr-2.5 text-base"></i> Pendaftaran Token System User Permanent
-                        </div>
-                        <div class="flex items-center bg-slate-950 p-3 rounded-xl border border-slate-800">
-                            <i class="fa-solid fa-circle-check text-emerald-400 mr-2.5 text-base"></i> Pelayan Terus ke Meta Cloud Server
-                        </div>
-                        <div class="flex items-center bg-slate-950 p-3 rounded-xl border border-slate-800">
-                            <i class="fa-solid fa-circle-check text-emerald-400 mr-2.5 text-base"></i> Sambungan Tanpa Perlu Telefon Pintar
-                        </div>
-                    </div>
-                </div>
-
-                <div class="lg:w-7/12 flex flex-col items-center justify-center bg-slate-950 p-3 rounded-2xl border border-slate-800 shadow-2xl w-full">
-                    <img src="/static/meta_proof.png" alt="Bukti Meta API Rasmi" class="w-full h-auto rounded-xl shadow-md mb-2.5 border border-slate-800 object-contain">
-                    <h3 class="font-bold text-sm text-white">Kelulusan Meta Business App</h3>
-                    <p class="text-xs text-emerald-400 font-bold mt-0.5"><i class="fa-solid fa-circle-check mr-1"></i>Verified & Active Status</p>
-                </div>
+    <main class="page">
+        <section id="bukti-legit" class="panel split">
+            <div>
+                <span class="pill">Jaminan rasmi Meta</span>
+                <h2>Integrasi terus ke Meta Business Cloud API</h2>
+                <p class="muted">Sistem didaftarkan melalui Meta for Developers. Bukan imbasan QR dan bukan web scraping yang sering menyebabkan nombor perniagaan disekat.</p>
+                <ul class="checks">
+                    <li>Token System User yang kekal</li>
+                    <li>Pelayan terus ke Meta Cloud</li>
+                    <li>Sambungan tanpa telefon pintar</li>
+                </ul>
             </div>
-        </div>
-    </section>
-
-    <!-- BAHAGIAN 2: RUANGAN PERTANYAAN INTERAKTIF -->
-    <section id="tanya-ai" class="py-12 px-6 max-w-5xl mx-auto">
-        <div class="text-center mb-8">
-            <h2 class="text-2xl md:text-3xl font-bold text-white">Ada Pertanyaan? Sembang Dengan AI Kami!</h2>
-            <p class="text-slate-400 text-sm mt-2">Uji sendiri kepintaran AI kami secara terus di laman web ini tanpa perlu berhubung menerusi WhatsApp.</p>
-        </div>
-
-        <div class="bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl p-6 md:p-8 max-w-3xl mx-auto">
-            <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
-                <div class="flex items-center space-x-3">
-                    <div class="relative">
-                        <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold">
-                            <i class="fa-solid fa-robot"></i>
-                        </div>
-                        <span class="w-3 h-3 bg-emerald-400 rounded-full absolute bottom-0 right-0 border-2 border-slate-900"></span>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-sm text-white">Pembantu BeShare Ai Solution</h3>
-                        <p class="text-xs text-emerald-400">Sedia Menjawab 24/7</p>
-                    </div>
-                </div>
-                <span class="text-xs bg-slate-950 text-slate-400 px-3 py-1 rounded-full border border-slate-800">Web Live Chat</span>
+            <div class="panel" style="box-shadow:none;">
+                <h3>Kelulusan Meta Business App</h3>
+                <p class="good">Status disahkan dan aktif</p>
+                <p class="muted">Bukti pendaftaran Meta for Developers disertakan semasa pemasangan.</p>
             </div>
+        </section>
 
-            <div class="space-y-4 text-sm text-center">
-                <p class="text-slate-300 font-medium">Sila tekan butang widget di bucu kanan bawah skrin untuk memulakan perbualan langsung bersama AI Sales Consultant kami.</p>
-                <div class="pt-2 flex justify-center">
-                    <button onclick="toggleWebChat()" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3 rounded-xl transition shadow-lg shadow-blue-600/30 flex items-center justify-center">
-                        <i class="fa-solid fa-comments text-lg mr-2"></i> Buka Kotak Chat AI
-                    </button>
-                </div>
+        <section id="tanya-ai">
+            <div class="section-title">
+                <h2>Sembang dengan AI di laman ini</h2>
+                <p>Uji jawapan AI tanpa perlu buka WhatsApp dahulu.</p>
             </div>
-        </div>
-    </section>
+            <div class="panel" style="max-width:720px; margin:0 auto; text-align:center;">
+                <h3>Pembantu BeShare AI Solution</h3>
+                <p class="good">Sedia menjawab 24/7</p>
+                <p class="muted">Buka kotak chat di bucu kanan bawah untuk bertanya tentang pemasangan.</p>
+                <button class="btn" type="button" onclick="toggleWebChat()">Buka kotak chat</button>
+            </div>
+        </section>
 
-    <!-- BAHAGIAN 3: PERBANDINGAN SISTEM -->
-    <section id="perbandingan" class="py-12 px-6 max-w-5xl mx-auto">
-        <div class="text-center mb-12">
-            <h2 class="text-2xl md:text-3xl font-bold text-white">Kenapa BeShare Ai Solution Berbeza?</h2>
-            <p class="text-slate-400 text-sm mt-2">Jangan biarkan nombor jualan anda berisiko disekat oleh bot pihak ketiga.</p>
-        </div>
-
-        <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
+        <section id="perbandingan">
+            <div class="section-title">
+                <h2>Kenapa BeShare berbeza</h2>
+                <p>Nombor jualan tidak perlu menumpang bot pihak ketiga.</p>
+            </div>
+            <div class="panel" style="overflow:auto;">
+                <table class="compare">
                     <thead>
-                        <tr class="bg-slate-950 text-xs uppercase tracking-wider">
-                            <th class="p-4 md:p-6 text-slate-400">Ciri-Ciri Utama</th>
-                            <th class="p-4 md:p-6 text-rose-400 bg-rose-950/20">Bot Biasa / Wabot Pihak Ke-3</th>
-                            <th class="p-4 md:p-6 text-blue-400 bg-blue-950/20">Sistem BeShare Ai Solution</th>
+                        <tr>
+                            <th>Ciri</th>
+                            <th>Bot biasa</th>
+                            <th>BeShare</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-800 text-sm">
+                    <tbody>
                         <tr>
-                            <td class="p-4 md:p-6 font-medium text-slate-200">Sambungan Pelayan</td>
-                            <td class="p-4 md:p-6 text-slate-400 bg-rose-950/10"><i class="fa-solid fa-xmark text-rose-500 mr-2"></i> Scan QR Code / Menumpang Server Luar</td>
-                            <td class="p-4 md:p-6 text-blue-300 bg-blue-950/10 font-semibold"><i class="fa-solid fa-check text-blue-400 mr-2"></i> Meta Cloud API Rasmi (Terus ke Server Meta)</td>
+                            <td>Sambungan</td>
+                            <td class="bad">Imbas QR, menumpang pelayan luar</td>
+                            <td class="good">Meta Cloud API, terus ke pelayan Meta</td>
                         </tr>
                         <tr>
-                            <td class="p-4 md:p-6 font-medium text-slate-200">Risiko Nombor Di-Banned</td>
-                            <td class="p-4 md:p-6 text-rose-400 bg-rose-950/10 font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Tinggi (Melanggar Terma Meta)</td>
-                            <td class="p-4 md:p-6 text-emerald-400 bg-emerald-950/10 font-bold"><i class="fa-solid fa-shield-halved mr-2"></i> Sifar (100% Diiktiraf Meta)</td>
+                            <td>Risiko nombor disekat</td>
+                            <td class="bad">Tinggi</td>
+                            <td class="good">Diiktiraf Meta</td>
                         </tr>
                         <tr>
-                            <td class="p-4 md:p-6 font-medium text-slate-200">Kepintaran Membalas</td>
-                            <td class="p-4 md:p-6 text-slate-400 bg-rose-950/10"><i class="fa-solid fa-xmark text-rose-500 mr-2"></i> Skrip Kaku / Mengikut Kata Kunci (Keyword)</td>
-                            <td class="p-4 md:p-6 text-blue-300 bg-blue-950/10 font-semibold"><i class="fa-solid fa-brain text-blue-400 mr-2"></i> Otak GPT-4o (Faham Konteks & Bahasa Pasar)</td>
+                            <td>Cara membalas</td>
+                            <td class="bad">Skrip kata kunci</td>
+                            <td class="good">Faham konteks dan bahasa pasar</td>
                         </tr>
                         <tr>
-                            <td class="p-4 md:p-6 font-medium text-slate-200">Auto Follow-Up Pemujuk</td>
-                            <td class="p-4 md:p-6 text-slate-400 bg-rose-950/10"><i class="fa-solid fa-xmark text-rose-500 mr-2"></i> Tiada Pemasa Dinamik</td>
-                            <td class="p-4 md:p-6 text-blue-300 bg-blue-950/10 font-semibold"><i class="fa-solid fa-stopwatch text-blue-400 mr-2"></i> Jam Randik Latar Belakang (Auto Pemulihan Cart)</td>
+                            <td>Susulan</td>
+                            <td class="bad">Tiada pemasa</td>
+                            <td class="good">Pemulihan troli automatik</td>
                         </tr>
                         <tr>
-                            <td class="p-4 md:p-6 font-medium text-slate-200">Fungsi Blasting / Broadcast</td>
-                            <td class="p-4 md:p-6 text-slate-400 bg-rose-950/10"><i class="fa-solid fa-xmark text-rose-500 mr-2"></i> Dihadkan / Disekat oleh Penyedia</td>
-                            <td class="p-4 md:p-6 text-blue-300 bg-blue-950/10 font-semibold"><i class="fa-solid fa-paper-plane text-blue-400 mr-2"></i> Boleh (Guna Templat Mesej Sah Meta)</td>
+                            <td>Siaran</td>
+                            <td class="bad">Sering disekat</td>
+                            <td class="good">Templat mesej Meta</td>
                         </tr>
                         <tr>
-                            <td class="p-4 md:p-6 font-medium text-slate-200">Pemilikan Data & Dashboard</td>
-                            <td class="p-4 md:p-6 text-slate-400 bg-rose-950/10"><i class="fa-solid fa-xmark text-rose-500 mr-2"></i> Menumpang Sistem Terbuka</td>
-                            <td class="p-4 md:p-6 text-blue-300 bg-blue-950/10 font-semibold"><i class="fa-solid fa-lock text-blue-400 mr-2"></i> Dashboard & Server Peribadi Klien (Penuh)</td>
+                            <td>Data</td>
+                            <td class="bad">Sistem terbuka orang lain</td>
+                            <td class="good">Dashboard jenama sendiri</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- BAHAGIAN 4: PAKEJ HARGA -->
-    <section id="pakej-harga" class="py-12 px-6 max-w-5xl mx-auto">
-        <div class="text-center mb-12">
-            <h2 class="text-2xl md:text-3xl font-bold text-white">Pakej Pemasangan Done-For-You (DFY)</h2>
-            <p class="text-slate-400 text-sm mt-2">Anda hanya fokus bawa masuk leads, pihak BeShare Ai Solution selesaikan teknikal A-Z.</p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <!-- Pakej Enterprise Single -->
-            <div class="bg-slate-900 rounded-2xl border border-slate-800 p-8 shadow-xl flex flex-col justify-between">
-                <div>
-                    <span class="text-xs font-bold uppercase tracking-wider text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">DFY Standard</span>
-                    <h3 class="text-2xl font-bold text-white mt-4">1 Produk / Brand</h3>
-                    <div class="my-6">
-                        <span class="text-4xl font-extrabold text-white">RM 1,200</span>
-                        <span class="text-slate-400 text-sm"> / setup</span>
-                        <p class="text-xs text-blue-400 mt-1 font-semibold">+ RM 800/bulan (Lesen Penggunaan AI & Penyelenggaraan Server)</p>
-                    </div>
-                    <ul class="space-y-3 text-sm text-slate-300 border-t border-slate-800 pt-6">
-                        <li class="flex items-center"><i class="fa-solid fa-check text-blue-400 mr-3"></i> Pendaftaran Meta Cloud API Rasmi</li>
-                        <li class="flex items-center"><i class="fa-solid fa-check text-blue-400 mr-3"></i> Pemasangan Private Cloud Server</li>
-                        <li class="flex items-center"><i class="fa-solid fa-check text-blue-400 mr-3"></i> Dashboard Admin & Live Chat Inbox</li>
-                        <li class="flex items-center"><i class="fa-solid fa-check text-blue-400 mr-3"></i> Auto-Train Skrip dari Landing Page</li>
-                        <li class="flex items-center"><i class="fa-solid fa-check text-blue-400 mr-3"></i> Pengurus Gambar & QR Code Bank</li>
+        <section id="pakej-harga">
+            <div class="section-title">
+                <h2>Pakej pemasangan done-for-you</h2>
+                <p>Anda bawa leads. BeShare siapkan bahagian teknikal.</p>
+            </div>
+            <div class="plans">
+                <article class="panel">
+                    <span class="pill">DFY Standard</span>
+                    <h3>1 produk / jenama</h3>
+                    <p class="price">RM 1,200</p>
+                    <p class="muted">sekali pasang, kemudian RM 800 sebulan untuk lesen AI dan pelayan</p>
+                    <ul class="checks">
+                        <li>Pendaftaran Meta Cloud API</li>
+                        <li>Pelayan peribadi</li>
+                        <li>Dashboard admin dan peti masuk</li>
+                        <li>Latih skrip dari landing page</li>
+                        <li>Gambar produk dan QR bank</li>
                     </ul>
-                </div>
-                <a href="#form-section" class="mt-8 bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 px-6 rounded-xl text-center transition">Pilih Pakej Standard</a>
-            </div>
-
-            <!-- Pakej Enterprise Pro -->
-            <div class="bg-slate-900 rounded-2xl border-2 border-blue-500 p-8 shadow-2xl flex flex-col justify-between relative">
-                <span class="absolute -top-3 right-6 bg-blue-600 text-white text-xs font-extrabold px-3 py-1 rounded-full uppercase">Paling Disyorkan</span>
-                <div>
-                    <span class="text-xs font-bold uppercase tracking-wider text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">DFY Ultimate</span>
-                    <h3 class="text-2xl font-bold text-white mt-4">Multi-Brand / Custom Blast</h3>
-                    <div class="my-6">
-                        <span class="text-4xl font-extrabold text-white">RM 1,800</span>
-                        <span class="text-slate-400 text-sm"> / setup</span>
-                        <p class="text-xs text-blue-400 mt-1 font-semibold">+ RM 1,000/bulan (Lesen Penggunaan AI, Server & Premium Support)</p>
-                    </div>
-                    <ul class="space-y-3 text-sm text-slate-300 border-t border-slate-800 pt-6">
-                        <li class="flex items-center"><i class="fa-solid fa-check text-blue-400 mr-3"></i> Semua Ciri Pakej Standard</li>
-                        <li class="flex items-center"><i class="fa-solid fa-check text-blue-400 mr-3"></i> Modul Khas Marketing Blaster</li>
-                        <li class="flex items-center"><i class="fa-solid fa-check text-blue-400 mr-3"></i> Integrasi Google Sheets Berganda</li>
-                        <li class="flex items-center"><i class="fa-solid fa-check text-blue-400 mr-3"></i> Bimbingan Setup Meta Developer (1-to-1)</li>
-                        <li class="flex items-center"><i class="fa-solid fa-check text-blue-400 mr-3"></i> Bantuan Kemaskini Prompt Tanpa Limit</li>
+                    <a class="btn btn--ghost" href="#form-section">Pilih pakej Standard</a>
+                </article>
+                <article class="panel plan--pick">
+                    <span class="pill">Paling disyorkan</span>
+                    <h3>Multi-jenama / siaran khas</h3>
+                    <p class="price">RM 1,800</p>
+                    <p class="muted">sekali pasang, kemudian RM 1,000 sebulan termasuk sokongan</p>
+                    <ul class="checks">
+                        <li>Semua ciri Standard</li>
+                        <li>Modul siaran pemasaran</li>
+                        <li>Google Sheet berganda</li>
+                        <li>Bimbingan setup Meta, satu ke satu</li>
+                        <li>Kemaskini arahan tanpa had</li>
                     </ul>
-                </div>
-                <a href="#form-section" class="mt-8 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl text-center transition shadow-lg shadow-blue-600/30">Pilih Pakej Ultimate</a>
+                    <a class="btn" href="#form-section">Pilih pakej Ultimate</a>
+                </article>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- BAHAGIAN 5: BORANG TEMPAHAN & PEMBAYARAN 2-LANGKAH -->
-    <section id="form-section" class="py-12 px-6 max-w-3xl mx-auto">
-        <div class="bg-slate-900 rounded-2xl border border-slate-800 p-8 shadow-2xl">
-            
-            <!-- STEP 1: MAKLUMAT PERNIAGAAN -->
-            <div id="step-1-container">
-                <div class="border-b border-slate-800 pb-6 mb-6">
-                    <span class="text-xs font-bold uppercase tracking-wider text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">Langkah 1 daripada 2</span>
-                    <h2 class="text-2xl font-bold text-white mt-3"><i class="fa-solid fa-file-pen text-blue-400 mr-2"></i>Borang Tempahan Pemasangan AI</h2>
-                    <p class="text-slate-400 text-sm mt-1">Sila isi maklumat perniagaan anda terlebih dahulu.</p>
-                </div>
-
-                <form id="onboarding-form-step1" onsubmit="goToStep2(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Nama Penuh Klien / Pemilik</label>
-                        <input type="text" id="nama_klien" placeholder="Contoh: Encik Ahmad" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 text-sm focus:border-blue-500 focus:outline-none">
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-300 mb-1">Nombor WhatsApp Diri (Notifikasi)</label>
-                            <input type="tel" id="phone_klien" placeholder="60123456789" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 text-sm focus:border-blue-500 focus:outline-none">
+        <section id="form-section">
+            <div class="section-title">
+                <h2>Tempah pemasangan</h2>
+                <p>Dua langkah. Maklumat jenama, kemudian resit bayaran.</p>
+            </div>
+            <div class="panel" style="max-width:720px; margin:0 auto;">
+                <div id="step-1-container">
+                    <span class="pill">Langkah 1 daripada 2</span>
+                    <h2>Borang tempahan</h2>
+                    <form class="form" id="onboarding-form-step1" onsubmit="goToStep2(event)">
+                        <label>Nama penuh
+                            <input type="text" id="nama_klien" placeholder="Contoh: Encik Ahmad" required>
+                        </label>
+                        <div class="pair">
+                            <label>WhatsApp diri
+                                <input type="tel" id="phone_klien" placeholder="60123456789" required>
+                            </label>
+                            <label>Nama jenama
+                                <input type="text" id="nama_jenama" placeholder="Syarikat ABC" required>
+                            </label>
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-300 mb-1">Nama Syarikat / Jenama Produk</label>
-                            <input type="text" id="nama_jenama" placeholder="Contoh: Syarikat ABC Sdn Bhd" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 text-sm focus:border-blue-500 focus:outline-none">
+                        <label>Laman jualan
+                            <input type="url" id="website_url" placeholder="https://www.website-anda.com" required>
+                        </label>
+                        <label>Nombor baharu untuk bot
+                            <input type="tel" id="phone_bot" placeholder="60198765432" required>
+                        </label>
+                        <label>Pakej
+                            <select id="pilihan_pakej">
+                                <option value="Standard DFY (RM 1,200 Setup)">DFY Standard (RM 1,200)</option>
+                                <option value="Ultimate DFY (RM 1,800 Setup)">DFY Ultimate (RM 1,800)</option>
+                            </select>
+                        </label>
+                        <label>Nota
+                            <textarea id="nota_khas" rows="2" placeholder="Kehendak khas, jika ada"></textarea>
+                        </label>
+                        <button class="btn" type="submit">Teruskan ke pembayaran</button>
+                    </form>
+                </div>
+
+                <div id="step-2-container" style="display:none;">
+                    <span class="pill">Langkah 2 daripada 2</span>
+                    <h2>Bayaran dan resit</h2>
+                    <p class="muted">Buat pindahan, kemudian muat naik gambar resit.</p>
+                    <div class="bank">
+                        <h3>Akaun rasmi pemasangan</h3>
+                        <p class="muted">Butiran akaun dihantar oleh BeShare. Nombor contoh pada enjin tidak dipaparkan di laman ini.</p>
+                    </div>
+                    <form class="form" id="onboarding-form-final" onsubmit="submitFinalOnboarding(event)">
+                        <label>Gambar resit (JPG/PNG)
+                            <input type="file" id="resit_file" accept="image/*" required>
+                        </label>
+                        <div class="actions">
+                            <button class="btn btn--ghost" type="button" onclick="backToStep1()">Kembali</button>
+                            <button class="btn" type="submit" id="btn-submit-final">Hantar resit</button>
                         </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Pautan Website / Landing Page Jualan Utama</label>
-                        <input type="url" id="website_url" placeholder="https://www.website-anda.com/salespage" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 text-sm focus:border-blue-500 focus:outline-none">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Nombor Telefon Baharu (Khas Untuk WhatsApp AI Bot)</label>
-                        <input type="tel" id="phone_bot" placeholder="60198765432" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 text-sm focus:border-blue-500 focus:outline-none">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Pilihan Pakej Pemasangan</label>
-                        <select id="pilihan_pakej" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 text-sm focus:border-blue-500 focus:outline-none">
-                            <option value="Standard DFY (RM 1,200 Setup)">Pakej DFY Standard (RM 1,200 Setup)</option>
-                            <option value="Ultimate DFY (RM 1,800 Setup)">Pakej DFY Ultimate + Blaster (RM 1,800 Setup)</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Nota Tambahan / Kehendak Khas (Jika Ada)</label>
-                        <textarea id="nota_khas" rows="2" placeholder="Sila nyatakan jika ada skrip khas..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 text-sm focus:border-blue-500 focus:outline-none"></textarea>
-                    </div>
-
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-blue-600/30 flex items-center justify-center">
-                        Teruskan Ke Pembayaran <i class="fa-solid fa-arrow-right ml-2"></i>
-                    </button>
-                </form>
-            </div>
-
-            <!-- STEP 2: MAKLUMAT PEMBAYARAN & MUAT NAIK RESIT -->
-            <div id="step-2-container" style="display: none;">
-                <div class="border-b border-slate-800 pb-6 mb-6">
-                    <span class="text-xs font-bold uppercase tracking-wider text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">Langkah 2 daripada 2</span>
-                    <h2 class="text-2xl font-bold text-white mt-3"><i class="fa-solid fa-building-columns text-blue-400 mr-2"></i>Pembayaran & Muat Naik Resit</h2>
-                    <p class="text-slate-400 text-sm mt-1">Sila buat pemindahan bank dan muat naik resit rasmi anda.</p>
+                    </form>
                 </div>
 
-                <!-- MAKLUMAT AKAUN BANK PERNIAGAAN -->
-                <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 mb-6 text-sm">
-                    <h3 class="font-bold text-blue-400 mb-3 text-base"><i class="fa-solid fa-wallet mr-2"></i>Akaun Bank Rasmi Pemasangan:</h3>
-                    <div class="space-y-2 text-slate-300">
-                        <p>Butiran akaun rasmi dihantar oleh BeShare. Nombor contoh pada enjin tidak dipaparkan di laman ini.</p>
-                    </div>
+                <div id="success-container" style="display:none; text-align:center;">
+                    <h2>Tempahan dan resit sudah dihantar</h2>
+                    <p class="muted">Pegawai BeShare menerima notifikasi. Pemasangan akan dimulakan.</p>
+                    <button class="btn btn--ghost" type="button" onclick="location.reload()">Kembali ke laman</button>
                 </div>
-
-                <form id="onboarding-form-final" onsubmit="submitFinalOnboarding(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 mb-1">Muat Naik Gambar Resit Pembayaran (JPG/PNG)</label>
-                        <input type="file" id="resit_file" accept="image/*" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 text-sm focus:border-blue-500 focus:outline-none">
-                    </div>
-
-                    <div class="flex gap-3 pt-2">
-                        <button type="button" onclick="backToStep1()" class="w-1/3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-4 rounded-xl transition">
-                            Kembali
-                        </button>
-                        <button type="submit" id="btn-submit-final" class="w-2/3 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-blue-600/30 flex items-center justify-center">
-                            <i class="fa-solid fa-paper-plane mr-2"></i> Hantar Resit & Sahkan
-                        </button>
-                    </div>
-                </form>
             </div>
+        </section>
+    </main>
 
-            <!-- SUCCESS SCREEN -->
-            <div id="success-container" style="display: none;" class="text-center py-8">
-                <div class="w-16 h-16 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
-                    <i class="fa-solid fa-circle-check"></i>
-                </div>
-                <h2 class="text-2xl font-bold text-white mb-2">Tempahan & Resit Berjaya Dihantar!</h2>
-                <p class="text-slate-300 text-sm max-w-md mx-auto mb-6">Notifikasi tempahan serta resit anda telah dihantar secara automatik ke sistem WhatsApp pegawai kami. Pemasangan pelayan anda akan dimulakan dengan serta-merta.</p>
-                <button onclick="location.reload()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-6 py-3 rounded-xl transition text-sm">
-                    Kembali Ke Laman Utama
-                </button>
-            </div>
-
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="border-t border-slate-900 py-8 text-center text-xs text-slate-500">
-        <p>© 2026 BeShare Ai Solution. All rights reserved. Meta Cloud API Partner Solution.</p>
+    <footer class="footer">
+        <p>&copy; <span id="year"></span> BeShare AI Solution. WhatsApp AI.</p>
     </footer>
 
-    <!-- WIDGET LIVE CHAT LANDING PAGE -->
-    <div id="web-chat-widget" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
-        <button id="chat-toggle-btn" onclick="toggleWebChat()" style="background: #2563eb; color: white; border: none; border-radius: 50px; padding: 12px 20px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.4); cursor: pointer; display: flex; items-center; gap: 8px;">
-            <i class="fa-solid fa-comments"></i> Tanya AI Kami
-        </button>
-
-        <div id="chat-box" style="display: none; width: 350px; height: 480px; background: #090d16; color: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); border: 1px solid #1e293b; flex-direction: column; overflow: hidden; position: absolute; bottom: 60px; right: 0;">
-            <div style="background: #0f172a; padding: 14px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; border-b: 1px solid #1e293b;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 10px; height: 10px; background: #3b82f6; border-radius: 50%;"></div>
-                    <span style="font-size: 14px;">🤖 BeShare AI Consultant</span>
-                </div>
-                <span onclick="toggleWebChat()" style="cursor: pointer; font-size: 16px; color: #94a3b8;">✖</span>
+    <div class="chat-launcher" id="web-chat-widget">
+        <div class="chat-box" id="chat-box">
+            <header>
+                <strong>BeShare AI</strong>
+                <button class="btn btn--ghost" type="button" onclick="toggleWebChat()">Tutup</button>
+            </header>
+            <div id="chat-messages">
+                <div class="bubble">Hai. Ada soalan tentang sistem WhatsApp AI BeShare?</div>
             </div>
-            
-            <div id="chat-messages" style="flex: 1; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.5;">
-                <div style="background: #1e293b; padding: 10px 14px; border-radius: 12px; max-width: 85%; align-self: flex-start; border: 1px solid #334155;">
-                    Hai! Ada apa-apa soalan mengenai sistem WhatsApp AI BeShare yang boleh saya bantu? 😊
-                </div>
-            </div>
-
-            <div style="padding: 12px; background: #020617; border-t: 1px solid #1e293b; display: flex; gap: 8px;">
-                <input type="text" id="chat-input" placeholder="Taip mesej anda..." onkeypress="handleKeyPress(event)" style="flex: 1; background: #0f172a; border: 1px solid #334155; color: white; padding: 10px 14px; border-radius: 8px; outline: none; font-size: 13px;">
-                <button onclick="sendWebMessage()" style="background: #2563eb; color: white; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px;">Hantar</button>
-            </div>
+            <form onsubmit="event.preventDefault(); sendWebMessage();">
+                <input type="text" id="chat-input" placeholder="Taip mesej" onkeypress="handleKeyPress(event)">
+                <button class="btn" type="submit">Hantar</button>
+            </form>
         </div>
+        <button class="btn" id="chat-toggle-btn" type="button" onclick="toggleWebChat()">Tanya AI</button>
     </div>
 
-    <!-- SCRIPT BORANG 2-LANGKAH & LIVE CHAT -->
     <script>
+    document.getElementById("year").textContent = String(new Date().getFullYear());
     let tempFormData = {};
 
     function goToStep2(e) {
@@ -405,7 +269,6 @@
             pilihan_pakej: document.getElementById('pilihan_pakej').value,
             nota_khas: document.getElementById('nota_khas').value || "Tiada"
         };
-
         document.getElementById('step-1-container').style.display = 'none';
         document.getElementById('step-2-container').style.display = 'block';
     }
@@ -422,36 +285,27 @@
             alert('Sila pilih gambar resit pembayarannya terlebih dahulu.');
             return;
         }
-
         const btn = document.getElementById('btn-submit-final');
         btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Sedang Menghantar Resit...';
-
+        btn.textContent = 'Sedang menghantar resit...';
         const formData = new FormData();
-        for (const key in tempFormData) {
-            formData.append(key, tempFormData[key]);
-        }
+        for (const key in tempFormData) formData.append(key, tempFormData[key]);
         formData.append('resit_file', resitFileInput.files[0]);
-
         try {
-            const res = await fetch('/api/submit-onboarding', {
-                method: 'POST',
-                body: formData
-            });
+            const res = await fetch('/api/submit-onboarding', { method: 'POST', body: formData });
             const data = await res.json();
-
             if (data.status === 'success') {
                 document.getElementById('step-2-container').style.display = 'none';
                 document.getElementById('success-container').style.display = 'block';
             } else {
                 alert('Gagal: ' + data.message);
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Hantar Resit & Sahkan';
+                btn.textContent = 'Hantar resit';
             }
         } catch (err) {
             alert('Laman ini belum boleh terima resit. Hantar gambar resit kepada BeShare di WhatsApp 60177308661.');
             btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Hantar Resit & Sahkan';
+            btn.textContent = 'Hantar resit';
         }
     }
 
@@ -470,17 +324,13 @@
         const input = document.getElementById("chat-input");
         const msg = input.value.trim();
         if (!msg) return;
-
         const messagesContainer = document.getElementById("chat-messages");
-        
-        messagesContainer.innerHTML += `<div style="background: #2563eb; color: white; padding: 10px 14px; border-radius: 12px; max-width: 85%; align-self: flex-end;">${msg}</div>`;
+        messagesContainer.innerHTML += `<div class="bubble bubble--me"></div>`;
+        messagesContainer.lastElementChild.textContent = msg;
         input.value = "";
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
         const loadingId = "loading_" + Date.now();
-        messagesContainer.innerHTML += `<div id="${loadingId}" style="background: #1e293b; padding: 10px 14px; border-radius: 12px; max-width: 85%; align-self: flex-start; border: 1px solid #334155;"><i>AI sedang menaip...</i></div>`;
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
+        messagesContainer.innerHTML += `<div class="bubble" id="${loadingId}">AI sedang menaip...</div>`;
         try {
             const response = await fetch('/api/web-chat', {
                 method: 'POST',
@@ -488,16 +338,14 @@
                 body: JSON.stringify({ session_id: sessionId, message: msg })
             });
             const data = await response.json();
-            
             document.getElementById(loadingId).remove();
-            messagesContainer.innerHTML += `<div style="background: #1e293b; padding: 10px 14px; border-radius: 12px; max-width: 85%; align-self: flex-start; border: 1px solid #334155;">${data.reply}</div>`;
+            messagesContainer.innerHTML += `<div class="bubble"></div>`;
+            messagesContainer.lastElementChild.textContent = data.reply || '';
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         } catch (err) {
-            document.getElementById(loadingId).remove();
-            messagesContainer.innerHTML += `<div style="background: #7f1d1d; color: #fca5a5; padding: 10px 14px; border-radius: 12px; max-width: 85%; align-self: flex-start;">Maaf, gagal berhubung dengan AI.</div>`;
+            document.getElementById(loadingId).textContent = 'Maaf, gagal berhubung dengan AI.';
         }
     }
     </script>
-
 </body>
 </html>
