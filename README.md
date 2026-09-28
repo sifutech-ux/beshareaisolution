@@ -4,10 +4,10 @@ Tapak gerbang (portal) statik untuk penyelesaian AI BeShare.
 
 ## Gerbang
 
-- **WhatsApp AI** — kad portal membuka landing tempahan sedia ada di `whatsapp/`.
+- **WhatsApp AI** — ditutup kepada pelawat _(akan datang)_
 - **IPO** — meja kerja (radar, HATA, portfolio, analisis) — https://beshare-ipo-bot.onrender.com
   Telegram kekal sebagai loceng: amaran harga, notis BELI, dan digest.
-- **AI Video Studio** — penciptaan video berkuasa AI _(akan datang)_
+- **AI Video Studio** — https://ai-video-saas-ten.vercel.app
 
 ## Struktur
 
