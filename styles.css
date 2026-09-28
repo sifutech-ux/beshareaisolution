@@ -140,6 +140,10 @@ body {
   --gate-color: var(--video);
 }
 
+.gate--video::before {
+  background: linear-gradient(135deg, #7c9cff, #b28bff);
+}
+
 .gate:hover,
 .gate:focus-visible {
   transform: translateY(-4px);
