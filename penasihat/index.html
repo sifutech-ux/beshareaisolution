@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ms">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Penasihat Perniagaan BeShare. Bantu susun perniagaan dan gerak kerja minggu ini dalam Bahasa Malaysia."
+    />
+    <title>Penasihat Perniagaan — BeShare AI Solution</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="stylesheet" href="../styles.css?v=20260929" />
+    <link rel="stylesheet" href="penasihat.css?v=20260929" />
+  </head>
+  <body>
+    <div class="bg-glow" aria-hidden="true"></div>
+
+    <header class="nasihat-atas">
+      <a class="brand" href="../">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="34" height="34">
+            <defs>
+              <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#7c9cff" />
+                <stop offset="1" stop-color="#b28bff" />
+              </linearGradient>
+            </defs>
+            <rect width="32" height="32" rx="8" fill="#131734" />
+            <path d="M8 9h16l-8 15z" fill="url(#g)" />
+          </svg>
+        </span>
+        <span class="brand__name">BeShare<span class="brand__accent"> AI Solution</span></span>
+      </a>
+    </header>
+
+    <main class="nasihat">
+      <p class="nasihat__kembali"><a href="../">Gerbang</a></p>
+      <h1>Penasihat Perniagaan</h1>
+      <p class="nasihat__ayat">Bantu susun perniagaan dan gerak kerja minggu ini.</p>
+
+      <form id="borang" class="borang">
+        <label>
+          Nama perniagaan atau produk
+          <input id="nama" name="nama" maxlength="80" required autocomplete="organization" />
+        </label>
+        <label>
+          Apa yang dijual, dan kepada siapa
+          <textarea id="jualan" name="jualan" maxlength="240" required rows="3"></textarea>
+        </label>
+        <fieldset>
+          <legend>Peringkat</legend>
+          <div class="pilihan">
+            <label><input type="radio" name="peringkat" value="mula" required /> Baru nak mula</label>
+            <label><input type="radio" name="peringkat" value="jual" /> Sudah jual</label>
+            <label><input type="radio" name="peringkat" value="kembang" /> Nak kembangkan</label>
+          </div>
+        </fieldset>
+        <p id="ralat-borang" class="ralat" hidden></p>
+        <button type="submit">Mula perbualan</button>
+      </form>
+
+      <section id="sembang" class="sembang" hidden>
+        <div class="ringkas">
+          <p id="ringkas"></p>
+          <button type="button" id="tukar">Tukar butiran</button>
+        </div>
+        <div id="log" class="log" aria-live="polite"></div>
+        <form id="mesej" class="mesej">
+          <label class="sr" for="tulis">Mesej kepada penasihat</label>
+          <textarea id="tulis" maxlength="600" rows="2" placeholder="Tulis soalan atau perkara yang nak disusun"></textarea>
+          <button type="submit" id="hantar">Hantar</button>
+        </form>
+        <p id="status" class="status" role="status"></p>
+      </section>
+
+      <p class="nota">
+        Penasihat ini bantu fikir perniagaan. Cukai, undang-undang, dan SSM perlu dirujuk kepada orang yang berkelayakan.
+      </p>
+    </main>
+
+    <script src="penasihat.js?v=20260929" defer></script>
+  </body>
+</html>

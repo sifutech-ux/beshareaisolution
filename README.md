@@ -4,6 +4,7 @@ Tapak gerbang (portal) statik untuk penyelesaian AI BeShare.
 
 ## Gerbang
 
+- **Penasihat Perniagaan** — halaman sendiri di `penasihat/` (bukan dalam AI Video atau WhatsApp)
 - **WhatsApp AI** — ditutup kepada pelawat _(akan datang)_
 - **IPO** — meja kerja (radar, HATA, portfolio, analisis) — https://beshare-ipo-bot.onrender.com
   Telegram kekal sebagai loceng: amaran harga, notis BELI, dan digest.
@@ -12,6 +13,7 @@ Tapak gerbang (portal) statik untuk penyelesaian AI BeShare.
 ## Struktur
 
 - `index.html` — halaman utama (akar repo)
+- `penasihat/` — Penasihat Perniagaan, halaman sendiri
 - `styles.css` — gaya tapak
 - `main.js` — skrip ringkas (tahun footer, kawalan pautan)
 - `favicon.svg` — ikon tapak
