@@ -10,7 +10,7 @@
     <title>Penasihat Perniagaan — BeShare AI Solution</title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <link rel="stylesheet" href="../styles.css?v=20260929" />
-    <link rel="stylesheet" href="penasihat.css?v=20260929" />
+    <link rel="stylesheet" href="penasihat.css?v=20260929s" />
   </head>
   <body>
     <div class="bg-glow" aria-hidden="true"></div>
@@ -36,7 +36,7 @@
     <main class="nasihat">
       <p class="nasihat__kembali"><a href="../">Gerbang</a></p>
       <h1>Penasihat Perniagaan</h1>
-      <p class="nasihat__ayat">Bantu susun perniagaan dan gerak kerja minggu ini.</p>
+      <p class="nasihat__ayat">Bantu susun perniagaan dan gerak kerja minggu ini. Boleh tulis, atau tekan Cakap.</p>
 
       <form id="borang" class="borang">
         <label>
@@ -68,7 +68,10 @@
         <form id="mesej" class="mesej">
           <label class="sr" for="tulis">Mesej kepada penasihat</label>
           <textarea id="tulis" maxlength="600" rows="2" placeholder="Tulis soalan atau perkara yang nak disusun"></textarea>
-          <button type="submit" id="hantar">Hantar</button>
+          <div class="mesej-aksi">
+            <button type="button" id="cakap">Cakap</button>
+            <button type="submit" id="hantar">Hantar</button>
+          </div>
         </form>
         <p id="status" class="status" role="status"></p>
       </section>
@@ -78,6 +81,6 @@
       </p>
     </main>
 
-    <script src="penasihat.js?v=20260929" defer></script>
+    <script src="penasihat.js?v=20260929s" defer></script>
   </body>
 </html>
