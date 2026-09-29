@@ -40,6 +40,11 @@
   line-height: 1.5;
 }
 
+.borang[hidden],
+.sembang[hidden] {
+  display: none;
+}
+
 .borang,
 .sembang {
   display: flex;
@@ -49,6 +54,11 @@
   border-radius: 18px;
   background: var(--card);
   border: 1px solid var(--card-border);
+}
+
+.sembang {
+  max-height: calc(100dvh - 230px);
+  overflow: hidden;
 }
 
 .borang label,
@@ -87,9 +97,15 @@
   gap: 0.45rem;
 }
 
+.pilihan input {
+  width: auto;
+  accent-color: var(--penasihat);
+}
+
 .pilihan label {
   flex-direction: row;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.55rem;
   min-height: 44px;
   padding: 0.35rem 0.7rem;
@@ -151,7 +167,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  max-height: min(52vh, 520px);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   padding-right: 0.15rem;
 }

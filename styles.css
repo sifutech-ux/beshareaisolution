@@ -230,6 +230,12 @@ body {
   font-size: 0.9rem;
 }
 
+@media (min-width: 860px) {
+  .gates {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
