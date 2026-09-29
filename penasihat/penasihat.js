@@ -1,6 +1,9 @@
-const API = ['localhost', '127.0.0.1'].includes(location.hostname)
-  ? 'http://127.0.0.1:3210/api/penasihat'
-  : 'https://ai-video-saas-ten.vercel.app/api/penasihat'
+const ASAL = ['localhost', '127.0.0.1'].includes(location.hostname)
+  ? 'http://127.0.0.1:3210'
+  : 'https://ai-video-saas-ten.vercel.app'
+const API = `${ASAL}/api/penasihat`
+const DENGAR_API = `${ASAL}/api/penasihat-dengar`
+const SUARA_API = `${ASAL}/api/penasihat-suara`
 
 const SIMPAN = 'beshare-penasihat'
 const PERINGKAT = {
@@ -17,9 +20,15 @@ const status = document.getElementById('status')
 const ralat = document.getElementById('ralat-borang')
 const tulis = document.getElementById('tulis')
 const hantar = document.getElementById('hantar')
+const cakap = document.getElementById('cakap')
+const pemain = new Audio()
 
 let keadaan = baca()
 let sibuk = false
+let media = null
+let rakaman = null
+let ketulan = []
+let masaRakam = 0
 
 function baca() {
   try {
@@ -33,6 +42,11 @@ function baca() {
 
 function simpan() {
   sessionStorage.setItem(SIMPAN, JSON.stringify(keadaan))
+}
+
+function sediaSuara() {
+  if (!pemain.src) pemain.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='
+  return pemain.play().then(() => pemain.pause()).catch(() => {})
 }
 
 function tunjukBorang(buka) {
@@ -73,9 +87,191 @@ function lukis() {
       }
       balon.append(senarai)
     }
+    if (item.dari === 'penasihat') {
+      const butang = document.createElement('button')
+      butang.type = 'button'
+      butang.className = 'dengar'
+      butang.textContent = 'Dengar'
+      butang.addEventListener('click', () => mainSuara(item, butang))
+      balon.append(butang)
+    }
     log.append(balon)
   }
   log.scrollTop = log.scrollHeight
+}
+
+function giliran() {
+  return keadaan.mesej.map((item) => ({
+    dari: item.dari,
+    teks: item.langkah?.length ? `${item.teks} Langkah minggu ini: ${item.langkah.join(' ')}` : item.teks,
+  }))
+}
+
+async function hantarTeks(teks, mainkan) {
+  if (!teks || sibuk || !keadaan) return
+  keadaan.mesej.push({ dari: 'klien', teks })
+  tulis.value = ''
+  sibuk = true
+  hantar.disabled = true
+  cakap.disabled = true
+  status.textContent = 'Penasihat sedang menulis…'
+  simpan()
+  lukis()
+  try {
+    const balas = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nama: keadaan.nama,
+        jualan: keadaan.jualan,
+        peringkat: keadaan.peringkat,
+        giliran: giliran(),
+      }),
+    })
+    const data = await balas.json()
+    if (!balas.ok || typeof data.jawapan !== 'string' || !Array.isArray(data.langkah) || data.langkah.length < 3) {
+      throw new Error(typeof data.error === 'string' ? data.error : 'gagal')
+    }
+    const jawapan = { dari: 'penasihat', teks: data.jawapan, langkah: data.langkah.slice(0, 3) }
+    keadaan.mesej.push(jawapan)
+    status.textContent = ''
+    simpan()
+    lukis()
+    if (mainkan) await mainSuara(jawapan)
+  } catch (error) {
+    const mesej = error instanceof Error && error.message && error.message !== 'gagal'
+      ? error.message
+      : 'Penasihat sedang sibuk. Tunggu sebentar, kemudian hantar sekali lagi.'
+    status.textContent = mesej
+    simpan()
+    lukis()
+  }
+  sibuk = false
+  hantar.disabled = false
+  cakap.disabled = false
+}
+
+async function mainSuara(item, butang) {
+  if (butang) butang.disabled = true
+  status.textContent = 'Menyediakan suara…'
+  try {
+    const balas = await fetch(SUARA_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jawapan: item.teks, langkah: item.langkah || [] }),
+    })
+    const data = await balas.json()
+    if (!balas.ok || typeof data.audio !== 'string') {
+      throw new Error(typeof data.error === 'string' ? data.error : 'gagal')
+    }
+    pemain.src = `data:${data.mime || 'audio/wav'};base64,${data.audio}`
+    await pemain.play()
+    status.textContent = ''
+  } catch (error) {
+    status.textContent = error instanceof Error && error.message && error.message !== 'gagal'
+      ? error.message
+      : 'Suara belum dapat didengar. Cuba sekali lagi, atau baca jawapan di skrin.'
+  }
+  if (butang) butang.disabled = false
+}
+
+function failCakap(mesej) {
+  status.textContent = mesej
+  cakap.textContent = 'Cakap'
+  cakap.classList.remove('rakam')
+  cakap.disabled = false
+  hantar.disabled = false
+}
+
+async function hantarRakaman(blob) {
+  sibuk = true
+  cakap.disabled = true
+  hantar.disabled = true
+  status.textContent = 'Menyusun apa yang awak cakap…'
+  try {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const bacaFail = new FileReader()
+      bacaFail.onload = () => resolve(String(bacaFail.result || ''))
+      bacaFail.onerror = () => reject(new Error('Rakaman tidak lengkap. Cuba cakap sekali lagi.'))
+      bacaFail.readAsDataURL(blob)
+    })
+    const padan = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+    if (!padan) throw new Error('Rakaman tidak lengkap. Cuba cakap sekali lagi.')
+    const balas = await fetch(DENGAR_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audio: padan[2], mime: padan[1] }),
+    })
+    const data = await balas.json()
+    if (!balas.ok || typeof data.teks !== 'string') {
+      throw new Error(typeof data.error === 'string' ? data.error : 'Suara tidak jelas. Cuba cakap sekali lagi, atau tulis mesej.')
+    }
+    sibuk = false
+    cakap.disabled = false
+    hantar.disabled = false
+    status.textContent = ''
+    await hantarTeks(data.teks, true)
+  } catch (error) {
+    sibuk = false
+    failCakap(error instanceof Error ? error.message : 'Suara tidak jelas. Cuba cakap sekali lagi, atau tulis mesej.')
+  }
+}
+
+async function togolCakap() {
+  if (sibuk) return
+  if (rakaman && rakaman.state === 'recording') {
+    rakaman.stop()
+    return
+  }
+  if (!navigator.mediaDevices || typeof MediaRecorder === 'undefined') {
+    failCakap('Pelayar ini belum boleh merakam. Tulis mesej dahulu.')
+    return
+  }
+  await sediaSuara()
+  try {
+    media = await navigator.mediaDevices.getUserMedia({ audio: true })
+  } catch {
+    failCakap('Mikrofon tidak dibenarkan. Tulis mesej, atau benarkan mikrofon.')
+    return
+  }
+  const jenis = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((item) => {
+    try {
+      return MediaRecorder.isTypeSupported(item)
+    } catch {
+      return false
+    }
+  })
+  try {
+    rakaman = jenis ? new MediaRecorder(media, { mimeType: jenis }) : new MediaRecorder(media)
+  } catch {
+    media.getTracks().forEach((track) => track.stop())
+    failCakap('Pelayar ini belum boleh merakam. Tulis mesej dahulu.')
+    return
+  }
+  ketulan = []
+  rakaman.ondataavailable = (event) => {
+    if (event.data && event.data.size) ketulan.push(event.data)
+  }
+  rakaman.onstop = () => {
+    clearTimeout(masaRakam)
+    if (media) media.getTracks().forEach((track) => track.stop())
+    cakap.textContent = 'Cakap'
+    cakap.classList.remove('rakam')
+    const blob = new Blob(ketulan, { type: rakaman.mimeType || jenis || 'audio/webm' })
+    if (blob.size < 800) {
+      failCakap('Suara tidak jelas. Cuba cakap sekali lagi, atau tulis mesej.')
+      return
+    }
+    hantarRakaman(blob)
+  }
+  rakaman.start()
+  cakap.textContent = 'Berhenti'
+  cakap.classList.add('rakam')
+  hantar.disabled = true
+  status.textContent = 'Cakap sekarang. Tekan Berhenti bila siap.'
+  masaRakam = setTimeout(() => {
+    if (rakaman && rakaman.state === 'recording') rakaman.stop()
+  }, 20000)
 }
 
 borang.addEventListener('submit', (event) => {
@@ -102,52 +298,12 @@ borang.addEventListener('submit', (event) => {
 })
 
 document.getElementById('tukar').addEventListener('click', () => tunjukBorang(true))
+cakap.addEventListener('click', () => { togolCakap() })
 
-document.getElementById('mesej').addEventListener('submit', async (event) => {
+document.getElementById('mesej').addEventListener('submit', (event) => {
   event.preventDefault()
   const teks = tulis.value.replace(/\s+/g, ' ').trim()
-  if (!teks || sibuk || !keadaan) return
-  keadaan.mesej.push({ dari: 'klien', teks })
-  tulis.value = ''
-  sibuk = true
-  hantar.disabled = true
-  status.textContent = 'Penasihat sedang menulis…'
-  simpan()
-  lukis()
-  try {
-    const balas = await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        nama: keadaan.nama,
-        jualan: keadaan.jualan,
-        peringkat: keadaan.peringkat,
-        giliran: keadaan.mesej.map((item) => ({
-          dari: item.dari,
-          teks: item.langkah?.length ? `${item.teks} Langkah minggu ini: ${item.langkah.join(' ')}` : item.teks,
-        })),
-      }),
-    })
-    const data = await balas.json()
-    if (!balas.ok || typeof data.jawapan !== 'string' || !Array.isArray(data.langkah) || data.langkah.length < 3) {
-      throw new Error(typeof data.error === 'string' ? data.error : 'gagal')
-    }
-    keadaan.mesej.push({
-      dari: 'penasihat',
-      teks: data.jawapan,
-      langkah: data.langkah.slice(0, 3),
-    })
-    status.textContent = ''
-  } catch (error) {
-    const mesej = error instanceof Error && error.message && error.message !== 'gagal'
-      ? error.message
-      : 'Penasihat sedang sibuk. Tunggu sebentar, kemudian hantar sekali lagi.'
-    status.textContent = mesej
-  }
-  sibuk = false
-  hantar.disabled = false
-  simpan()
-  lukis()
+  hantarTeks(teks, false)
 })
 
 lukis()
