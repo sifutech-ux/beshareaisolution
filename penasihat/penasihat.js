@@ -21,7 +21,6 @@ const ralat = document.getElementById('ralat-borang')
 const tulis = document.getElementById('tulis')
 const hantar = document.getElementById('hantar')
 const cakap = document.getElementById('cakap')
-const pemain = new Audio()
 
 let keadaan = baca()
 let sibuk = false
@@ -29,6 +28,11 @@ let media = null
 let rakaman = null
 let ketulan = []
 let masaRakam = 0
+let audioCtx = null
+let sumber = null
+
+const MIKROFON = 'Mikrofon tidak dibenarkan. Tekan Cakap sekali lagi dan pilih Benarkan.'
+const SUARA_GAGAL = 'Suara belum dapat didengar. Tekan Dengar sekali lagi, atau baca jawapan di skrin.'
 
 function baca() {
   try {
@@ -44,9 +48,20 @@ function simpan() {
   sessionStorage.setItem(SIMPAN, JSON.stringify(keadaan))
 }
 
-function sediaSuara() {
-  if (!pemain.src) pemain.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='
-  return pemain.play().then(() => pemain.pause()).catch(() => {})
+function bukaAudio() {
+  const Konteks = window.AudioContext || window.webkitAudioContext
+  if (!Konteks) return null
+  if (!audioCtx) audioCtx = new Konteks()
+  if (audioCtx.state === 'suspended') audioCtx.resume()
+  return audioCtx
+}
+
+function ayatPelayar(error, sandaran) {
+  const text = error instanceof Error ? error.message : ''
+  if (!text || text === 'gagal') return sandaran
+  if (/not allowed|permission|user agent|denied|NotAllowed|NotFound|NotReadable|request|failed to fetch|load failed|networkerror/i.test(text)) return sandaran
+  if (text.includes('{')) return sandaran
+  return text
 }
 
 function tunjukBorang(buka) {
@@ -92,7 +107,10 @@ function lukis() {
       butang.type = 'button'
       butang.className = 'dengar'
       butang.textContent = 'Dengar'
-      butang.addEventListener('click', () => mainSuara(item, butang))
+      butang.addEventListener('click', () => {
+        bukaAudio()
+        mainSuara(item, butang)
+      })
       balon.append(butang)
     }
     log.append(balon)
@@ -139,10 +157,7 @@ async function hantarTeks(teks, mainkan) {
     lukis()
     if (mainkan) await mainSuara(jawapan)
   } catch (error) {
-    const mesej = error instanceof Error && error.message && error.message !== 'gagal'
-      ? error.message
-      : 'Penasihat sedang sibuk. Tunggu sebentar, kemudian hantar sekali lagi.'
-    status.textContent = mesej
+    status.textContent = ayatPelayar(error, 'Penasihat sedang sibuk. Tunggu sebentar, kemudian hantar sekali lagi.')
     simpan()
     lukis()
   }
@@ -164,13 +179,24 @@ async function mainSuara(item, butang) {
     if (!balas.ok || typeof data.audio !== 'string') {
       throw new Error(typeof data.error === 'string' ? data.error : 'gagal')
     }
-    pemain.src = `data:${data.mime || 'audio/wav'};base64,${data.audio}`
-    await pemain.play()
+    const ctx = bukaAudio()
+    if (!ctx) throw new Error(SUARA_GAGAL)
+    if (ctx.state === 'suspended') await ctx.resume()
+    const bersih = data.audio.replace(/\s/g, '')
+    const binary = atob(bersih)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+    const buffer = await ctx.decodeAudioData(bytes.buffer.slice(0))
+    if (sumber) {
+      try { sumber.stop() } catch { /* rakaman lama sudah tamat */ }
+    }
+    sumber = ctx.createBufferSource()
+    sumber.buffer = buffer
+    sumber.connect(ctx.destination)
+    sumber.start()
     status.textContent = ''
   } catch (error) {
-    status.textContent = error instanceof Error && error.message && error.message !== 'gagal'
-      ? error.message
-      : 'Suara belum dapat didengar. Cuba sekali lagi, atau baca jawapan di skrin.'
+    status.textContent = ayatPelayar(error, SUARA_GAGAL)
   }
   if (butang) butang.disabled = false
 }
@@ -213,7 +239,7 @@ async function hantarRakaman(blob) {
     await hantarTeks(data.teks, true)
   } catch (error) {
     sibuk = false
-    failCakap(error instanceof Error ? error.message : 'Suara tidak jelas. Cuba cakap sekali lagi, atau tulis mesej.')
+    failCakap(ayatPelayar(error, 'Suara tidak jelas. Cuba cakap sekali lagi, atau tulis mesej.'))
   }
 }
 
@@ -223,15 +249,15 @@ async function togolCakap() {
     rakaman.stop()
     return
   }
+  bukaAudio()
   if (!navigator.mediaDevices || typeof MediaRecorder === 'undefined') {
     failCakap('Pelayar ini belum boleh merakam. Tulis mesej dahulu.')
     return
   }
-  await sediaSuara()
   try {
     media = await navigator.mediaDevices.getUserMedia({ audio: true })
   } catch {
-    failCakap('Mikrofon tidak dibenarkan. Tulis mesej, atau benarkan mikrofon.')
+    failCakap(MIKROFON)
     return
   }
   const jenis = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((item) => {
@@ -298,7 +324,10 @@ borang.addEventListener('submit', (event) => {
 })
 
 document.getElementById('tukar').addEventListener('click', () => tunjukBorang(true))
-cakap.addEventListener('click', () => { togolCakap() })
+cakap.addEventListener('click', () => {
+  bukaAudio()
+  togolCakap()
+})
 
 document.getElementById('mesej').addEventListener('submit', (event) => {
   event.preventDefault()
