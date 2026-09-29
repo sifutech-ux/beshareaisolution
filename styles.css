@@ -10,6 +10,7 @@
   --whatsapp: #25d366;
   --ipo: #7c9cff;
   --video: #b28bff;
+  --penasihat: #f0c36a;
 }
 
 * {
@@ -130,6 +131,9 @@ body {
   opacity: 0.9;
 }
 
+.gate--penasihat {
+  --gate-color: var(--penasihat);
+}
 .gate--whatsapp {
   --gate-color: var(--whatsapp);
 }
