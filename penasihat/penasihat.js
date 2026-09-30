@@ -4,6 +4,10 @@ const ASAL = ['localhost', '127.0.0.1'].includes(location.hostname)
 const API = `${ASAL}/api/penasihat`
 const DENGAR_API = `${ASAL}/api/penasihat-dengar`
 const SUARA_API = `${ASAL}/api/penasihat-suara`
+const AKAUN = ['localhost', '127.0.0.1'].includes(location.hostname)
+  ? 'http://127.0.0.1:8767'
+  : 'https://beshare-ipo-bot.onrender.com'
+const AKAUN_KUNCI = 'beshare-akaun'
 
 const SIMPAN = 'beshare-penasihat'
 const PERINGKAT = {
@@ -12,6 +16,7 @@ const PERINGKAT = {
   kembang: 'Nak kembangkan',
 }
 
+const pintu = document.getElementById('pintu')
 const borang = document.getElementById('borang')
 const sembang = document.getElementById('sembang')
 const log = document.getElementById('log')
@@ -22,7 +27,7 @@ const tulis = document.getElementById('tulis')
 const hantar = document.getElementById('hantar')
 const cakap = document.getElementById('cakap')
 
-let keadaan = baca()
+let keadaan = null
 let sibuk = false
 let media = null
 let rakaman = null
@@ -84,11 +89,96 @@ function baca() {
   return sesi
 }
 
-function simpan() {
+function sesiAkaun() {
+  try {
+    const data = JSON.parse(localStorage.getItem(AKAUN_KUNCI) || 'null')
+    if (!data || typeof data.token !== 'string' || typeof data.email !== 'string') return null
+    return data
+  } catch {
+    return null
+  }
+}
+
+function kepalaAkaun() {
+  const sesi = sesiAkaun()
+  return {
+    'Content-Type': 'application/json',
+    ...(sesi ? { Authorization: `Bearer ${sesi.token}` } : {}),
+  }
+}
+
+function tunjukPintu() {
+  pintu.hidden = false
+  borang.hidden = true
+  sembang.hidden = true
+}
+
+function keluarAkaun() {
+  localStorage.removeItem(AKAUN_KUNCI)
+  localStorage.removeItem(SIMPAN)
+  try { sessionStorage.removeItem(SIMPAN) } catch { /* salinan sesi kosong */ }
+  keadaan = null
+  location.href = '../akaun/'
+}
+
+async function simpanAkaun() {
+  if (!sesiAkaun() || !keadaan) return
+  const balas = await fetch(`${AKAUN}/api/akaun/penasihat`, {
+    method: 'POST',
+    headers: kepalaAkaun(),
+    body: JSON.stringify({ penasihat: keadaan }),
+  })
+  if (balas.status === 401) {
+    keluarAkaun()
+    return
+  }
+  if (!balas.ok) throw new Error('gagal')
+}
+
+async function simpan() {
   if (!keadaan) return
   keadaan.mesej = keadaan.mesej.slice(-40)
   const json = JSON.stringify(keadaan)
   if (!tulisStor(localStorage, json)) tulisStor(sessionStorage, json)
+  try {
+    await simpanAkaun()
+  } catch {
+    status.textContent = 'Perubahan belum disimpan ke akaun. Semak talian, kemudian cuba lagi.'
+  }
+}
+
+async function mula() {
+  if (!sesiAkaun()) {
+    tunjukPintu()
+    return
+  }
+  pintu.hidden = true
+  try {
+    const balas = await fetch(`${AKAUN}/api/akaun/saya`, { headers: kepalaAkaun() })
+    const data = await balas.json().catch(() => ({}))
+    if (balas.status === 401) {
+      localStorage.removeItem(AKAUN_KUNCI)
+      tunjukPintu()
+      return
+    }
+    if (!balas.ok) throw new Error(typeof data.error === 'string' ? data.error : 'gagal')
+    const jauh = rekodSah(data.penasihat)
+    if (jauh) {
+      keadaan = jauh
+      const json = JSON.stringify(keadaan)
+      if (!tulisStor(localStorage, json)) tulisStor(sessionStorage, json)
+    } else {
+      const telefon = baca()
+      if (telefon) {
+        keadaan = telefon
+        await simpanAkaun()
+      }
+    }
+  } catch {
+    keadaan = baca()
+    status.textContent = 'Akaun tidak dapat dihubungi. Salinan telefon ditunjukkan dahulu.'
+  }
+  lukis()
 }
 
 function bukaAudio() {
@@ -108,6 +198,7 @@ function ayatPelayar(error, sandaran) {
 }
 
 function tunjukBorang(buka) {
+  pintu.hidden = true
   borang.hidden = !buka
   sembang.hidden = buka
   if (buka && keadaan) {
@@ -124,7 +215,8 @@ function lukis() {
     return
   }
   tunjukBorang(false)
-  ringkas.textContent = `${keadaan.nama} · ${PERINGKAT[keadaan.peringkat] || ''}`
+  const emel = sesiAkaun()?.email
+  ringkas.textContent = `${keadaan.nama} · ${PERINGKAT[keadaan.peringkat] || ''}${emel ? ` · ${emel}` : ''}`
   log.replaceChildren()
   for (const item of keadaan.mesej) {
     const balon = document.createElement('article')
@@ -343,7 +435,7 @@ async function togolCakap() {
   }, 20000)
 }
 
-borang.addEventListener('submit', (event) => {
+borang.addEventListener('submit', async (event) => {
   event.preventDefault()
   const nama = document.getElementById('nama').value.replace(/\s+/g, ' ').trim()
   const jualan = document.getElementById('jualan').value.replace(/\s+/g, ' ').trim()
@@ -361,12 +453,13 @@ borang.addEventListener('submit', (event) => {
     peringkat,
     mesej: sama ? keadaan.mesej : [{ dari: 'penasihat', teks: `Baik. Saya catat ${nama}. Cerita apa yang awak nak susun untuk minggu ini.` }],
   }
-  simpan()
+  await simpan()
   lukis()
   tulis.focus()
 })
 
 document.getElementById('tukar').addEventListener('click', () => tunjukBorang(true))
+document.getElementById('keluar').addEventListener('click', () => keluarAkaun())
 cakap.addEventListener('click', () => {
   bukaAudio()
   togolCakap()
@@ -378,4 +471,4 @@ document.getElementById('mesej').addEventListener('submit', (event) => {
   hantarTeks(teks, false)
 })
 
-lukis()
+mula()
