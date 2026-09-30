@@ -143,13 +143,38 @@
 
 .ringkas {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
 }
 
 .ringkas > div {
+  flex: 1 1 100%;
   min-width: 0;
+}
+
+.ringkas p {
+  overflow-wrap: anywhere;
+}
+
+.ringkas-aksi {
+  display: flex;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+
+.pintu-masuk {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 1rem;
+  border-radius: 12px;
+  background: var(--penasihat);
+  color: #1a1406;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .ringkas p {

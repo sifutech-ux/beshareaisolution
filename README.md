@@ -4,7 +4,8 @@ Tapak gerbang (portal) statik untuk penyelesaian AI BeShare.
 
 ## Gerbang
 
-- **Penasihat Perniagaan** — halaman sendiri di `penasihat/` (bukan dalam AI Video atau WhatsApp)
+- **Akaun** — daftar dan masuk di `akaun/`. Satu akaun BeShare.
+- **Penasihat Perniagaan** — halaman sendiri di `penasihat/` (bukan dalam AI Video atau WhatsApp). Perlukan akaun. Perniagaan disimpan pada akaun itu.
 - **WhatsApp AI** — ditutup kepada pelawat _(akan datang)_
 - **IPO** — meja kerja (radar, HATA, portfolio, analisis) — https://beshare-ipo-bot.onrender.com
   Telegram kekal sebagai loceng: amaran harga, notis BELI, dan digest.

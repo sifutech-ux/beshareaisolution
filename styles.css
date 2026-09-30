@@ -56,7 +56,17 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  margin-bottom: 2.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.pintu-akaun {
+  margin: 0 0 2rem;
+}
+
+.pintu-akaun a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .brand__mark {

@@ -1,0 +1,108 @@
+.nasihat-atas {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 0;
+}
+
+.nasihat-atas .brand {
+  margin-bottom: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.akaun {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 2.5rem;
+}
+
+.akaun__kembali {
+  margin: 0 0 0.8rem;
+}
+
+.akaun__kembali a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.akaun h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 6vw, 2.4rem);
+}
+
+.akaun__ayat {
+  margin: 0.6rem 0 1.4rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.kad {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.1rem;
+  border-radius: 18px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+}
+
+.kad[hidden] {
+  display: none;
+}
+
+.mod {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.mod button,
+.kad button,
+.utama {
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mod button {
+  flex: 1;
+}
+
+.mod button.hidup,
+.kad button[type="submit"],
+.utama {
+  border: 0;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  color: #0f1220;
+}
+
+.kad label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.kad input {
+  width: 100%;
+  padding: 0.8rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: rgba(8, 10, 20, 0.45);
+  color: var(--text);
+  font: inherit;
+}
+
+.ralat {
+  margin: 0;
+  color: #ffb4c0;
+}

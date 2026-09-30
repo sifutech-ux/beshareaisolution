@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ms">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Daftar atau masuk akaun BeShare AI Solution." />
+    <title>Akaun — BeShare AI Solution</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="stylesheet" href="../styles.css?v=20260930" />
+    <link rel="stylesheet" href="akaun.css?v=20260930" />
+  </head>
+  <body>
+    <div class="bg-glow" aria-hidden="true"></div>
+    <header class="nasihat-atas">
+      <a class="brand" href="../">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="34" height="34">
+            <defs>
+              <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#7c9cff" />
+                <stop offset="1" stop-color="#b28bff" />
+              </linearGradient>
+            </defs>
+            <rect width="32" height="32" rx="8" fill="#131734" />
+            <path d="M8 9h16l-8 15z" fill="url(#g)" />
+          </svg>
+        </span>
+        <span class="brand__name">BeShare<span class="brand__accent"> AI Solution</span></span>
+      </a>
+    </header>
+    <main class="akaun">
+      <p class="akaun__kembali"><a href="../">Gerbang</a></p>
+      <h1>Akaun BeShare</h1>
+      <p class="akaun__ayat">Satu akaun untuk penasihat. Gerbang lain belum dikunci, dan bayaran belum dipasang.</p>
+
+      <section id="sudah" class="kad" hidden>
+        <p id="emel-semasa"></p>
+        <a class="utama" href="../penasihat/">Buka Penasihat</a>
+        <button type="button" id="keluar">Keluar</button>
+      </section>
+
+      <form id="borang" class="kad">
+        <div class="mod" role="tablist">
+          <button type="button" id="mod-masuk" class="hidup" role="tab">Masuk</button>
+          <button type="button" id="mod-daftar" role="tab">Daftar</button>
+        </div>
+        <label>
+          E-mel
+          <input id="email" name="email" type="email" autocomplete="username" required maxlength="120" />
+        </label>
+        <label>
+          Kata laluan
+          <input id="password" name="password" type="password" autocomplete="current-password" required minlength="8" maxlength="72" />
+        </label>
+        <p id="ralat" class="ralat" hidden></p>
+        <button type="submit" id="hantar">Masuk</button>
+      </form>
+    </main>
+    <script src="akaun.js?v=20260930" defer></script>
+  </body>
+</html>

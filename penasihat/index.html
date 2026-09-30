@@ -10,7 +10,7 @@
     <title>Penasihat Perniagaan — BeShare AI Solution</title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <link rel="stylesheet" href="../styles.css?v=20260929" />
-    <link rel="stylesheet" href="penasihat.css?v=20260930" />
+    <link rel="stylesheet" href="penasihat.css?v=20260930a" />
   </head>
   <body>
     <div class="bg-glow" aria-hidden="true"></div>
@@ -36,9 +36,14 @@
     <main class="nasihat">
       <p class="nasihat__kembali"><a href="../">Gerbang</a></p>
       <h1>Penasihat Perniagaan</h1>
-      <p class="nasihat__ayat">Bantu susun perniagaan dan gerak kerja minggu ini. Boleh tulis, atau tekan Cakap. Telefon yang sama masih ingat bila awak kembali.</p>
+      <p class="nasihat__ayat">Bantu susun perniagaan dan gerak kerja minggu ini. Boleh tulis, atau tekan Cakap. Akaun BeShare menyimpan perniagaan ini.</p>
 
-      <form id="borang" class="borang">
+      <section id="pintu" class="borang" hidden>
+        <p>Log masuk dengan akaun BeShare. Perniagaan dan langkah minggu ini disimpan pada akaun, bukan hanya pada telefon ini.</p>
+        <a class="pintu-masuk" href="../akaun/?selepas=penasihat">Masuk atau daftar</a>
+      </section>
+
+      <form id="borang" class="borang" hidden>
         <label>
           Nama perniagaan atau produk
           <input id="nama" name="nama" maxlength="80" required autocomplete="organization" />
@@ -63,9 +68,12 @@
         <div class="ringkas">
           <div>
             <p id="ringkas"></p>
-            <p class="ingat">Telefon ini ingat perniagaan dan langkah minggu ini.</p>
+            <p class="ingat">Akaun ini ingat perniagaan dan langkah minggu ini.</p>
           </div>
-          <button type="button" id="tukar">Tukar butiran</button>
+          <div class="ringkas-aksi">
+            <button type="button" id="tukar">Tukar butiran</button>
+            <button type="button" id="keluar">Keluar</button>
+          </div>
         </div>
         <div id="log" class="log" aria-live="polite"></div>
         <form id="mesej" class="mesej">
@@ -84,6 +92,6 @@
       </p>
     </main>
 
-    <script src="penasihat.js?v=20260930" defer></script>
+    <script src="penasihat.js?v=20260930a" defer></script>
   </body>
 </html>
