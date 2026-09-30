@@ -34,18 +34,61 @@ let sumber = null
 const MIKROFON = 'Mikrofon tidak dibenarkan. Tekan Cakap sekali lagi dan pilih Benarkan.'
 const SUARA_GAGAL = 'Suara belum dapat didengar. Tekan Dengar sekali lagi, atau baca jawapan di skrin.'
 
-function baca() {
+function mesejSah(item) {
+  if (!item || (item.dari !== 'klien' && item.dari !== 'penasihat')) return null
+  if (typeof item.teks !== 'string') return null
+  const teks = item.teks.replace(/\s+/g, ' ').trim()
+  if (!teks) return null
+  const bersih = { dari: item.dari, teks }
+  if (Array.isArray(item.langkah)) {
+    const langkah = item.langkah.filter((baris) => typeof baris === 'string' && baris.trim()).slice(0, 3)
+    if (langkah.length === 3) bersih.langkah = langkah
+  }
+  return bersih
+}
+
+function rekodSah(data) {
+  if (!data || typeof data.nama !== 'string' || typeof data.jualan !== 'string') return null
+  if (!PERINGKAT[data.peringkat] || !Array.isArray(data.mesej)) return null
+  const nama = data.nama.replace(/\s+/g, ' ').trim()
+  const jualan = data.jualan.replace(/\s+/g, ' ').trim()
+  if (nama.length < 2 || jualan.length < 8) return null
+  const mesej = data.mesej.map(mesejSah).filter(Boolean).slice(-40)
+  if (!mesej.length) return null
+  return { nama, jualan, peringkat: data.peringkat, mesej }
+}
+
+function bacaStor(stor) {
   try {
-    const data = JSON.parse(sessionStorage.getItem(SIMPAN) || 'null')
-    if (!data || typeof data.nama !== 'string' || !Array.isArray(data.mesej)) return null
-    return data
+    return rekodSah(JSON.parse(stor.getItem(SIMPAN) || 'null'))
   } catch {
     return null
   }
 }
 
+function tulisStor(stor, json) {
+  try {
+    stor.setItem(SIMPAN, json)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function baca() {
+  const kekal = bacaStor(localStorage)
+  if (kekal) return kekal
+  const sesi = bacaStor(sessionStorage)
+  if (!sesi) return null
+  tulisStor(localStorage, JSON.stringify(sesi))
+  return sesi
+}
+
 function simpan() {
-  sessionStorage.setItem(SIMPAN, JSON.stringify(keadaan))
+  if (!keadaan) return
+  keadaan.mesej = keadaan.mesej.slice(-40)
+  const json = JSON.stringify(keadaan)
+  if (!tulisStor(localStorage, json)) tulisStor(sessionStorage, json)
 }
 
 function bukaAudio() {
