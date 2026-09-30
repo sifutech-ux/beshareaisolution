@@ -1,0 +1,158 @@
+.atas {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 0;
+}
+
+.atas .brand {
+  margin-bottom: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.meja {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 2.5rem;
+}
+
+.kembali {
+  margin: 0 0 0.8rem;
+}
+
+.kembali a,
+.lain a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.meja h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 6vw, 2.4rem);
+}
+
+.ayat,
+.lain {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.ayat {
+  margin: 0.6rem 0 1.2rem;
+}
+
+.amaran,
+.kad {
+  padding: 1.1rem;
+  border-radius: 18px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+}
+
+.amaran {
+  margin-bottom: 1rem;
+  border-color: color-mix(in srgb, var(--penasihat) 45%, transparent);
+}
+
+.amaran p,
+.kad p {
+  margin: 0.35rem 0 0;
+  line-height: 1.45;
+}
+
+.kad {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.kad h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.kad label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.kad input,
+.kad textarea {
+  width: 100%;
+  padding: 0.8rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: rgba(8, 10, 20, 0.45);
+  color: var(--text);
+  font: inherit;
+}
+
+.baris {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.baris input {
+  flex: 1;
+}
+
+.kad button {
+  min-height: 48px;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  color: #0f1220;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.senarai {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.senarai li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.senarai label {
+  flex: 1;
+  font-weight: 600;
+}
+
+.kad button.buang {
+  min-height: 40px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--card-border);
+}
+
+#pratonton {
+  width: min(100%, 240px);
+  border-radius: 12px;
+}
+
+.ralat {
+  margin: 0;
+  color: #ffb4c0;
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

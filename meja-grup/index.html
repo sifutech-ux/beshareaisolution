@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ms">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="BeShare Meja Grup. Sediakan satu iklan untuk grup WhatsApp yang nombor anda sudah sertai. Meja ini tidak menghantar mesej."
+    />
+    <title>Meja Grup — BeShare AI Solution</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="stylesheet" href="../styles.css?v=20260930b" />
+    <link rel="stylesheet" href="meja-grup.css?v=20260930" />
+  </head>
+  <body>
+    <div class="bg-glow" aria-hidden="true"></div>
+    <header class="atas">
+      <a class="brand" href="../">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="34" height="34">
+            <defs>
+              <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#7c9cff" />
+                <stop offset="1" stop-color="#b28bff" />
+              </linearGradient>
+            </defs>
+            <rect width="32" height="32" rx="8" fill="#131734" />
+            <path d="M8 9h16l-8 15z" fill="url(#g)" />
+          </svg>
+        </span>
+        <span class="brand__name">BeShare<span class="brand__accent"> AI Solution</span></span>
+      </a>
+    </header>
+    <main class="meja">
+      <p class="kembali"><a href="../">Gerbang</a></p>
+      <h1>Meja Grup</h1>
+      <p class="ayat">Projek sampingan. Sediakan satu iklan untuk grup yang nombor anda sudah sertai.</p>
+
+      <section class="amaran" role="note">
+        <p>Meta boleh sekat nombor yang terlalu kerap menampal iklan dalam grup.</p>
+        <p>Meja ini tidak menyambung ke WhatsApp dan tidak menghantar mesej. Tiada grup baharu, dan pautan jemputan tidak diterima.</p>
+      </section>
+
+      <section class="kad">
+        <h2>Grup yang sudah disertai</h2>
+        <form id="tambah-grup" class="baris">
+          <label class="sr" for="nama-grup">Nama grup</label>
+          <input id="nama-grup" maxlength="80" placeholder="Nama grup, contoh Komuniti Taman" />
+          <button type="submit">Tambah</button>
+        </form>
+        <p id="ralat-grup" class="ralat" hidden></p>
+        <ul id="senarai" class="senarai"></ul>
+      </section>
+
+      <section class="kad">
+        <h2>Satu iklan</h2>
+        <label>
+          Teks iklan
+          <textarea id="teks" maxlength="700" rows="5" placeholder="Tulis satu mesej untuk grup yang ditanda"></textarea>
+        </label>
+        <label>
+          Gambar
+          <input id="gambar" type="file" accept="image/jpeg,image/png,image/webp" />
+        </label>
+        <img id="pratonton" alt="" hidden />
+        <p id="ralat-iklan" class="ralat" hidden></p>
+        <button type="button" id="simpan">Simpan draf</button>
+      </section>
+
+      <section class="kad" id="ringkas" hidden>
+        <h2>Draf tersimpan</h2>
+        <p id="ringkas-teks"></p>
+        <p id="ringkas-grup"></p>
+      </section>
+
+      <p class="lain">
+        WhatsApp AI rasmi ialah produk lain, bukan syarat untuk guna meja ini.
+        <a href="../whatsapp/">Lihat WhatsApp AI</a>
+      </p>
+    </main>
+    <script src="meja-grup.js?v=20260930" defer></script>
+  </body>
+</html>
