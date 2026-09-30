@@ -10,7 +10,7 @@
     <title>Penasihat Perniagaan — BeShare AI Solution</title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <link rel="stylesheet" href="../styles.css?v=20260929" />
-    <link rel="stylesheet" href="penasihat.css?v=20260929s" />
+    <link rel="stylesheet" href="penasihat.css?v=20260930" />
   </head>
   <body>
     <div class="bg-glow" aria-hidden="true"></div>
@@ -36,7 +36,7 @@
     <main class="nasihat">
       <p class="nasihat__kembali"><a href="../">Gerbang</a></p>
       <h1>Penasihat Perniagaan</h1>
-      <p class="nasihat__ayat">Bantu susun perniagaan dan gerak kerja minggu ini. Boleh tulis, atau tekan Cakap.</p>
+      <p class="nasihat__ayat">Bantu susun perniagaan dan gerak kerja minggu ini. Boleh tulis, atau tekan Cakap. Telefon yang sama masih ingat bila awak kembali.</p>
 
       <form id="borang" class="borang">
         <label>
@@ -61,7 +61,10 @@
 
       <section id="sembang" class="sembang" hidden>
         <div class="ringkas">
-          <p id="ringkas"></p>
+          <div>
+            <p id="ringkas"></p>
+            <p class="ingat">Telefon ini ingat perniagaan dan langkah minggu ini.</p>
+          </div>
           <button type="button" id="tukar">Tukar butiran</button>
         </div>
         <div id="log" class="log" aria-live="polite"></div>
@@ -81,6 +84,6 @@
       </p>
     </main>
 
-    <script src="penasihat.js?v=20260929m" defer></script>
+    <script src="penasihat.js?v=20260930" defer></script>
   </body>
 </html>
