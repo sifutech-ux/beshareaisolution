@@ -28,7 +28,7 @@
             <span class="brand__name">BeShare<span class="brand__accent"> AI Solution</span></span>
         </a>
         <div class="topbar__links">
-            <a href="masuk.html">Masuk dashboard</a>
+            <a href="https://beshare-whatsapp.onrender.com/masuk">Masuk dashboard</a>
             <a class="btn" href="#form-section">Dapatkan sistem</a>
         </div>
     </div>
@@ -292,7 +292,7 @@
         for (const key in tempFormData) formData.append(key, tempFormData[key]);
         formData.append('resit_file', resitFileInput.files[0]);
         try {
-            const res = await fetch('/api/submit-onboarding', { method: 'POST', body: formData });
+            const res = await fetch('https://beshare-whatsapp.onrender.com/api/submit-onboarding', { method: 'POST', body: formData });
             const data = await res.json();
             if (data.status === 'success') {
                 document.getElementById('step-2-container').style.display = 'none';
