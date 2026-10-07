@@ -231,6 +231,28 @@ body {
   border-color: transparent;
 }
 
+.dasar {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 1.5rem 2rem;
+  text-align: left;
+  line-height: 1.6;
+}
+
+.dasar h2 {
+  margin: 1.6rem 0 0.4rem;
+  font-size: 1.15rem;
+}
+
+.dasar p,
+.dasar li {
+  color: var(--muted);
+}
+
+.dasar a {
+  color: var(--accent);
+}
+
 /* Footer */
 .footer {
   margin-top: auto;
@@ -238,6 +260,10 @@ body {
   text-align: center;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.footer a {
+  color: var(--accent);
 }
 
 @media (min-width: 860px) {
