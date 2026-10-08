@@ -28,6 +28,7 @@
             <span class="brand__name">BeShare<span class="brand__accent"> AI Solution</span></span>
         </a>
         <div class="topbar__links">
+            <a href="../whatsapp-api/">Whatsapp BeShare API</a>
             <a href="masuk.html">Masuk dashboard</a>
             <a class="btn" href="#form-section">Dapatkan sistem</a>
         </div>
@@ -256,6 +257,12 @@
 
     <script>
     document.getElementById("year").textContent = String(new Date().getFullYear());
+    if (new URLSearchParams(location.search).get("produk") === "api") {
+        const nota = document.getElementById("nota_khas");
+        if (nota && !nota.value) nota.value = "Whatsapp BeShare API";
+        const ringkas = document.querySelector("#form-section .section-title p");
+        if (ringkas) ringkas.textContent = "Tempahan Whatsapp BeShare API. Dua langkah. Maklumat jenama, kemudian resit bayaran.";
+    }
     let tempFormData = {};
 
     function goToStep2(e) {
