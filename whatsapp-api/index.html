@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+      name="description"
+      content="Whatsapp BeShare API. Satu kunci untuk AI membalas lead, dengan papan Baru, Sedang ikut, dan Sudah tutup."
+    >
+    <title>Whatsapp BeShare API — BeShare AI Solution</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="../whatsapp/landing.css">
+    <link rel="stylesheet" href="api.css">
+</head>
+<body>
+    <div class="bg-glow" aria-hidden="true"></div>
+
+    <div class="topbar">
+        <a class="brand" href="../" style="margin:0; text-decoration:none; color:inherit;">
+            <span class="brand__mark" aria-hidden="true">
+                <svg viewBox="0 0 32 32" width="34" height="34">
+                    <defs>
+                        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" stop-color="#7c9cff"></stop>
+                            <stop offset="1" stop-color="#b28bff"></stop>
+                        </linearGradient>
+                    </defs>
+                    <rect width="32" height="32" rx="8" fill="#131734"></rect>
+                    <path d="M8 9h16l-8 15z" fill="url(#g)"></path>
+                </svg>
+            </span>
+            <span class="brand__name">BeShare<span class="brand__accent"> AI Solution</span></span>
+        </a>
+        <div class="topbar__links">
+            <a href="../whatsapp/">WhatsApp AI</a>
+            <a class="btn" href="../whatsapp/?produk=api#form-section">Tempah</a>
+        </div>
+    </div>
+
+    <header class="hero">
+        <p class="pill">Satu kunci</p>
+        <h1 class="hero__title">Whatsapp BeShare API</h1>
+        <p class="hero__subtitle">
+            Kedai memegang satu kunci API BeShare. AI membalas chat lead ikut produk
+            dan harga kedai. Papan menunjukkan siapa yang baru, siapa sedang ikut,
+            dan siapa sudah tutup.
+        </p>
+        <div class="actions" style="justify-content:center; margin-top:1.5rem;">
+            <a class="btn" href="../whatsapp/?produk=api#form-section">Tempah pemasangan</a>
+            <a class="btn btn--ghost" href="#papan">Lihat papan lead</a>
+        </div>
+    </header>
+
+    <main class="page">
+        <section>
+            <div class="ciri">
+                <article class="panel">
+                    <h2>Satu kunci</h2>
+                    <p class="muted">Kedai, atau sistem kedai, panggil API dengan kunci BeShare. Sambungan WhatsApp dipegang oleh BeShare.</p>
+                </article>
+                <article class="panel">
+                    <h2>Balas lead</h2>
+                    <p class="muted">AI jawab guna nama kedai, ucapan, dan senarai produk serta harga yang kedai isi.</p>
+                </article>
+                <article class="panel">
+                    <h2>Ambil alih</h2>
+                    <p class="muted">Bila manusia membalas, AI berhenti untuk sembang itu. Pulangkan kepada AI bila mahu.</p>
+                </article>
+            </div>
+        </section>
+
+        <section id="papan">
+            <div class="section-title">
+                <h2>Papan lead</h2>
+                <p>Contoh susunan. Lead baharu masuk di Baru. Ambil alih menandanya Sedang ikut.</p>
+            </div>
+            <div class="lajur-api">
+                <section class="panel">
+                    <h3>Baru <span class="kira">1</span></h3>
+                    <article class="kad-lead">
+                        <strong>Aminah</strong>
+                        <p>berapa harga minyak mawar?</p>
+                    </article>
+                </section>
+                <section class="panel">
+                    <h3>Sedang ikut <span class="kira">1</span></h3>
+                    <article class="kad-lead">
+                        <strong>Farid</strong>
+                        <p>boleh hantar esok?</p>
+                    </article>
+                </section>
+                <section class="panel">
+                    <h3>Sudah tutup <span class="kira">1</span></h3>
+                    <article class="kad-lead">
+                        <strong>Lina</strong>
+                        <p>saya nak tempah dua botol</p>
+                    </article>
+                </section>
+            </div>
+        </section>
+
+        <section id="pakej-harga">
+            <div class="section-title">
+                <h2>Pakej pemasangan</h2>
+                <p>Harga yang sama. BeShare siapkan sambungan dan serahkan kunci kepada kedai.</p>
+            </div>
+            <div class="plans">
+                <article class="panel">
+                    <span class="pill">Standard</span>
+                    <h3>Satu jenama</h3>
+                    <p class="price">RM 1,200</p>
+                    <p class="muted">sekali pasang, kemudian RM 800 sebulan</p>
+                    <ul class="checks">
+                        <li>Satu kunci API BeShare</li>
+                        <li>AI jawab ikut produk dan harga</li>
+                        <li>Papan lead: Baru, Sedang ikut, Sudah tutup</li>
+                        <li>Ambil alih dan pulangkan kepada AI</li>
+                    </ul>
+                    <a class="btn btn--ghost" href="../whatsapp/?produk=api#form-section">Pilih pakej Standard</a>
+                </article>
+                <article class="panel plan--pick">
+                    <span class="pill">Ultimate</span>
+                    <h3>Dengan bimbingan</h3>
+                    <p class="price">RM 1,800</p>
+                    <p class="muted">sekali pasang, kemudian RM 1,000 sebulan</p>
+                    <ul class="checks">
+                        <li>Semua ciri Standard</li>
+                        <li>Bimbingan pemasangan, satu ke satu</li>
+                        <li>Kemaskini arahan kedai</li>
+                    </ul>
+                    <a class="btn" href="../whatsapp/?produk=api#form-section">Pilih pakej Ultimate</a>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; <span id="year"></span> BeShare AI Solution. Whatsapp BeShare API. <a href="../privasi/">Dasar privasi</a></p>
+    </footer>
+    <script>
+        document.getElementById("year").textContent = String(new Date().getFullYear());
+    </script>
+</body>
+</html>
