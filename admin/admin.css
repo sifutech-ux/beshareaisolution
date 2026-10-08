@@ -1,0 +1,77 @@
+.peranan-kini {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.kepala-admin {
+  text-align: left;
+  margin: 1.5rem 0 1rem;
+}
+
+.kepala-admin h1,
+.kepala-admin h2 {
+  margin: 0;
+}
+
+.login h1 {
+  margin: 0.6rem 0 0.2rem;
+  font-size: 1.7rem;
+}
+
+.login .panel {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.meja-dua {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.kunci-sekali {
+  margin-bottom: 1.25rem;
+}
+
+.kunci-sekali textarea {
+  width: 100%;
+  margin: 0.8rem 0;
+  font: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid color-mix(in srgb, var(--whatsapp) 55%, transparent);
+  border-radius: 14px;
+  padding: 0.8rem 0.9rem;
+  resize: vertical;
+}
+
+.senarai {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.baris-pelanggan {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.ok {
+  color: #b7f7cf;
+}
+
+.ralat {
+  color: #ffb4c8;
+}
+
+.papan-kedai {
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 800px) {
+  .meja-dua {
+    grid-template-columns: 1fr;
+  }
+}
