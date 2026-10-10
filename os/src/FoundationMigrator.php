@@ -12,6 +12,8 @@ final class FoundationMigrator
     private PDO $pdo;
     private string $upPath;
     private string $checksum;
+    private string $exportReal = '';
+    private string $exportChecksum = '';
 
     public function __construct(private string $repoRoot)
     {
@@ -20,8 +22,8 @@ final class FoundationMigrator
 
     public function apply(string $exportPath, string $exportChecksum): int
     {
-        $export = ExportGuard::realExport($exportPath, $this->repoRoot);
-        ExportGuard::checksum($export, $exportChecksum);
+        $this->exportReal = ExportGuard::realExport($exportPath, $this->repoRoot);
+        $this->exportChecksum = ExportGuard::checksum($this->exportReal, $exportChecksum);
         if (!is_file($this->upPath)) {
             fwrite(STDERR, "migration_file_missing\n");
             return 4;
@@ -65,6 +67,7 @@ final class FoundationMigrator
         }
 
         $statements = SqlScript::statements((string) file_get_contents($this->upPath));
+        ExportGuard::checksum($this->exportReal, $this->exportChecksum);
         if ($this->hashMigration() !== $this->checksum || $this->inspect() !== 'empty') {
             fwrite(STDERR, "preflight_changed\n");
             return 4;
@@ -79,20 +82,11 @@ final class FoundationMigrator
             }
         }
 
-        if ($this->hashMigration() !== $this->checksum) {
-            fwrite(STDERR, "ddl_complete_version_unrecorded\n");
-            return 7;
+        if ($this->inspect() !== 'complete_unrecorded') {
+            fwrite(STDERR, "ddl_incomplete\n");
+            return 6;
         }
-        $after = CatalogState::classify(
-            $this->names($this->rows('SELECT TABLE_NAME AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = \'BASE TABLE\'')),
-            $this->names($this->rows('SELECT TRIGGER_NAME AS name FROM information_schema.triggers WHERE trigger_schema = DATABASE()')),
-            $this->names($this->rows('SELECT ROUTINE_NAME AS name FROM information_schema.routines WHERE routine_schema = DATABASE()')),
-            $this->names($this->rows('SELECT EVENT_NAME AS name FROM information_schema.events WHERE event_schema = DATABASE()')),
-            $this->names($this->rows('SELECT TABLE_NAME AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = \'VIEW\'')),
-            [],
-            $this->checksum
-        );
-        if ($after !== 'complete_unrecorded') {
+        if ($this->hashMigration() !== $this->checksum) {
             fwrite(STDERR, "ddl_complete_version_unrecorded\n");
             return 7;
         }

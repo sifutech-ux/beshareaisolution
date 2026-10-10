@@ -11,6 +11,12 @@ final class Contract
     public const LOCK = 'beshare_os_foundation_0001';
     public const CONFIRM = '--confirm-foundation-0001';
 
+    /**
+     * GET_LOCK uses LOCK on the migration connection before inventory and DDL.
+     * complete_unrecorded means every foundation object exists and schema_migrations
+     * has no version row. The runner reports it and does not insert or drop.
+     */
+
     public const TABLES = [
         'schema_migrations',
         'users',

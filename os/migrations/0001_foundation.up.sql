@@ -8,12 +8,29 @@
 --
 -- Dua trigger tambahan berbanding senarai tiga nama yang awal:
 -- bi_businesses_active_owner menolak sisipan terus sebagai active.
--- bd_business_users_owner menolak pemadaman pemilik semasa status active.
+-- bd_business_users_owner menolak pemadaman pemilik semasa status active
+-- atau suspended.
 -- Trigger tidak mengemas kini jadual lain, supaya MariaDB tidak menolaknya
 -- dengan ralat 1442 semasa semakan foreign key.
--- Invarian pemilik dikuatkuasakan pada sempadan status active dan suspended.
--- Urutan aplikasi: sisip provisioning, sisip keahlian owner, tetapkan
--- owner_user_id, kemudian kemas kini status kepada active.
+--
+-- Mesin status perniagaan:
+--   Sisipan hanya provisioning.
+--   provisioning -> active atau suspended dibenarkan jika owner_user_id
+--   tidak berubah dalam pernyataan yang sama dan tepat satu keahlian owner
+--   sepadan.
+--   active <-> suspended dibenarkan. owner_user_id tidak berubah.
+--   active atau suspended -> provisioning dibenarkan. owner_user_id tidak
+--   berubah. Ini membuka tetingkap pemindahan pemilikan, bukan menukar pemilik.
+--   owner_user_id hanya berubah apabila status kekal provisioning.
+--   Peranan owner pada business_users hanya berubah semasa provisioning.
+--   Kemas kini business_users menyemak status perniagaan lama dan baharu.
+--   Memindahkan baris owner keluar dari active atau suspended ditolak,
+--   walaupun destinasi masih provisioning.
+--   Perubahan pemilik dan pertukaran status dalam satu pernyataan ditolak.
+--
+-- Pemindahan pemilikan: tukar ke provisioning, ubah keahlian, tetapkan
+-- owner_user_id semasa masih provisioning, kemudian kembali ke active
+-- atau suspended.
 
 CREATE TABLE schema_migrations (
   version VARCHAR(16) NOT NULL,
@@ -85,7 +102,7 @@ FOR EACH ROW
 BEGIN
   DECLARE biz_status VARCHAR(16);
   SELECT status INTO biz_status FROM businesses WHERE id = NEW.business_id;
-  IF biz_status = 'active' AND NEW.role = 'owner' THEN
+  IF biz_status IN ('active', 'suspended') AND NEW.role = 'owner' THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'owner_change_requires_provisioning';
   END IF;
 END;
@@ -94,9 +111,12 @@ CREATE TRIGGER bu_business_users_owner
 BEFORE UPDATE ON business_users
 FOR EACH ROW
 BEGIN
-  DECLARE biz_status VARCHAR(16);
-  SELECT status INTO biz_status FROM businesses WHERE id = NEW.business_id;
-  IF biz_status = 'active' AND (OLD.role = 'owner' OR NEW.role = 'owner') THEN
+  DECLARE old_status VARCHAR(16);
+  DECLARE new_status VARCHAR(16);
+  SELECT status INTO old_status FROM businesses WHERE id = OLD.business_id;
+  SELECT status INTO new_status FROM businesses WHERE id = NEW.business_id;
+  IF (old_status IN ('active', 'suspended') OR new_status IN ('active', 'suspended'))
+    AND (OLD.role = 'owner' OR NEW.role = 'owner') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'owner_change_requires_provisioning';
   END IF;
 END;
@@ -107,7 +127,7 @@ FOR EACH ROW
 BEGIN
   DECLARE biz_status VARCHAR(16);
   SELECT status INTO biz_status FROM businesses WHERE id = OLD.business_id;
-  IF biz_status = 'active' AND OLD.role = 'owner' THEN
+  IF biz_status IN ('active', 'suspended') AND OLD.role = 'owner' THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'owner_delete_requires_provisioning';
   END IF;
 END;
@@ -118,9 +138,8 @@ FOR EACH ROW
 BEGIN
   DECLARE owner_count INT;
   DECLARE matched INT;
-  IF OLD.status <> 'provisioning'
-    AND NEW.status <> 'provisioning'
-    AND NOT (OLD.owner_user_id <=> NEW.owner_user_id) THEN
+  IF NOT (OLD.owner_user_id <=> NEW.owner_user_id)
+    AND NOT (OLD.status = 'provisioning' AND NEW.status = 'provisioning') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'owner_change_requires_provisioning';
   END IF;
   IF NEW.status IN ('active', 'suspended') THEN
@@ -271,6 +290,10 @@ CREATE TABLE onboarding_sessions (
   )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Retensi payload: cipher, nonce, tag dan versi kunci boleh ada semasa
+-- accepted, processing atau failed supaya percubaan semula boleh membaca payload.
+-- Status processed mewajibkan keempat-empatnya kosong dan payload_purged_at terisi.
+-- payload_hash kekal. Kandungan mesej tidak disimpan selepas processed.
 CREATE TABLE webhook_events (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   business_id BIGINT UNSIGNED NULL,
@@ -332,7 +355,14 @@ CREATE TABLE webhook_events (
     )
   ),
   CONSTRAINT chk_webhook_purged CHECK (
-    status <> 'processed' OR payload_ciphertext IS NULL
+    status <> 'processed'
+    OR (
+      payload_ciphertext IS NULL
+      AND payload_nonce IS NULL
+      AND payload_tag IS NULL
+      AND payload_key_version IS NULL
+      AND payload_purged_at IS NOT NULL
+    )
   )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

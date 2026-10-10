@@ -16,6 +16,7 @@ final class SqlScript
         $caseDepth = 0;
         $inSingle = false;
         $inDouble = false;
+        $inBacktick = false;
         $inLine = false;
         $inBlock = false;
         $i = 0;
@@ -42,7 +43,7 @@ final class SqlScript
                 $i++;
                 continue;
             }
-            if (!$inSingle && !$inDouble && self::startsComment($sql, $i)) {
+            if (!$inSingle && !$inDouble && !$inBacktick && self::startsComment($sql, $i)) {
                 if ($char === '#') {
                     $inLine = true;
                     $i++;
@@ -55,6 +56,22 @@ final class SqlScript
                 }
                 $inBlock = true;
                 $i += 2;
+                continue;
+            }
+            if ($char === '`' && !$inSingle && !$inDouble) {
+                if ($inBacktick && $next === '`') {
+                    $buffer .= '``';
+                    $i += 2;
+                    continue;
+                }
+                $inBacktick = !$inBacktick;
+                $buffer .= $char;
+                $i++;
+                continue;
+            }
+            if ($inBacktick) {
+                $buffer .= $char;
+                $i++;
                 continue;
             }
             if ($char === "'" && !$inDouble) {
@@ -91,6 +108,9 @@ final class SqlScript
             if (!$inSingle && !$inDouble && self::atWord($sql, $i)) {
                 $word = self::readWord($sql, $i);
                 $upper = strtoupper($word);
+                if ($upper === 'DELIMITER' || $upper === 'PROCEDURE' || $upper === 'FUNCTION') {
+                    throw new \InvalidArgumentException('sql_unsupported');
+                }
                 if ($upper === 'BEGIN') {
                     $beginDepth++;
                 } elseif ($upper === 'CASE') {
@@ -114,9 +134,20 @@ final class SqlScript
             $i++;
         }
 
-        $tail = trim($buffer);
-        if ($tail !== '') {
-            $statements[] = $tail;
+        if ($inSingle || $inDouble) {
+            throw new \InvalidArgumentException('sql_unterminated_string');
+        }
+        if ($inBacktick) {
+            throw new \InvalidArgumentException('sql_unterminated_identifier');
+        }
+        if ($inBlock) {
+            throw new \InvalidArgumentException('sql_unterminated_comment');
+        }
+        if ($beginDepth !== 0 || $caseDepth !== 0) {
+            throw new \InvalidArgumentException('sql_unbalanced');
+        }
+        if (trim($buffer) !== '') {
+            throw new \InvalidArgumentException('sql_unterminated_statement');
         }
         return $statements;
     }

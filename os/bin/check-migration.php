@@ -62,6 +62,69 @@ foreach ($downStatements as $statement) {
     }
 }
 
+$check('up sql has 13 statements', count($upStatements) === 13);
+$check('up sql has 8 tables and 5 triggers', count($createdTables) === 8 && count($createdTriggers) === 5);
+$triggersKeepSemicolons = true;
+foreach ($upStatements as $statement) {
+    if (SqlScript::objectName($statement, 'trigger') === null) {
+        continue;
+    }
+    if (!str_contains($statement, 'BEGIN') || !str_contains($statement, ';') || !preg_match('/\bEND$/', $statement)) {
+        $triggersKeepSemicolons = false;
+    }
+}
+$check('semicolons inside triggers stay in the statement', $triggersKeepSemicolons);
+$triggerFixture = <<<'SQL'
+CREATE TRIGGER sample_owner
+BEFORE UPDATE ON businesses
+FOR EACH ROW
+BEGIN
+  IF NEW.status = 'active' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'owner_change_requires_provisioning';
+  END IF;
+  IF NEW.status = 'suspended' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'owner_change_requires_provisioning';
+  END IF;
+END;
+SQL;
+$parsedFixture = SqlScript::statements($triggerFixture);
+$check(
+    'fixture trigger with internal semicolons is one statement',
+    count($parsedFixture) === 1
+        && substr_count($parsedFixture[0], ';') === 4
+        && substr_count($parsedFixture[0], 'END IF;') === 2
+);
+$stringFixture = <<<'SQL'
+CREATE TRIGGER sample_text
+BEFORE UPDATE ON businesses
+FOR EACH ROW
+BEGIN
+  IF NEW.status = 'active' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'keep;this';
+  END IF;
+END;
+SQL;
+$parsedString = SqlScript::statements($stringFixture);
+$check(
+    'semicolon inside a trigger string stays in one statement',
+    count($parsedString) === 1
+        && str_contains($parsedString[0], "'keep;this'")
+        && str_contains($parsedString[0], 'END IF;')
+);
+$expectParserError = static function (string $sql, string $message) use ($check): void {
+    try {
+        SqlScript::statements($sql);
+        $check($message, false);
+    } catch (InvalidArgumentException $exception) {
+        $check($message, $exception->getMessage() === $message);
+    }
+};
+$expectParserError("DELIMITER $$\n", 'sql_unsupported');
+$expectParserError("CREATE PROCEDURE p()\nBEGIN\n  SELECT 1;\nEND;\n", 'sql_unsupported');
+$expectParserError("CREATE FUNCTION f()\nRETURNS INT\nBEGIN\n  RETURN 1;\nEND;\n", 'sql_unsupported');
+$expectParserError("CREATE TABLE t (\n  id INT\n", 'sql_unterminated_statement');
+$expectParserError("CREATE TRIGGER t BEFORE INSERT ON businesses FOR EACH ROW\nBEGIN\n  SET @a = 1;\n", 'sql_unbalanced');
+$expectParserError("SELECT 'unterminated\n", 'sql_unterminated_string');
 $check('up statements are tables and triggers only', count($upStatements) === count($createdTables) + count($createdTriggers));
 $check('up tables match contract', $createdTables === Contract::TABLES);
 $check('up triggers match contract', $createdTriggers === Contract::TRIGGERS);
@@ -93,12 +156,44 @@ $applyEnd = strpos($php, 'private function run');
 $apply = substr($php, (int) $applyStart, (int) $applyEnd - (int) $applyStart);
 $check('runner locks before preflight', strpos($apply, 'acquireLock') < strpos($apply, 'run()'));
 $check('runner records the version after exec', strpos($php, '->exec($statement)') < strpos($php, 'INSERT INTO schema_migrations'));
+$runStart = strpos($php, 'private function run');
+$runEnd = strpos($php, 'private function recordVersion');
+$run = substr($php, (int) $runStart, (int) $runEnd - (int) $runStart);
+$check('export checksum is repeated before ddl', strpos($run, 'ExportGuard::checksum') < strpos($run, '->exec($statement)'));
+$check('complete catalog is inspected before version insert', str_contains($run, "inspect() !== 'complete_unrecorded'"));
+$check('processed payload must be purged', str_contains($up, 'payload_purged_at IS NOT NULL'));
+$membershipGuards = 0;
+$ownerMoveChecked = false;
+$ownerIdOnlyWhileProvisioning = false;
+foreach ($upStatements as $statement) {
+    $triggerName = SqlScript::objectName($statement, 'trigger');
+    if (in_array($triggerName, ['bi_business_users_owner', 'bu_business_users_owner', 'bd_business_users_owner'], true)
+        && str_contains($statement, "IN ('active', 'suspended')")) {
+        $membershipGuards++;
+    }
+    if ($triggerName === 'bu_business_users_owner'
+        && str_contains($statement, 'OLD.business_id')
+        && str_contains($statement, 'NEW.business_id')) {
+        $ownerMoveChecked = true;
+    }
+    if ($triggerName === 'bu_businesses_active_owner'
+        && str_contains($statement, "OLD.status = 'provisioning' AND NEW.status = 'provisioning'")) {
+        $ownerIdOnlyWhileProvisioning = true;
+    }
+}
+$check('active and suspended block owner membership changes', $membershipGuards === 3);
+$check('owner membership move checks both businesses', $ownerMoveChecked);
+$check('owner id changes only while provisioning', $ownerIdOnlyWhileProvisioning);
 $check('no embedded password assignment', preg_match('/DB_PASSWORD\s*=\s*[\'\"][^\'\"]+[\'\"]/', $php) !== 1);
 
 $baseMode = 'NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION';
 $check('strict mode is appended once', SqlMode::withStrict($baseMode) === $baseMode . ',STRICT_TRANS_TABLES');
 $check('strict mode is not duplicated', SqlMode::withStrict('STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION') === 'STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION');
 $check('strict token is exact', SqlMode::hasStrict('NOT_STRICT_TRANS_TABLES') === false);
+$check(
+    'spaced sql mode is normalized',
+    SqlMode::withStrict('NO_AUTO_CREATE_USER, NO_ENGINE_SUBSTITUTION') === 'NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES'
+);
 $check('session literal stays narrow', SqlMode::isSafeLiteral(SqlMode::withStrict($baseMode)));
 
 $fullTables = Contract::TABLES;

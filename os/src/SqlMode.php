@@ -12,14 +12,11 @@ final class SqlMode
 
     public static function withStrict(string $mode): string
     {
-        if (self::hasStrict($mode)) {
-            return $mode;
+        $tokens = self::tokens($mode);
+        if (!in_array('STRICT_TRANS_TABLES', $tokens, true)) {
+            $tokens[] = 'STRICT_TRANS_TABLES';
         }
-        $mode = trim($mode);
-        if ($mode === '') {
-            return 'STRICT_TRANS_TABLES';
-        }
-        return $mode . ',STRICT_TRANS_TABLES';
+        return implode(',', $tokens);
     }
 
     public static function isSafeLiteral(string $mode): bool
