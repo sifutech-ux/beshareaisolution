@@ -524,13 +524,14 @@ function automation(state) {
   }).join("") || `<tr><td colspan="5">Tiada peraturan.</td></tr>`;
   const editing = state.rules.find((item) => item.id === state.editingRule);
   const form = editing ? `<form id="rule">
-      <input type="hidden" name="id" value="${esc(editing.id)}">
+      <input type="hidden" name="ruleId" value="${esc(editing.id)}">
       <label class="field">Nama<input name="name" required value="${esc(editing.name)}"></label>
       <label class="field">Kata kunci<input name="keyword" value="${esc(editing.keyword)}"></label>
       <label class="field">Tindakan<select name="action">
         ${["sambutan", "balas_pengetahuan", "serahan", "luar_waktu", "hantar_luar_tetingkap", "picu_diri"].map((item) =>
           `<option value="${item}" ${editing.action === item ? "selected" : ""}>${esc(actionLabel(item))}</option>`).join("")}
       </select></label>
+      ${state.notice ? `<p class="error">${esc(state.notice)}</p>` : ""}
       <button class="btn" type="submit">Simpan peraturan</button>
     </form>` : "";
   return `<article class="panel">
@@ -890,7 +891,8 @@ function onSubmit(event) {
   if (!(form instanceof HTMLFormElement)) return;
   event.preventDefault();
   const data = new FormData(form);
-  if (form.id === "auth") {
+  const formId = form.getAttribute("id");
+  if (formId === "auth") {
     const kind = form.getAttribute("data-kind");
     const email = String(data.get("email") || "").trim();
     const password = String(data.get("password") || "");
@@ -934,7 +936,7 @@ function onSubmit(event) {
   }
   const state = load();
   if (!state) return;
-  if (form.id === "reply") {
+  if (formId === "reply") {
     const current = currentConversation(state);
     const text = String(data.get("text") || "").trim();
     if (!text || !current || current.mode !== "human_takeover" || current.window !== "open") return;
@@ -944,13 +946,13 @@ function onSubmit(event) {
     route();
     return;
   }
-  if (form.id === "play") {
+  if (formId === "play") {
     const result = answerFor(state, String(data.get("text") || ""));
     document.getElementById("answer").textContent = result.text;
     document.getElementById("source").textContent = "Sumber: " + result.source + (result.handover ? " Serahan manusia dicadangkan." : "");
     return;
   }
-  if (form.id === "know") {
+  if (formId === "know") {
     state.knowledge.push({
       id: "n" + Date.now(),
       section: String(data.get("section") || "FAQ"),
@@ -963,8 +965,8 @@ function onSubmit(event) {
     route();
     return;
   }
-  if (form.id === "rule") {
-    const item = state.rules.find((entry) => entry.id === String(data.get("id")));
+  if (formId === "rule") {
+    const item = state.rules.find((entry) => entry.id === String(data.get("ruleId")));
     const action = String(data.get("action") || "");
     if (action === "hantar_luar_tetingkap" || action === "picu_diri") {
       state.notice = action === "picu_diri"
@@ -985,7 +987,7 @@ function onSubmit(event) {
     route();
     return;
   }
-  if (form.id === "invite") {
+  if (formId === "invite") {
     const email = String(data.get("email") || "").trim();
     if (!email.includes("@")) return;
     state.team.push({ name: String(data.get("name") || "").trim(), email, role: String(data.get("role") || "staff") });
@@ -994,7 +996,7 @@ function onSubmit(event) {
     route();
     return;
   }
-  if (form.id === "settings") {
+  if (formId === "settings") {
     state.business.name = String(data.get("name") || "").trim();
     state.business.industry = String(data.get("industry") || "").trim();
     state.business.language = String(data.get("language") || "ms");
