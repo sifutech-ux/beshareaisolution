@@ -420,18 +420,164 @@
   font-size: 0.88rem;
 }
 
+.os-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+.os-kpi strong,
+.os-kpi span {
+  display: block;
+}
+
+.os-kpi span {
+  color: var(--muted);
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0;
+}
+
+.chips .is-on {
+  color: #fff;
+  background: #6d5efc;
+  border-color: transparent;
+}
+
+.os-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.os-table th,
+.os-table td {
+  text-align: left;
+  padding: 0.6rem 0.35rem;
+  border-bottom: 1px solid var(--card-border);
+  vertical-align: top;
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.steps button {
+  font: inherit;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+}
+
+.steps .is-on {
+  color: #fff;
+  background: #6d5efc;
+  border-color: transparent;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.modal .panel {
+  width: min(440px, 100%);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.nav-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.8rem;
+}
+
+.nav-tools select {
+  font: inherit;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 0.45rem 0.5rem;
+}
+
+html[data-theme="cerah"] body {
+  --bg: #f6f7fb;
+  --bg-2: #ffffff;
+  --text: #12141c;
+  --muted: #5c6478;
+  --card: #ffffff;
+  --card-border: rgba(18, 20, 28, 0.1);
+  background: #f6f7fb;
+  color: #12141c;
+}
+
+html[data-theme="cerah"] .demo-banner {
+  color: #6b4e00;
+  background: #fff6df;
+}
+
+html[data-theme="cerah"] .state,
+html[data-theme="cerah"] .msg,
+html[data-theme="cerah"] .field input,
+html[data-theme="cerah"] .field select,
+html[data-theme="cerah"] .field textarea,
+html[data-theme="cerah"] .nav-tools select {
+  background: #f3f5fb;
+}
+
 @media (max-width: 800px) {
   .split,
   .plans,
   .pair,
   .states,
   .shell,
-  .inbox {
+  .inbox,
+  .os-kpis {
     grid-template-columns: 1fr;
   }
 
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .nav {
+    display: flex;
+    gap: 0.35rem;
+    overflow-x: auto;
+  }
+
+  .nav a {
+    white-space: nowrap;
+  }
+
+  .inbox[data-pane="list"] .pane-talk,
+  .inbox[data-pane="list"] .pane-profile,
+  .inbox[data-pane="talk"] .pane-list,
+  .inbox[data-pane="talk"] .pane-profile,
+  .inbox[data-pane="profile"] .pane-list,
+  .inbox[data-pane="profile"] .pane-talk {
+    display: none;
   }
 }
