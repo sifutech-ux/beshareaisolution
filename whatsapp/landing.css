@@ -358,12 +358,74 @@
   gap: 1rem;
 }
 
+.nav {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  padding: 1rem 0.75rem 0.9rem;
+  overflow: hidden;
+}
+
+.nav::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--whatsapp);
+}
+
+.nav-brand strong,
+.nav-brand p {
+  margin: 0.15rem 0.7rem;
+}
+
+.nav-links {
+  display: flex;
+  flex-direction: column;
+}
+
 .nav a {
   display: block;
   color: var(--muted);
   text-decoration: none;
   padding: 0.55rem 0.7rem;
   border-radius: 10px;
+}
+
+.phone-bar {
+  display: none;
+}
+
+.thread-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+  cursor: pointer;
+}
+
+.thread-item small {
+  color: var(--muted);
+}
+
+.thread-item.is-on {
+  color: #fff;
+  border-color: transparent;
+  background: #6d5efc;
+}
+
+.thread-item.is-on small {
+  color: rgba(255, 255, 255, 0.86);
+  background: transparent;
 }
 
 .nav a.is-on,
@@ -537,6 +599,12 @@ html[data-theme="cerah"] .demo-banner {
   background: #fff6df;
 }
 
+html[data-theme="cerah"] .nav a.is-on,
+html[data-theme="cerah"] .nav a:hover {
+  color: #3c2eb8;
+  background: rgba(109, 94, 252, 0.12);
+}
+
 html[data-theme="cerah"] .state,
 html[data-theme="cerah"] .msg,
 html[data-theme="cerah"] .field input,
@@ -558,18 +626,106 @@ html[data-theme="cerah"] .nav-tools select {
   }
 
   .topbar {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+    padding: 0.85rem 1rem 0;
+  }
+
+  .topbar__links {
+    margin-left: auto;
+  }
+
+  .shell {
+    padding: 0.75rem 0.75rem 2rem;
   }
 
   .nav {
     display: flex;
-    gap: 0.35rem;
-    overflow-x: auto;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding: 0.75rem;
   }
 
-  .nav a {
+  .nav-brand {
+    display: none;
+  }
+
+  .nav-links {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 28px), transparent);
+  }
+
+  .nav-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-links a {
+    flex: 0 0 auto;
     white-space: nowrap;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .nav-tools {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0;
+    gap: 0.5rem;
+  }
+
+  .nav-tools label,
+  .nav-tools .btn {
+    white-space: nowrap;
+  }
+
+  .nav-tools label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    font-size: 0.82rem;
+  }
+
+  .nav-tools .btn {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .inbox-screen[data-screen="talk"] > h1,
+  .inbox-screen[data-screen="profile"] > h1,
+  .inbox-screen[data-screen="talk"] .inbox-find,
+  .inbox-screen[data-screen="profile"] .inbox-find {
+    display: none;
+  }
+
+  .demo-banner {
+    margin: 0 0 0.75rem;
+  }
+
+  .phone-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .phone-bar .btn {
+    min-height: 44px;
+    padding: 0.55rem 0.85rem;
+  }
+
+  .os-table {
+    display: block;
+    overflow-x: auto;
   }
 
   .inbox[data-pane="list"] .pane-talk,

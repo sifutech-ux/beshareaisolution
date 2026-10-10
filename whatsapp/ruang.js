@@ -353,10 +353,12 @@ function shell(state, hash, body) {
       <button class="btn btn--ghost" type="button" data-act="modal-close">Batal</button></p>
     </div></div>` : "";
   return `<div class="shell">
-    <aside class="panel nav">
-      <strong>BeShare AI OS</strong>
-      <p class="muted nav-meta">${esc(state.business.name)}</p>
-      ${links}
+    <aside class="nav">
+      <div class="nav-brand">
+        <strong>BeShare AI OS</strong>
+        <p class="muted">${esc(state.business.name)}</p>
+      </div>
+      <div class="nav-links">${links}</div>
       <div class="nav-tools">
         <label class="muted">Peranan demo
           <select data-act="role" aria-label="Peranan demo">
@@ -400,13 +402,15 @@ function inbox(state) {
   const list = visibleConversations(state);
   const current = list.find((item) => item.id === state.active) || null;
   const buttons = list.map((item) =>
-    `<button class="btn btn--ghost ${item.id === state.active ? "is-on" : ""}" type="button" data-act="open" data-value="${esc(item.id)}">${esc(item.name)} · ${esc(label(item.mode))}${item.unread ? " · belum dibaca" : ""}</button>`
+    `<button class="thread-item ${item.id === state.active ? "is-on" : ""}" type="button" data-act="open" data-value="${esc(item.id)}"><span>${esc(item.name)}</span><small>${esc(label(item.mode))}${item.unread ? " · belum dibaca" : ""}</small></button>`
   ).join("") || `<p class="muted">Tiada hasil.</p>`;
   const filters = [["semua", "Semua"], ["belum", "Belum dibaca"], ["saya", "Tugasan saya"], ["ai", "AI"], ["manusia", "Manusia"], ["selesai", "Selesai"]];
-  return `<article class="panel">
+  return `<article class="panel inbox-screen" data-screen="${esc(state.inboxPane || "list")}">
     <h1>Peti masuk</h1>
+    <div class="inbox-find">
     <label class="field">Cari<input name="q" value="${esc(state.inboxQuery || "")}" placeholder="Nama atau tag"></label>
     <div class="chips">${filters.map(([id, name]) => `<button class="btn btn--ghost ${state.inboxFilter === id ? "is-on" : ""}" type="button" data-act="filter" data-value="${id}">${name}</button>`).join("")}</div>
+    </div>
     <div class="inbox" data-pane="${esc(state.inboxPane || "list")}">
       <div class="pane-list thread" id="thread">${buttons}</div>
       <div class="pane-talk">${talk(state, current)}</div>
@@ -417,10 +421,11 @@ function inbox(state) {
 
 function talk(state, current) {
   if (!current) return `<p class="muted">Pilih perbualan.</p><p><button class="btn btn--ghost" type="button" data-act="pane" data-value="list">Senarai</button></p>`;
+  const who = { customer: "Pelanggan", ai: "AI", staff: "Staf" };
   const messages = current.messages.map((item) =>
-    `<div class="msg ${item.from === "staff" ? "msg--staff" : ""}"><strong>${esc(item.from)}</strong><p>${esc(item.text)}</p><small class="muted">${esc(item.wamid)} · ${esc(item.status || "")}</small></div>`
+    `<div class="msg ${item.from === "staff" ? "msg--staff" : ""}"><strong>${esc(who[item.from] || item.from)}</strong><p>${esc(item.text)}</p><small class="muted">${esc(item.wamid)} · ${esc(item.status || "")}</small></div>`
   ).join("");
-  const back = `<p class="actions"><button class="btn btn--ghost" type="button" data-act="pane" data-value="list">Senarai</button> <button class="btn btn--ghost" type="button" data-act="pane" data-value="profile">Profil</button></p>`;
+  const back = `<div class="phone-bar"><button class="btn btn--ghost" type="button" data-act="pane" data-value="list">Senarai</button><strong>${esc(current.name)}</strong><button class="btn btn--ghost" type="button" data-act="pane" data-value="profile">Profil</button></div>`;
   if (current.mode === "resolved") {
     return `${back}<p>Mod: <strong>${esc(label(current.mode))}</strong></p><div class="msgs">${messages}</div>
       <p class="muted">Perbualan ditutup. Pembukaan semula perlu pilih mod.</p>
@@ -1014,7 +1019,7 @@ function onInput(event) {
     state.inboxQuery = event.target.value;
     save(state);
     const list = visibleConversations(state).map((item) =>
-      `<button class="btn btn--ghost ${item.id === state.active ? "is-on" : ""}" type="button" data-act="open" data-value="${esc(item.id)}">${esc(item.name)} · ${esc(label(item.mode))}${item.unread ? " · belum dibaca" : ""}</button>`
+      `<button class="thread-item ${item.id === state.active ? "is-on" : ""}" type="button" data-act="open" data-value="${esc(item.id)}"><span>${esc(item.name)}</span><small>${esc(label(item.mode))}${item.unread ? " · belum dibaca" : ""}</small></button>`
     ).join("") || `<p class="muted">Tiada hasil.</p>`;
     const thread = document.getElementById("thread");
     if (thread) thread.innerHTML = list;
