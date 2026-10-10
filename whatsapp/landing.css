@@ -428,10 +428,16 @@
   background: transparent;
 }
 
-.nav a.is-on,
-.nav a:hover {
+.nav a.is-on {
   color: var(--text);
   background: rgba(255, 255, 255, 0.06);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .nav a:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.06);
+  }
 }
 
 .inbox {
@@ -599,10 +605,24 @@ html[data-theme="cerah"] .demo-banner {
   background: #fff6df;
 }
 
-html[data-theme="cerah"] .nav a.is-on,
-html[data-theme="cerah"] .nav a:hover {
+html[data-theme="cerah"] .nav a.is-on {
   color: #3c2eb8;
   background: rgba(109, 94, 252, 0.12);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html[data-theme="cerah"] .nav a:hover {
+    color: #3c2eb8;
+    background: rgba(109, 94, 252, 0.12);
+  }
+}
+
+@media (hover: none) {
+  .nav a:hover:not(.is-on),
+  html[data-theme="cerah"] .nav a:hover:not(.is-on) {
+    color: var(--muted);
+    background: transparent;
+  }
 }
 
 html[data-theme="cerah"] .state,
