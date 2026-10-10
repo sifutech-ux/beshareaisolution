@@ -40,11 +40,25 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 }
 
 $meja = baca_meja();
+$storPerbualan = baca_perbualan();
 $kilat = ambil_kilat();
 $csrf = token_csrf();
 $tokenAda = trim((string) ($meja['token_meta'] ?? '')) !== '';
 $laman = trim((string) ($meja['website_url'] ?? ''));
 $bankNama = trim((string) ($meja['bank_name'] ?? ''));
+$bilChat = 0;
+$bilSah = 0;
+foreach ($storPerbualan['perbualan'] as $mesej) {
+    if (!is_array($mesej) || $mesej === []) {
+        continue;
+    }
+    $bilChat++;
+    if (perbualan_sah($mesej)) {
+        $bilSah++;
+    }
+}
+$bilJeda = count(is_array($storPerbualan['jeda']) ? $storPerbualan['jeda'] : []);
+$bilPesanan = count(is_array($storPerbualan['pesanan']) ? $storPerbualan['pesanan'] : []);
 
 function simpan_qr_jika_ada(): string
 {
@@ -116,7 +130,25 @@ function simpan_qr_jika_ada(): string
       <?php endif; ?>
       <p class="muted">Phone number ID 1443799975474056. Webhook sudah pada beshareaisolution.com/webhook/.</p>
       <p class="muted">Laman latih: <?= $laman !== '' ? e($laman) : 'Belum' ?>. Bank: <?= $bankNama !== '' ? e($bankNama) : 'Belum' ?>.</p>
-      <p class="muted">App Meta masih Development. Chat dari telefon belum masuk sehingga app itu Live. Butang Test pada webhook Meta boleh sampai.</p>
+      <p class="muted">Chat yang masuk disimpan dalam Peti Masuk. Tekan Refresh Inbox selepas anda hantar mesej baharu.</p>
+    </section>
+
+    <section class="panel" style="margin-bottom:1.25rem;">
+      <h2>Peti Masuk Perbualan</h2>
+      <p class="muted"><?= (int) $bilChat ?> prospek sedang bersembang. <?= (int) $bilJeda ?> nombor diambil alih.</p>
+      <a class="btn" href="/whatsapp/meja/perbualan/">Buka Inbox Semua Prospek</a>
+    </section>
+
+    <section class="panel" style="margin-bottom:1.25rem;">
+      <h2>Peti Masuk Chat Pembeli</h2>
+      <p class="muted"><?= (int) $bilSah ?> chat yang sudah beri pesanan.</p>
+      <a class="btn" href="/whatsapp/meja/perbualan/?tapis=sah">Buka Inbox Pembeli Sah</a>
+    </section>
+
+    <section class="panel" style="margin-bottom:1.25rem;">
+      <h2>Pengurusan Pesanan</h2>
+      <p class="muted"><?= (int) $bilPesanan ?> pesanan disimpan.</p>
+      <a class="btn" href="/whatsapp/meja/pesanan/">Lihat Semua Pesanan</a>
     </section>
 
     <section class="panel" style="margin-bottom:1.25rem;">
