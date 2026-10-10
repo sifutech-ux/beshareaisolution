@@ -358,7 +358,7 @@ function sumber_jawapan(array $meja): string
             if ($baris === '' || strlen($baris) < 12) {
                 continue;
             }
-            if (preg_match('/^(anda|tugas|syarat|jangan|dilarang|peranan|pembantu jualan|balas pendek)\b/i', $baris)) {
+            if (preg_match('/^(anda|tugas|syarat|jangan|dilarang|peranan|pembantu jualan|balas pendek|maklumat laman)\b/i', $baris)) {
                 continue;
             }
             $berguna[] = $baris;
@@ -372,17 +372,23 @@ function bina_balasan(string $soalan, array $meja): string
     $soalan = trim($soalan);
     $bank = ayat_bank($meja);
     $nakBank = $bank !== '' && preg_match('/bank|bayar|transfer|akaun|qr|duitnow|resit/i', $soalan) === 1;
+    $sapaan = preg_match('/\A(hai|hi|hello|helo|assalamualaikum|assalam|salam|selamat)\b/iu', $soalan) === 1
+        && mb_strlen($soalan) <= 40;
+    if ($sapaan) {
+        $asas = 'Hai, terima kasih kerana menulis. Saya pembantu jualan WhatsApp. Anda mahu tanya harga, pakej, atau cara bayar?';
+        return $nakBank ? $asas . "\n\n" . $bank : $asas;
+    }
     $sumber = sumber_jawapan($meja);
     if ($sumber === '') {
         $asas = 'Hai, terima kasih kerana menulis kepada BeShare AI Solution. Saya pembantu WhatsApp rasmi. Apa soalan jualan yang boleh saya bantu?';
         return $nakBank ? $asas . "\n\n" . $bank : $asas;
     }
     $petikan = petik_berkaitan($sumber, $soalan);
-    $balas = 'Hai. ' . $petikan;
+    $balas = $petikan;
     if ($nakBank) {
         $balas .= "\n\n" . $bank;
     }
-    return meja_potong($balas, 900);
+    return meja_potong($balas, 700);
 }
 
 function petik_berkaitan(string $teks, string $soalan): string
@@ -420,12 +426,12 @@ function petik_berkaitan(string $teks, string $soalan): string
         $ambil[] = $item[1];
     }
     if ($ambil === []) {
-        $ambil[] = meja_potong(trim($teks), 420);
+        return 'Terima kasih kerana menulis. Apa yang anda ingin tahu: harga, pakej, atau cara bayaran?';
     }
-    return meja_potong(implode("\n", $ambil), 700);
+    return meja_potong(implode("\n", $ambil), 500);
 }
 
-function hantar_whatsapp(string $phoneId, string $token, string $kepada, string $teks): void
+function hantar_whatsapp(string $phoneId, string $token, string $kepada, string $teks): bool
 {
     $badan = json_encode([
         'messaging_product' => 'whatsapp',
@@ -433,8 +439,8 @@ function hantar_whatsapp(string $phoneId, string $token, string $kepada, string 
         'type' => 'text',
         'text' => ['body' => $teks],
     ], JSON_UNESCAPED_UNICODE);
-    if ($badan === false) {
-        return;
+    if ($badan === false || $token === '' || $kepada === '') {
+        return false;
     }
     $url = 'https://graph.facebook.com/v21.0/' . rawurlencode($phoneId) . '/messages';
     $header = [
@@ -444,7 +450,7 @@ function hantar_whatsapp(string $phoneId, string $token, string $kepada, string 
     if (function_exists('curl_init')) {
         $curl = curl_init($url);
         if ($curl === false) {
-            return;
+            return false;
         }
         curl_setopt_array($curl, [
             CURLOPT_POST => true,
@@ -454,8 +460,9 @@ function hantar_whatsapp(string $phoneId, string $token, string $kepada, string 
             CURLOPT_TIMEOUT => 20,
         ]);
         curl_exec($curl);
+        $kod = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
         curl_close($curl);
-        return;
+        return $kod >= 200 && $kod < 300;
     }
     $konteks = stream_context_create([
         'http' => [
@@ -467,4 +474,208 @@ function hantar_whatsapp(string $phoneId, string $token, string $kepada, string 
         ],
     ]);
     @file_get_contents($url, false, $konteks);
+    $kod = 0;
+    if (isset($http_response_header) && is_array($http_response_header)) {
+        foreach ($http_response_header as $baris) {
+            if (preg_match('#^HTTP/\S+\s+(\d+)#', (string) $baris, $padan)) {
+                $kod = (int) $padan[1];
+            }
+        }
+    }
+    return $kod >= 200 && $kod < 300;
+}
+
+function laluan_perbualan(): string
+{
+    return dirname(meja_laluan()) . '/perbualan.json';
+}
+
+function perbualan_kosong(): array
+{
+    return ['perbualan' => [], 'jeda' => [], 'pesanan' => []];
+}
+
+function baca_perbualan(): array
+{
+    $path = laluan_perbualan();
+    if (!is_file($path)) {
+        return perbualan_kosong();
+    }
+    $mentah = file_get_contents($path);
+    $data = json_decode(is_string($mentah) ? $mentah : '', true);
+    if (!is_array($data)) {
+        return perbualan_kosong();
+    }
+    $data = array_merge(perbualan_kosong(), $data);
+    if (!is_array($data['perbualan'])) {
+        $data['perbualan'] = [];
+    }
+    if (!is_array($data['jeda'])) {
+        $data['jeda'] = [];
+    }
+    if (!is_array($data['pesanan'])) {
+        $data['pesanan'] = [];
+    }
+    return $data;
+}
+
+function dengan_perbualan(callable $ubah): array
+{
+    $path = laluan_perbualan();
+    $dir = dirname($path);
+    if (!is_dir($dir) && !mkdir($dir, 0700, true) && !is_dir($dir)) {
+        throw new RuntimeException('Stor tidak boleh dibuka.');
+    }
+    $fh = fopen($path, 'c+');
+    if ($fh === false) {
+        throw new RuntimeException('Stor tidak boleh dibuka.');
+    }
+    try {
+        if (!flock($fh, LOCK_EX)) {
+            throw new RuntimeException('Stor sedang digunakan.');
+        }
+        $mentah = stream_get_contents($fh);
+        $data = json_decode(is_string($mentah) ? $mentah : '', true);
+        if (!is_array($data)) {
+            $data = perbualan_kosong();
+        } else {
+            $data = array_merge(perbualan_kosong(), $data);
+        }
+        $data = $ubah($data);
+        rewind($fh);
+        ftruncate($fh, 0);
+        $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        if ($json === false || fwrite($fh, $json) === false) {
+            throw new RuntimeException('Stor tidak boleh ditulis.');
+        }
+        fflush($fh);
+        flock($fh, LOCK_UN);
+    } finally {
+        fclose($fh);
+    }
+    @chmod($path, 0600);
+    return $data;
+}
+
+function masa_malaysia(): string
+{
+    $masa = new DateTime('now', new DateTimeZone('Asia/Kuala_Lumpur'));
+    return $masa->format('j M Y, g:i A');
+}
+
+function telefon_bersih(string $telefon): string
+{
+    $telefon = preg_replace('/\D+/', '', $telefon) ?? '';
+    if (strlen($telefon) < 8 || strlen($telefon) > 15) {
+        return '';
+    }
+    return $telefon;
+}
+
+function rekod_perbualan(string $telefon, string $peranan, string $teks, string $oleh = ''): void
+{
+    $telefon = telefon_bersih($telefon);
+    $teks = meja_potong(trim($teks), 2000);
+    if ($telefon === '' || $teks === '' || !in_array($peranan, ['user', 'assistant'], true)) {
+        return;
+    }
+    dengan_perbualan(function (array $data) use ($telefon, $peranan, $teks, $oleh): array {
+        $senarai = $data['perbualan'][$telefon] ?? [];
+        if (!is_array($senarai)) {
+            $senarai = [];
+        }
+        $item = [
+            'role' => $peranan,
+            'content' => $teks,
+            'masa' => masa_malaysia(),
+        ];
+        if ($oleh !== '') {
+            $item['by'] = $oleh;
+        }
+        $senarai[] = $item;
+        $data['perbualan'][$telefon] = array_slice($senarai, -80);
+        $susun = $data['perbualan'];
+        unset($susun[$telefon]);
+        $susun[$telefon] = $data['perbualan'][$telefon];
+        if (count($susun) > 50) {
+            $susun = array_slice($susun, -50, null, true);
+        }
+        $data['perbualan'] = $susun;
+        return $data;
+    });
+}
+
+function nombor_dijeda(string $telefon): bool
+{
+    $telefon = telefon_bersih($telefon);
+    if ($telefon === '') {
+        return false;
+    }
+    $jeda = baca_perbualan()['jeda'];
+    return is_array($jeda) && in_array($telefon, $jeda, true);
+}
+
+function set_jeda(string $telefon, bool $jeda): void
+{
+    $telefon = telefon_bersih($telefon);
+    if ($telefon === '') {
+        throw new InvalidArgumentException('Nombor tidak sah.');
+    }
+    dengan_perbualan(function (array $data) use ($telefon, $jeda): array {
+        $senarai = is_array($data['jeda']) ? $data['jeda'] : [];
+        $senarai = array_values(array_filter($senarai, static function ($satu) use ($telefon): bool {
+            return (string) $satu !== $telefon;
+        }));
+        if ($jeda) {
+            $senarai[] = $telefon;
+        }
+        $data['jeda'] = $senarai;
+        return $data;
+    });
+}
+
+function nampak_pesanan(string $teks): bool
+{
+    $rendah = mb_strtolower($teks);
+    if (str_contains($rendah, '[order_complete]')) {
+        return true;
+    }
+    return str_contains($rendah, 'alamat') && (str_contains($rendah, 'pakej') || str_contains($rendah, 'nama'));
+}
+
+function rekod_pesanan(string $telefon, string $butiran): void
+{
+    $telefon = telefon_bersih($telefon);
+    $butiran = meja_potong(trim($butiran), 1000);
+    if ($telefon === '' || $butiran === '') {
+        return;
+    }
+    dengan_perbualan(function (array $data) use ($telefon, $butiran): array {
+        $senarai = is_array($data['pesanan']) ? $data['pesanan'] : [];
+        foreach ($senarai as $satu) {
+            if (is_array($satu) && (string) ($satu['phone'] ?? '') === $telefon && (string) ($satu['details'] ?? '') === $butiran) {
+                return $data;
+            }
+        }
+        $senarai[] = [
+            'phone' => $telefon,
+            'time' => masa_malaysia(),
+            'details' => $butiran,
+        ];
+        $data['pesanan'] = array_slice($senarai, -100);
+        return $data;
+    });
+}
+
+function perbualan_sah(array $mesej): bool
+{
+    foreach ($mesej as $satu) {
+        if (!is_array($satu)) {
+            continue;
+        }
+        if (nampak_pesanan((string) ($satu['content'] ?? ''))) {
+            return true;
+        }
+    }
+    return false;
 }

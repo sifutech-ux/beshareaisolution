@@ -52,9 +52,6 @@ foreach ($data['entry'] ?? [] as $entri) {
             continue;
         }
         $token = token_nombor($nombor);
-        if ($token === '') {
-            continue;
-        }
         foreach ($nilai['messages'] ?? [] as $mesej) {
             if (!is_array($mesej)) {
                 continue;
@@ -73,11 +70,33 @@ foreach ($data['entry'] ?? [] as $entri) {
                 if ($badan === '') {
                     continue;
                 }
-                $teks = bina_balasan($badan, baca_meja());
+                rekod_perbualan($dari, 'user', $badan);
+                if (nampak_pesanan($badan)) {
+                    rekod_pesanan($dari, $badan);
+                }
+                if (nombor_dijeda($dari)) {
+                    if ($id !== '') {
+                        tandakan_dilihat($id);
+                    }
+                    continue;
+                }
+                $teks = $token === '' ? '' : bina_balasan($badan, baca_meja());
             } else {
+                rekod_perbualan($dari, 'user', 'Mesej bukan teks.');
+                if (nombor_dijeda($dari) || $token === '') {
+                    if ($id !== '') {
+                        tandakan_dilihat($id);
+                    }
+                    continue;
+                }
                 $teks = 'Sila taip mesej teks. Saya pembantu WhatsApp BeShare AI Solution.';
             }
-            hantar_whatsapp($nombor, $token, $dari, $teks);
+            if ($token !== '' && $teks !== '' && hantar_whatsapp($nombor, $token, $dari, $teks)) {
+                rekod_perbualan($dari, 'assistant', $teks, 'ai');
+                if (nampak_pesanan($teks)) {
+                    rekod_pesanan($dari, $teks);
+                }
+            }
             if ($id !== '') {
                 tandakan_dilihat($id);
             }
