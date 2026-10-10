@@ -264,6 +264,8 @@ function applyTheme(state) {
 }
 
 function route() {
+  const bar = document.querySelector(".nav-links");
+  const kept = bar ? bar.scrollLeft : 0;
   const state = load();
   applyTheme(state);
   const hash = location.hash.replace("#", "") || (state ? "papan" : "masuk");
@@ -287,6 +289,12 @@ function route() {
       ? shell(state, hash, views[hash](state))
       : shell(state, hash, `<article class="panel"><h1>Skrin dikunci</h1><p class="muted">Peranan demo ini tidak membuka skrin tersebut.</p></article>`);
   }
+  const place = () => {
+    const next = document.querySelector(".nav-links");
+    if (next) next.scrollLeft = kept;
+  };
+  place();
+  requestAnimationFrame(place);
 }
 
 const views = {
