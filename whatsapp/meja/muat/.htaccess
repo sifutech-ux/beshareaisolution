@@ -1,0 +1,6 @@
+Options -Indexes
+<FilesMatch "\.(php|phtml|phar)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+</FilesMatch>
