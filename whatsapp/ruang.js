@@ -26,6 +26,7 @@ function seed() {
     theme: "gelap",
     connection: { token: "Belum", webhook: "Belum", registration: "Belum", messaging: "Belum" },
     connectionNote: "",
+    templateDraft: { name: "", language: "ms", body: "", savedAt: "" },
     onboarding: { step: 6, done: true },
     inboxQuery: "",
     inboxFilter: "semua",
@@ -146,6 +147,13 @@ function normalize(state) {
   next.user = { ...base.user, ...(state.user || {}) };
   next.business = { ...base.business, ...(state.business || {}) };
   next.connection = { ...base.connection, ...(state.connection || {}) };
+  const draft = state.templateDraft && typeof state.templateDraft === "object" ? state.templateDraft : {};
+  next.templateDraft = {
+    name: typeof draft.name === "string" ? draft.name : "",
+    language: draft.language === "en" ? "en" : "ms",
+    body: typeof draft.body === "string" ? draft.body : "",
+    savedAt: typeof draft.savedAt === "string" ? draft.savedAt : ""
+  };
   next.onboarding = { ...base.onboarding, ...(state.onboarding || {}) };
   next.knowledge = Array.isArray(state.knowledge) ? state.knowledge : base.knowledge;
   next.contacts = Array.isArray(state.contacts) ? state.contacts : base.contacts;
@@ -592,9 +600,22 @@ function team(state) {
 }
 
 function connection(state) {
-  return `<article class="panel">
+  const draft = state.templateDraft || { name: "", language: "ms", body: "", savedAt: "" };
+  const saved = draft.savedAt
+    ? `Draf disimpan dalam pelayar pada ${esc(draft.savedAt)}. Tidak dihantar ke Meta.`
+    : "Draf belum disimpan.";
+  return `<article class="panel record-screen">
     <h1>Sambungan WhatsApp</h1>
-    <p class="muted">Empat keadaan berasingan. Token yang tersimpan belum bermaksud nombor sudah berfungsi.</p>
+    <p>Kebenaran <strong>whatsapp_business_management</strong> digunakan selepas perniagaan selesai Embedded Signup. Aplikasi kemudian boleh mengurus akaun WhatsApp Business itu: nombor telefon, templat mesej, kod QR, dan langganan webhook. Ini penggunaan Cloud API rasmi, bukan status rakan kongsi Meta.</p>
+    <h2>Langkah pada skrin</h2>
+    <ol class="record-steps">
+      <li>Log masuk ke workspace.</li>
+      <li>Buka halaman ini dan baca empat keadaan di bawah.</li>
+      <li>Semasa sesi rakaman, Embedded Signup meminta kebenaran pada akaun ujian.</li>
+      <li>Cipta satu templat mesej dalam aplikasi atau dalam WhatsApp Manager.</li>
+    </ol>
+    <h2>Empat keadaan</h2>
+    <p class="muted">Token yang tersimpan belum bermaksud nombor sudah berfungsi. Keempat-empat keadaan masih Belum.</p>
     <div class="states">
       <article class="state"><strong>Token</strong><span>${esc(state.connection.token)}</span></article>
       <article class="state"><strong>Webhook</strong><span>${esc(state.connection.webhook)}</span></article>
@@ -602,8 +623,29 @@ function connection(state) {
       <article class="state"><strong>Mesej</strong><span>${esc(state.connection.messaging)}</span></article>
     </div>
     <p>Ralat terakhir: ${esc(state.connectionNote || "Tiada.")}</p>
-    <button class="btn" type="button" data-act="connect">Mula Embedded Signup</button>
-    <p class="muted">Butang ini tidak memanggil Meta. Kebenaran whatsapp_business_management belum diminta. Video semakan Meta ialah langkah seterusnya, selepas modul ini.</p>
+    <div class="record-actions">
+      <button class="btn" type="button" data-act="connect">Mula Embedded Signup</button>
+      <a class="btn btn--ghost" href="panduan-rakaman.html">Skrip rakaman</a>
+    </div>
+    <p class="muted">Butang ini tidak memanggil Meta pada binaan ini. Empat keadaan kekal Belum. Panggil sebenar hanya semasa sesi rakaman, selepas tetingkap Meta benar-benar terbuka.</p>
+    <h2>Draf templat</h2>
+    <p class="muted">Borang ini menyimpan nama, bahasa, dan isi dalam pelayar sahaja. Ia tidak dihantar ke Meta dan tidak mencipta templat sebenar.</p>
+    <form id="template-draft">
+      <p class="error" id="form-error" hidden></p>
+      <label class="field">Nama templat<input name="name" required maxlength="512" autocomplete="off" value="${esc(draft.name)}" placeholder="sambutan_kedai"></label>
+      <label class="field">Bahasa
+        <select name="language">
+          <option value="ms" ${draft.language === "ms" ? "selected" : ""}>Bahasa Melayu</option>
+          <option value="en" ${draft.language === "en" ? "selected" : ""}>English</option>
+        </select>
+      </label>
+      <label class="field">Isi templat<textarea name="body" required maxlength="1024" rows="4">${esc(draft.body)}</textarea></label>
+      <button class="btn" type="submit">Simpan draf dalam pelayar</button>
+    </form>
+    <p class="muted">${saved}</p>
+    <h2>Laluan webhook baharu</h2>
+    <p>URL calon: <code>https://beshareaisolution.com/whatsapp/sambungan/webhook.php</code></p>
+    <p class="muted">Laluan ini berasingan daripada callback yang sedang hidup. Jangan tukar callback aplikasi Meta yang sedang berkhidmat. URL ini belum didaftarkan.</p>
   </article>`;
 }
 
@@ -837,6 +879,7 @@ function onClick(event) {
     return;
   }
   if (act === "connect") {
+    state.connection = { token: "Belum", webhook: "Belum", registration: "Belum", messaging: "Belum" };
     state.connectionNote = "Embedded Signup tidak dipanggil. Empat keadaan kekal Belum.";
     log(state, "Percubaan sambung disekat: Meta tidak dipanggil.");
     save(state);
@@ -1006,6 +1049,29 @@ function onSubmit(event) {
     if (!email.includes("@")) return;
     state.team.push({ name: String(data.get("name") || "").trim(), email, role: String(data.get("role") || "staff") });
     log(state, "Jemputan demo tidak menghantar e-mel kepada " + email + ".");
+    save(state);
+    route();
+    return;
+  }
+  if (formId === "template-draft") {
+    const name = String(data.get("name") || "").trim();
+    const language = String(data.get("language") || "");
+    const body = String(data.get("body") || "").trim();
+    if (!/^[a-z0-9_]{1,512}$/.test(name)) {
+      showError("Nama templat guna huruf kecil, nombor, dan garis bawah sahaja.");
+      return;
+    }
+    if (language !== "ms" && language !== "en") {
+      showError("Pilih Bahasa Melayu atau English.");
+      return;
+    }
+    if (!body || body.length > 1024) {
+      showError("Isi templat diperlukan, paling banyak 1024 aksara.");
+      return;
+    }
+    state.templateDraft = { name, language, body, savedAt: stamp() };
+    state.connection = { token: "Belum", webhook: "Belum", registration: "Belum", messaging: "Belum" };
+    log(state, "Draf templat disimpan dalam pelayar. Meta tidak dipanggil.");
     save(state);
     route();
     return;

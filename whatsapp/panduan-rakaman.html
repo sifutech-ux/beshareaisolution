@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Skrip rakaman semakan Meta — BeShare AI OS</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="landing.css?v=20261010l">
+</head>
+<body>
+    <div class="bg-glow" aria-hidden="true"></div>
+    <div class="topbar">
+        <a class="brand" href="index.html" style="margin:0; text-decoration:none; color:inherit;">
+            <span class="brand__name">BeShare<span class="brand__accent"> AI OS</span></span>
+        </a>
+        <div class="topbar__links">
+            <a href="ruang.html?demo=1#sambungan">Sambungan</a>
+        </div>
+    </div>
+
+    <header class="hero">
+        <p class="demo-banner">Jangan hantar video ini selagi Embedded Signup belum terbuka dan satu templat mesej belum dicipta. Tangkapan skrin tidak mencukupi. Sepanduk “Meta belum dipanggil” pada prototip bukan bukti untuk semakan.</p>
+        <p class="pill">whatsapp_business_management</p>
+        <h1 class="hero__title">Skrip rakaman semakan Meta</h1>
+        <p class="hero__subtitle">Satu video untuk satu kebenaran. Rakaman mesti menunjukkan log masuk, pemberian kebenaran, kemudian aplikasi atau WhatsApp Manager mencipta templat.</p>
+    </header>
+
+    <main class="page">
+        <section class="panel">
+            <h2>Apa yang perlu kelihatan</h2>
+            <ol class="record-steps">
+                <li>Mula dalam keadaan log keluar, kemudian log masuk.</li>
+                <li>Jika log masuk Meta atau Business Login digunakan, rakaman mesti menunjukkan pengguna memberi kebenaran <strong>whatsapp_business_management</strong>.</li>
+                <li>Cipta satu templat mesej dalam aplikasi, atau dalam WhatsApp Manager. Templat itu mesti kelihatan selepas dicipta.</li>
+                <li>Penyemak Meta menggunakan video ini sebagai panduan ujian. Satu rakaman untuk kebenaran ini sahaja.</li>
+            </ol>
+            <p class="muted">Aplikasi perniagaan mendapat Standard Access untuk akaun yang dimiliki sendiri. Advanced Access melalui App Review diperlukan untuk mengurus akaun WhatsApp Business pelanggan yang baru didaftarkan. Tanpa itu, Meta boleh memulangkan ralat 200.</p>
+        </section>
+
+        <section class="panel">
+            <h2>Skrip, Bahasa Melayu</h2>
+            <ol class="record-steps">
+                <li>
+                    <strong>Log masuk.</strong>
+                    Kata: “Saya log masuk ke BeShare AI OS.”
+                    Tunjuk borang masuk, kemudian workspace selepas masuk.
+                </li>
+                <li>
+                    <strong>Buka Sambungan.</strong>
+                    Kata: “Ini halaman sambungan WhatsApp. Empat keadaan masih berasingan: token, webhook, pendaftaran, dan mesej.”
+                    Tunjuk keempat-empat kad. Jangan tandakan mana-mana sebagai siap jika panggilan Meta belum berlaku.
+                </li>
+                <li>
+                    <strong>Terangkan kebenaran.</strong>
+                    Kata: “Kebenaran whatsapp_business_management membolehkan aplikasi mengurus akaun WhatsApp Business yang baru didaftarkan: nombor telefon, templat mesej, kod QR, dan langganan webhook. Ini penggunaan Cloud API, bukan status rakan kongsi Meta.”
+                </li>
+                <li>
+                    <strong>Beri kebenaran.</strong>
+                    Tekan Mula Embedded Signup. Pada sesi rakaman, tetingkap Meta mesti terbuka. Pilih akaun ujian dan benarkan whatsapp_business_management. Biarkan pemberian kebenaran itu kelihatan dalam video.
+                </li>
+                <li>
+                    <strong>Cipta templat.</strong>
+                    Kata: “Saya cipta satu templat mesej.”
+                    Isi nama, bahasa, dan isi, kemudian hantar kepada Meta — atau buka WhatsApp Manager dan cipta templat di situ. Tunggu sehingga templat itu kelihatan.
+                </li>
+                <li>
+                    <strong>Tamat.</strong>
+                    Jangan tambah dakwaan lain selepas templat kelihatan.
+                </li>
+            </ol>
+        </section>
+
+        <section class="panel">
+            <h2>Perenggan untuk borang App Review</h2>
+            <p class="muted">Salin perenggan Inggeris ini ke borang semakan.</p>
+            <p class="copy-block">BeShare AI OS uses the official WhatsApp Cloud API. After a business completes Embedded Signup, whatsapp_business_management lets the app manage that onboarded WhatsApp Business Account: its phone numbers, message templates, QR codes, and webhook subscriptions. The app does not use this permission on accounts that have not completed onboarding. This recording shows a logged-in user granting whatsapp_business_management and one message template being created in the app or in WhatsApp Manager. BeShare is not a Meta Business Partner. Use of the Cloud API is not a partnership, certification, or official-partner status.</p>
+        </section>
+
+        <section class="panel">
+            <h2>Jangan tunjukkan dan jangan sebut</h2>
+            <ul class="record-steps">
+                <li>Jangan sebut rakan kongsi Meta, jaminan rasmi, atau Certified.</li>
+                <li>Jangan tunjuk meja nombor yang sedang hidup, callback <code>/webhook/</code>, atau sembang pelanggan sebenar.</li>
+                <li>Jangan tukar callback aplikasi Meta yang sedang berkhidmat.</li>
+                <li>Draf templat dalam pelayar pada skrin Sambungan bukan templat Meta. Ia hanya nota tempatan sehingga sesi rakaman membuat templat sebenar.</li>
+            </ul>
+        </section>
+
+        <section class="panel">
+            <h2>Laluan webhook baharu</h2>
+            <p>URL calon, belum didaftarkan: <code>https://beshareaisolution.com/whatsapp/sambungan/webhook.php</code></p>
+            <p class="muted">Callback yang sedang hidup kekal di <code>https://beshareaisolution.com/webhook/</code>. Daftar URL calon hanya pada aplikasi semakan, semasa sesi rakaman, selepas fail konfigurasi peribadi diletakkan di luar <code>public_html</code>. Tanpa fail itu, laluan baharu membalas 503 dan tidak menggemakan cabaran. Rahsia aplikasi tidak disimpan dalam repositori.</p>
+            <p class="actions"><a class="btn" href="ruang.html?demo=1#sambungan">Kembali ke Sambungan</a></p>
+        </section>
+    </main>
+</body>
+</html>

@@ -532,6 +532,55 @@
   vertical-align: top;
 }
 
+.record-steps {
+  margin: 0.4rem 0 1rem;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.record-steps li {
+  line-height: 1.5;
+}
+
+.record-screen h2,
+.page .panel h2 {
+  margin-top: 1.35rem;
+  font-size: 1.15rem;
+}
+
+.record-screen h2:first-of-type,
+.page .panel h2:first-child {
+  margin-top: 0.2rem;
+}
+
+.record-screen code,
+.page code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  word-break: break-word;
+}
+
+.record-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.copy-block {
+  white-space: pre-wrap;
+  line-height: 1.55;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.page .panel + .panel {
+  margin-top: 1rem;
+}
+
 .steps {
   display: flex;
   flex-wrap: wrap;
@@ -625,6 +674,7 @@ html[data-theme="cerah"] .nav a.is-on {
   }
 }
 
+html[data-theme="cerah"] .copy-block,
 html[data-theme="cerah"] .state,
 html[data-theme="cerah"] .msg,
 html[data-theme="cerah"] .field input,
@@ -741,6 +791,15 @@ html[data-theme="cerah"] .nav-tools select {
   .phone-bar .btn {
     min-height: 44px;
     padding: 0.55rem 0.85rem;
+  }
+
+  .record-screen .states {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .record-actions .btn {
+    width: 100%;
+    min-height: 44px;
   }
 
   .os-table {
