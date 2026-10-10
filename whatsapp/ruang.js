@@ -444,9 +444,10 @@ function talk(state, current) {
 }
 
 function profile(state, current) {
-  if (!current) return `<p class="muted">Profil muncul selepas perbualan dipilih.</p>`;
+  if (!current) return `<div class="phone-bar"><button class="btn btn--ghost" type="button" data-act="pane" data-value="list">Senarai</button></div><p class="muted">Profil muncul selepas perbualan dipilih.</p>`;
   const contact = state.contacts.find((item) => item.conversationId === current.id);
-  return `<h2>${esc(current.name)}</h2>
+  return `<div class="phone-bar"><button class="btn btn--ghost" type="button" data-act="pane" data-value="talk">Perbualan</button><strong>${esc(current.name)}</strong><button class="btn btn--ghost" type="button" data-act="pane" data-value="list">Senarai</button></div>
+    <h2>${esc(current.name)}</h2>
     <p class="muted">${esc(contact ? contact.phone : "Tiada telefon demo")}</p>
     <p>Tag: ${esc(current.tag)}<br>Ejen: ${esc(current.assignee)}<br>Tetingkap: ${current.window === "open" ? "dibuka" : "tamat"}</p>
     <p class="muted">${esc(current.note || "Tiada nota.")}</p>
