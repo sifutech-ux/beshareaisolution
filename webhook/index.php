@@ -1,10 +1,11 @@
 <?php
 declare(strict_types=1);
 
+require_once dirname(__DIR__) . '/whatsapp/meja/lib.php';
+
 const WEBHOOK_TOKEN_HASH = '384957d2a80da96f47c954979d2f01b93a1f5c3586a501cc254d897ce78b4560';
 const NOMBOR_011 = '1443799975474056';
 const NOMBOR_DHERBS = '1207159062490441';
-const BALASAN_011 = 'Hai, terima kasih kerana menulis kepada BeShare AI Solution. Saya pembantu WhatsApp rasmi. Apa soalan jualan yang boleh saya bantu?';
 
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: no-store');
@@ -67,10 +68,16 @@ foreach ($data['entry'] ?? [] as $entri) {
                 continue;
             }
             $jenis = (string) ($mesej['type'] ?? '');
-            $teks = $jenis === 'text'
-                ? BALASAN_011
-                : 'Sila taip mesej teks. Saya pembantu WhatsApp BeShare AI Solution.';
-            hantar_teks($nombor, $token, $dari, $teks);
+            if ($jenis === 'text') {
+                $badan = trim((string) ($mesej['text']['body'] ?? ''));
+                if ($badan === '') {
+                    continue;
+                }
+                $teks = bina_balasan($badan, baca_meja());
+            } else {
+                $teks = 'Sila taip mesej teks. Saya pembantu WhatsApp BeShare AI Solution.';
+            }
+            hantar_whatsapp($nombor, $token, $dari, $teks);
             if ($id !== '') {
                 tandakan_dilihat($id);
             }
@@ -89,6 +96,12 @@ function pertanyaan(string $nama): string
 
 function token_nombor(string $phoneId): string
 {
+    if ($phoneId === NOMBOR_011) {
+        $token = token_meja();
+        if ($token !== '') {
+            return $token;
+        }
+    }
     $path = dirname(__DIR__) . '/admin/stor/data.json';
     if (!is_file($path)) {
         return '';
@@ -142,34 +155,3 @@ function tandakan_dilihat(string $id): void
     @chmod($path, 0600);
 }
 
-function hantar_teks(string $phoneId, string $token, string $kepada, string $teks): void
-{
-    if (!function_exists('curl_init')) {
-        return;
-    }
-    $badan = json_encode([
-        'messaging_product' => 'whatsapp',
-        'to' => $kepada,
-        'type' => 'text',
-        'text' => ['body' => $teks],
-    ], JSON_UNESCAPED_UNICODE);
-    if ($badan === false) {
-        return;
-    }
-    $curl = curl_init('https://graph.facebook.com/v21.0/' . rawurlencode($phoneId) . '/messages');
-    if ($curl === false) {
-        return;
-    }
-    curl_setopt_array($curl, [
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $badan,
-        CURLOPT_HTTPHEADER => [
-            'Authorization: Bearer ' . $token,
-            'Content-Type: application/json',
-        ],
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 20,
-    ]);
-    curl_exec($curl);
-    curl_close($curl);
-}
