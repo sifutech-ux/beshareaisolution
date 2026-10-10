@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const HASH_PEMILIK = '$2y$10$s1aVDBgAw5xM4/mpniino./BwCn4IXJNwELhJCV.NOWL6hmcOfuHG';
+const HASH_PEMILIK = '$2y$10$aWfJjOH0kBUvwTiBFD6e1.28vFvFcNgIEUr68CvXKA42rrGM.XEai';
 const HASH_CEO = '$2y$10$1InhZkZeUTLubwsmUQJ9IO9B1Q0AYMIJau6A8/vGf9q2mBl6LyUKi';
 const HASH_KOSONG = '$2y$10$JspQbz5mtPnKZwoUg/2UD.uEAv5/R/KqvMDi9BAZbAn1PGBib8eYC';
 
