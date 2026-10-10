@@ -141,6 +141,9 @@ body {
   opacity: 0.9;
 }
 
+.gate--os {
+  --gate-color: #8b7cff;
+}
 .gate--penasihat {
   --gate-color: var(--penasihat);
 }
@@ -228,6 +231,12 @@ body {
 .gate__badge--live {
   color: #0a0f1f;
   background: var(--ipo);
+  border-color: transparent;
+}
+
+.gate__badge--os {
+  color: #ffffff;
+  background: #6d5efc;
   border-color: transparent;
 }
 
