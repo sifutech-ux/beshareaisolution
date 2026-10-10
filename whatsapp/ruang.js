@@ -303,6 +303,7 @@ function route() {
   };
   place();
   requestAnimationFrame(place);
+  if (hash === "sambungan") prepareSignup();
 }
 
 const views = {
@@ -611,7 +612,7 @@ function connection(state) {
     <ol class="record-steps">
       <li>Log masuk ke workspace.</li>
       <li>Buka halaman ini dan baca empat keadaan di bawah.</li>
-      <li>Semasa sesi rakaman, Embedded Signup meminta kebenaran pada akaun ujian.</li>
+      <li>Tekan Buka tetingkap Meta. Facebook meminta kebenaran whatsapp_business_management.</li>
       <li>Cipta satu templat mesej dalam aplikasi atau dalam WhatsApp Manager.</li>
     </ol>
     <h2>Empat keadaan</h2>
@@ -624,10 +625,10 @@ function connection(state) {
     </div>
     <p>Ralat terakhir: ${esc(state.connectionNote || "Tiada.")}</p>
     <div class="record-actions">
-      <button class="btn" type="button" data-act="connect">Mula Embedded Signup</button>
+      <button class="btn" type="button" data-act="connect">Buka tetingkap Meta</button>
       <a class="btn btn--ghost" href="panduan-rakaman.html">Skrip rakaman</a>
     </div>
-    <p class="muted">Butang ini tidak memanggil Meta pada binaan ini. Empat keadaan kekal Belum. Panggil sebenar hanya semasa sesi rakaman, selepas tetingkap Meta benar-benar terbuka.</p>
+    <p class="muted" id="signup-hint">Butang ini membuka tetingkap Facebook untuk kebenaran whatsapp_business_management. Tetingkap itu belum boleh dibuka kerana App ID dan Configuration ID belum dipasang.</p>
     <h2>Draf templat</h2>
     <p class="muted">Borang ini menyimpan nama, bahasa, dan isi dalam pelayar sahaja. Ia tidak dihantar ke Meta dan tidak mencipta templat sebenar.</p>
     <form id="template-draft">
@@ -879,11 +880,7 @@ function onClick(event) {
     return;
   }
   if (act === "connect") {
-    state.connection = { token: "Belum", webhook: "Belum", registration: "Belum", messaging: "Belum" };
-    state.connectionNote = "Embedded Signup tidak dipanggil. Empat keadaan kekal Belum.";
-    log(state, "Percubaan sambung disekat: Meta tidak dipanggil.");
-    save(state);
-    route();
+    openEmbeddedSignup();
     return;
   }
   if (act === "bill") {
@@ -1111,6 +1108,139 @@ function onInput(event) {
     }
   }
 }
+
+let signupReady = { appId: "", configId: "", version: "v26.0" };
+
+function facebookHost(origin) {
+  try {
+    const host = new URL(origin).hostname;
+    return host === "facebook.com" || host.endsWith(".facebook.com");
+  } catch {
+    return false;
+  }
+}
+
+function keepUnconnected(state, note, action) {
+  state.connection = { token: "Belum", webhook: "Belum", registration: "Belum", messaging: "Belum" };
+  state.connectionNote = note;
+  if (action) log(state, action);
+  save(state);
+  if ((location.hash.replace("#", "") || "") === "sambungan") route();
+}
+
+function prepareSignup() {
+  fetch("sambungan/awam.php", { cache: "no-store" })
+    .then((res) => res.json())
+    .then((data) => {
+      if (!data || data.ready !== true || !/^\d{5,20}$/.test(data.appId || "") || !/^\d{5,20}$/.test(data.configId || "")) {
+        signupReady = { appId: "", configId: "", version: "v26.0" };
+        return;
+      }
+      signupReady = { appId: data.appId, configId: data.configId, version: data.version || "v26.0" };
+      loadFacebookSdk(signupReady);
+    })
+    .catch(() => {
+      signupReady = { appId: "", configId: "", version: "v26.0" };
+    });
+}
+
+function loadFacebookSdk(cfg) {
+  const init = () => {
+    if (!window.FB) return;
+    window.FB.init({
+      appId: cfg.appId,
+      autoLogAppEvents: true,
+      xfbml: false,
+      version: cfg.version
+    });
+  };
+  if (window.FB) {
+    init();
+    return;
+  }
+  window.fbAsyncInit = init;
+  if (!document.getElementById("facebook-jssdk")) {
+    const script = document.createElement("script");
+    script.id = "facebook-jssdk";
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    script.src = "https://connect.facebook.net/en_US/sdk.js";
+    document.head.appendChild(script);
+  }
+}
+
+function openEmbeddedSignup() {
+  const state = load();
+  if (!state) return;
+  if (!signupReady.appId || !signupReady.configId || !window.FB) {
+    keepUnconnected(
+      state,
+      signupReady.appId
+        ? "SDK Meta masih dimuat. Tekan butang sekali lagi."
+        : "Tetingkap Meta tidak dibuka. App ID dan Configuration ID belum dipasang pada pelayan.",
+      "Tetingkap Embedded Signup tidak dibuka."
+    );
+    return;
+  }
+  window.FB.login((response) => {
+    const current = load();
+    if (!current) return;
+    const code = response && response.authResponse ? response.authResponse.code : "";
+    if (!code) {
+      keepUnconnected(current, "Tetingkap Meta ditutup sebelum kebenaran diberi. Empat keadaan kekal Belum.", "Embedded Signup ditutup tanpa kod.");
+      return;
+    }
+    keepUnconnected(current, "Tetingkap Meta dibuka. Kod dihantar ke pelayan. Empat keadaan kekal Belum.", "Kod Embedded Signup dihantar ke pelayan. Token tidak disimpan dalam pelayar.");
+    exchangeSignupCode(code);
+  }, {
+    config_id: signupReady.configId,
+    response_type: "code",
+    override_default_response_type: true,
+    extras: { setup: {} }
+  });
+}
+
+function exchangeSignupCode(code) {
+  fetch("sambungan/tukar.php", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code })
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      const state = load();
+      if (!state) return;
+      const note = data && data.ok && data.stored
+        ? "Kod ditukar dan disimpan di luar tapak awam. Empat keadaan kekal Belum sehingga nombor disahkan."
+        : "Tetingkap Meta dibuka, tetapi pelayan belum boleh menyimpan token. Empat keadaan kekal Belum.";
+      keepUnconnected(state, note, "");
+    })
+    .catch(() => {
+      const state = load();
+      if (!state) return;
+      keepUnconnected(state, "Tetingkap Meta dibuka, tetapi pertukaran kod gagal. Empat keadaan kekal Belum.", "");
+    });
+}
+
+window.addEventListener("message", (event) => {
+  if (!facebookHost(event.origin)) return;
+  let data = event.data;
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return;
+    }
+  }
+  if (!data || data.type !== "WA_EMBEDDED_SIGNUP") return;
+  const state = load();
+  if (!state) return;
+  const eventName = typeof data.event === "string" ? data.event : "";
+  const note = eventName === "FINISH" || eventName.indexOf("FINISH") === 0
+    ? "Meta menandakan aliran selesai. Empat keadaan kekal Belum sehingga nombor disahkan."
+    : "Aliran Meta berhenti pada " + (eventName || "langkah semasa") + ". Empat keadaan kekal Belum.";
+  keepUnconnected(state, note, "Peristiwa Embedded Signup: " + (eventName || "tanpa nama") + ".");
+});
 
 ensureDemo();
 const app = document.getElementById("app");

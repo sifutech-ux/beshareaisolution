@@ -13,6 +13,8 @@ declare(strict_types=1);
  * Tanpa konfigurasi yang sah, skrip membalas 503 dan tidak menggemakan cabaran.
  */
 
+require __DIR__ . '/config.php';
+
 function beshare_os_webhook_finish(int $status, string $body, string $type = 'text/plain; charset=UTF-8'): void
 {
     http_response_code($status);
@@ -23,36 +25,10 @@ function beshare_os_webhook_finish(int $status, string $body, string $type = 'te
     exit;
 }
 
-function beshare_os_webhook_config(): ?array
-{
-    $path = getenv('BESHARE_OS_WEBHOOK_CONFIG');
-    if (!is_string($path) || $path === '') {
-        $path = dirname(__DIR__, 3) . '/private/beshare-os-webhook.php';
-    }
-    if (!is_file($path) || !is_readable($path)) {
-        return null;
-    }
-    $real = realpath($path);
-    $publicRoot = realpath(dirname(__DIR__, 2));
-    if ($real === false || ($publicRoot !== false && str_starts_with($real, $publicRoot . DIRECTORY_SEPARATOR))) {
-        return null;
-    }
-    ob_start();
-    $config = include $real;
-    $leak = ob_get_clean();
-    if ($leak !== '' || !is_array($config)) {
-        return null;
-    }
-    $token = $config['verify_token'] ?? null;
-    $secret = $config['app_secret'] ?? null;
-    if (!is_string($token) || $token === '' || !is_string($secret) || $secret === '') {
-        return null;
-    }
-    return ['verify_token' => $token, 'app_secret' => $secret];
-}
-
-$config = beshare_os_webhook_config();
-if ($config === null) {
+$config = beshare_os_private_config();
+$tokenValue = is_array($config) ? ($config['verify_token'] ?? '') : '';
+$secret = is_array($config) ? ($config['app_secret'] ?? '') : '';
+if (!is_string($tokenValue) || $tokenValue === '' || !is_string($secret) || $secret === '') {
     beshare_os_webhook_finish(503, 'Unavailable');
 }
 
@@ -65,7 +41,7 @@ if ($method === 'GET') {
     if (!is_string($mode) || !is_string($token) || !is_string($challenge)) {
         beshare_os_webhook_finish(400, 'Bad request');
     }
-    if ($mode !== 'subscribe' || $challenge === '' || !hash_equals($config['verify_token'], $token)) {
+    if ($mode !== 'subscribe' || $challenge === '' || !hash_equals($tokenValue, $token)) {
         beshare_os_webhook_finish(403, 'Forbidden');
     }
     beshare_os_webhook_finish(200, $challenge);
@@ -80,7 +56,7 @@ if ($method === 'POST') {
     if (!is_string($header) || !preg_match('/\Asha256=([0-9a-f]{64})\z/i', $header, $match)) {
         beshare_os_webhook_finish(403, 'Forbidden');
     }
-    $expected = hash_hmac('sha256', $raw, $config['app_secret']);
+    $expected = hash_hmac('sha256', $raw, $secret);
     if (!hash_equals($expected, strtolower($match[1]))) {
         beshare_os_webhook_finish(403, 'Forbidden');
     }
