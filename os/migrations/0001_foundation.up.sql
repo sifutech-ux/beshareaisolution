@@ -31,6 +31,14 @@
 -- Pemindahan pemilikan: tukar ke provisioning, ubah keahlian, tetapkan
 -- owner_user_id semasa masih provisioning, kemudian kembali ke active
 -- atau suspended.
+--
+-- Akses aplikasi, bukan trigger:
+--   business_id datang daripada sesi keahlian, bukan badan permintaan.
+--   owner_user_id bukan pemberian akses.
+--   admin dan staff tidak boleh mengubah status atau owner_user_id.
+--   Hanya pemilik semasa boleh membuka provisioning, menukar pemilik
+--   semasa status kekal provisioning, atau menutup tetingkap itu.
+--   Setiap langkah ialah pernyataan berasingan. Trigger menolak gabungan.
 
 CREATE TABLE schema_migrations (
   version VARCHAR(16) NOT NULL,

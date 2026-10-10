@@ -5,25 +5,33 @@ namespace BesharOs;
 
 final class ExportGuard
 {
-    public static function realExport(string $path, string $repoRoot): string
+    /**
+     * Placement and byte identity of an export file.
+     * checksum() proves the bytes named by the operator. It does not prove
+     * which database produced the file. Database identity is BackupProof.
+     */
+    public static function realExport(string $path, string $repoRoot, string $label = 'export'): string
     {
-        if ($path === '' || !is_file($path)) {
+        if (preg_match('/\A[a-z_]+\z/', $label) !== 1) {
             throw new \InvalidArgumentException('export_missing');
+        }
+        if ($path === '' || !is_file($path)) {
+            throw new \InvalidArgumentException($label . '_missing');
         }
         $real = realpath($path);
         $root = realpath($repoRoot);
         if ($real === false || $root === false || !is_file($real)) {
-            throw new \InvalidArgumentException('export_missing');
+            throw new \InvalidArgumentException($label . '_missing');
         }
         if (filesize($real) === 0) {
-            throw new \InvalidArgumentException('export_empty');
+            throw new \InvalidArgumentException($label . '_empty');
         }
         $prefix = rtrim($root, '/') . '/';
         if ($real === $root || str_starts_with($real, $prefix)) {
-            throw new \InvalidArgumentException('export_inside_repository');
+            throw new \InvalidArgumentException($label . '_inside_repository');
         }
         if (preg_match('#(?:^|/)public_html(?:/|$)#', $real) === 1) {
-            throw new \InvalidArgumentException('export_inside_public_html');
+            throw new \InvalidArgumentException($label . '_inside_public_html');
         }
         return $real;
     }

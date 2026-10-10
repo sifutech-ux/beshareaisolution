@@ -1,9 +1,13 @@
 -- Pemulihan manual sahaja.
--- Runner tidak memuatkan atau menjalankan fail ini.
--- Jalankan hanya selepas inventori dibandingkan dengan preflight,
--- setiap objek baharu berada dalam senarai yang dibenarkan,
--- dan setiap jadual baharu mempunyai sifar baris.
--- Objek yang tidak dikenali atau jadual yang mempunyai data menghentikan pemulihan.
+-- Runner tidak memuatkan fail ini, tidak melaksanakan DROP, dan tidak
+-- menyisipkan versi sebagai pemulihan.
+-- Nama objek tidak mencukupi. Jalankan hanya selepas definisi sebenar
+-- jadual, foreign key, CHECK, kolum janaan, indeks dan trigger sepadan
+-- dengan 0001_foundation.up.sql, dan checksum SHA-256 fail migrasi itu
+-- sama dengan checksum yang diluluskan.
+-- Inventori dibandingkan dengan preflight. Setiap jadual baharu mempunyai
+-- sifar baris. Objek asing, definisi salah, atau checksum berbeza
+-- menghentikan pemulihan.
 -- Jangan gunakan fail ini selepas baris schema_migrations wujud.
 
 DROP TRIGGER IF EXISTS bd_business_users_owner;

@@ -14,16 +14,20 @@ final class FoundationMigrator
     private string $checksum;
     private string $exportReal = '';
     private string $exportChecksum = '';
+    /** @var array<string,string> */
+    private array $backupManifest = [];
 
     public function __construct(private string $repoRoot)
     {
         $this->upPath = $this->repoRoot . '/os/migrations/0001_foundation.up.sql';
     }
 
-    public function apply(string $exportPath, string $exportChecksum): int
+    public function apply(string $exportPath, string $exportChecksum, string $proofPath): int
     {
         $this->exportReal = ExportGuard::realExport($exportPath, $this->repoRoot);
         $this->exportChecksum = ExportGuard::checksum($this->exportReal, $exportChecksum);
+        $this->backupManifest = BackupProof::read($proofPath, $this->repoRoot);
+        BackupProof::verify((string) file_get_contents($this->exportReal), $this->backupManifest, $this->exportChecksum);
         if (!is_file($this->upPath)) {
             fwrite(STDERR, "migration_file_missing\n");
             return 4;
@@ -53,7 +57,7 @@ final class FoundationMigrator
             fwrite(STDERR, "checksum_mismatch\n");
             return 5;
         }
-        if ($state === 'foreign_object' || $state === 'drift' || $state === 'partial') {
+        if ($state === 'foreign_object' || $state === 'drift' || $state === 'partial' || $state === 'definition_mismatch') {
             fwrite(STDERR, $state . "\n");
             return 5;
         }
@@ -68,6 +72,7 @@ final class FoundationMigrator
 
         $statements = SqlScript::statements((string) file_get_contents($this->upPath));
         ExportGuard::checksum($this->exportReal, $this->exportChecksum);
+        BackupProof::verify((string) file_get_contents($this->exportReal), $this->backupManifest, $this->exportChecksum);
         if ($this->hashMigration() !== $this->checksum || $this->inspect() !== 'empty') {
             fwrite(STDERR, "preflight_changed\n");
             return 4;
@@ -150,7 +155,38 @@ final class FoundationMigrator
         if (in_array('schema_migrations', $tables, true)) {
             $versions = $this->rows('SELECT version, checksum FROM schema_migrations ORDER BY version');
         }
-        return CatalogState::classify($tables, $triggers, $routines, $events, $views, $versions, $this->checksum);
+        $definitions = SchemaDefinition::fromCatalog(
+            $this->rows(
+                'SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, COLUMN_TYPE AS column_type, IS_NULLABLE AS is_nullable, COLUMN_DEFAULT AS column_default, EXTRA AS extra, GENERATION_EXPRESSION AS generation_expression, CHARACTER_SET_NAME AS character_set_name, COLLATION_NAME AS collation_name, ORDINAL_POSITION AS ordinal_position FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME, ORDINAL_POSITION'
+            ),
+            $this->rows(
+                'SELECT TABLE_NAME AS table_name, INDEX_NAME AS index_name, NON_UNIQUE AS non_unique, COLUMN_NAME AS column_name, SEQ_IN_INDEX AS seq_in_index FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX'
+            ),
+            $this->rows(
+                'SELECT CONSTRAINT_NAME AS constraint_name, TABLE_NAME AS table_name, COLUMN_NAME AS column_name, ORDINAL_POSITION AS ordinal_position, REFERENCED_TABLE_NAME AS referenced_table, REFERENCED_COLUMN_NAME AS referenced_column FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION'
+            ),
+            $this->rows(
+                'SELECT tc.TABLE_NAME AS table_name, tc.CONSTRAINT_NAME AS constraint_name, cc.CHECK_CLAUSE AS check_clause FROM information_schema.TABLE_CONSTRAINTS tc INNER JOIN information_schema.CHECK_CONSTRAINTS cc ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME WHERE tc.TABLE_SCHEMA = DATABASE() AND tc.CONSTRAINT_TYPE = \'CHECK\''
+            ),
+            $this->rows(
+                'SELECT TRIGGER_NAME AS trigger_name, ACTION_TIMING AS timing, EVENT_MANIPULATION AS event_name, EVENT_OBJECT_TABLE AS table_name, ACTION_STATEMENT AS statement FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE()'
+            ),
+            $this->rows(
+                'SELECT TABLE_NAME AS table_name, ENGINE AS engine, TABLE_COLLATION AS table_collation FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = \'BASE TABLE\''
+            )
+        );
+        $expected = SchemaDefinition::fromSql((string) file_get_contents($this->upPath));
+        return CatalogState::classify(
+            $tables,
+            $triggers,
+            $routines,
+            $events,
+            $views,
+            $versions,
+            $this->checksum,
+            $definitions,
+            $expected
+        );
     }
 
     private function connect(): void

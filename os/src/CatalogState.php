@@ -12,6 +12,8 @@ final class CatalogState
      * @param list<string> $events
      * @param list<string> $views
      * @param list<array{version:string,checksum:string}> $versions
+     * @param array{tables?:array<string,array<string,mixed>>,triggers?:array<string,array<string,mixed>>} $definitions
+     * @param array{tables?:array<string,array<string,mixed>>,triggers?:array<string,array<string,mixed>>} $expected
      */
     public static function classify(
         array $tables,
@@ -20,7 +22,9 @@ final class CatalogState
         array $events,
         array $views,
         array $versions,
-        string $fileChecksum
+        string $fileChecksum,
+        array $definitions,
+        array $expected
     ): string {
         $tables = self::sorted($tables);
         $triggers = self::sorted($triggers);
@@ -42,6 +46,13 @@ final class CatalogState
         $complete = $tablesMatch && $triggersMatch;
         $empty = $tables === [] && $triggers === [];
 
+        if ($empty && $versions === []) {
+            return 'empty';
+        }
+        if (!$empty && !self::definitionsAgree($tables, $triggers, $definitions, $expected)) {
+            return 'definition_mismatch';
+        }
+
         if (count($versions) > 1) {
             return 'drift';
         }
@@ -58,13 +69,52 @@ final class CatalogState
             }
             return 'applied';
         }
-        if ($empty) {
-            return 'empty';
-        }
         if ($complete) {
             return 'complete_unrecorded';
         }
         return 'partial';
+    }
+
+    /**
+     * @param list<string> $tables
+     * @param list<string> $triggers
+     * @param array{tables?:array<string,array<string,mixed>>,triggers?:array<string,array<string,mixed>>} $definitions
+     * @param array{tables?:array<string,array<string,mixed>>,triggers?:array<string,array<string,mixed>>} $expected
+     */
+    private static function definitionsAgree(array $tables, array $triggers, array $definitions, array $expected): bool
+    {
+        $actualTables = $definitions['tables'] ?? null;
+        $actualTriggers = $definitions['triggers'] ?? null;
+        $expectedTables = $expected['tables'] ?? null;
+        $expectedTriggers = $expected['triggers'] ?? null;
+        if (!is_array($actualTables) || !is_array($actualTriggers) || !is_array($expectedTables) || !is_array($expectedTriggers)) {
+            return false;
+        }
+        $presentTables = self::sorted($tables);
+        $presentTriggers = self::sorted($triggers);
+        if (self::sorted(array_map('strval', array_keys($actualTables))) !== $presentTables) {
+            return false;
+        }
+        if (self::sorted(array_map('strval', array_keys($actualTriggers))) !== $presentTriggers) {
+            return false;
+        }
+        foreach ($presentTables as $name) {
+            if (!isset($expectedTables[$name]) || !is_array($actualTables[$name]) || !is_array($expectedTables[$name])) {
+                return false;
+            }
+            if (!SchemaDefinition::same($actualTables[$name], $expectedTables[$name])) {
+                return false;
+            }
+        }
+        foreach ($presentTriggers as $name) {
+            if (!isset($expectedTriggers[$name]) || !is_array($actualTriggers[$name]) || !is_array($expectedTriggers[$name])) {
+                return false;
+            }
+            if (!SchemaDefinition::same($actualTriggers[$name], $expectedTriggers[$name])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** @param list<string> $names

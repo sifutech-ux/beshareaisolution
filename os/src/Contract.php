@@ -13,8 +13,11 @@ final class Contract
 
     /**
      * GET_LOCK uses LOCK on the migration connection before inventory and DDL.
-     * complete_unrecorded means every foundation object exists and schema_migrations
-     * has no version row. The runner reports it and does not insert or drop.
+     * Export checksum proves export bytes only. BackupProof proves database identity.
+     * complete_unrecorded and applied require the definition fingerprint, not names.
+     * The runner reports complete_unrecorded and does not insert a version or drop.
+     * Manual recovery stays outside the runner and requires the same fingerprint
+     * plus the approved migration checksum.
      */
 
     public const TABLES = [
