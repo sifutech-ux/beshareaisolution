@@ -107,7 +107,7 @@ final class AuthHttp
             Tenants::rename($this->pdo, $actor, $this->text($body, 'name'));
             return $this->respond($session, false, $this->payload($this->actor($session)));
         }
-        if ($action === 'sambung' || $action === 'peristiwa' || $action === 'tukar') {
+        if ($action === 'sambung' || $action === 'peristiwa' || $action === 'tukar' || $action === 'segera' || $action === 'selesai-kenalan') {
             return $this->whatsapp($action, $session, $actor, $body, $remote, $sessionKey);
         }
         throw new AuthException('Tindakan tidak dikenali.', 404);
@@ -270,6 +270,28 @@ final class AuthHttp
         if ($action === 'peristiwa') {
             $this->whatsapp->record($actor, $sessionKey, $body);
             return $this->respond($session, false, $this->payload($this->actor($session)));
+        }
+        if ($action === 'segera') {
+            $key = 'segera|' . $actor['user_id'] . '|' . $remote;
+            if ($this->rates->tooMany($key)) {
+                throw new AuthException('Terlalu banyak percubaan. Cuba lagi kemudian.', 429);
+            }
+            $this->rates->hit($key);
+            $sync = $this->whatsapp->authorizeSync($actor, $this->text($body, 'sync_type'));
+            $payload = $this->payload($this->actor($session));
+            $payload['sync'] = $sync;
+            return $this->respond($session, false, $payload);
+        }
+        if ($action === 'selesai-kenalan') {
+            $key = 'selesai|' . $actor['user_id'] . '|' . $remote;
+            if ($this->rates->tooMany($key)) {
+                throw new AuthException('Terlalu banyak percubaan. Cuba lagi kemudian.', 429);
+            }
+            $this->rates->hit($key);
+            $sync = $this->whatsapp->settleContacts($actor);
+            $payload = $this->payload($this->actor($session));
+            $payload['sync'] = $sync;
+            return $this->respond($session, false, $payload);
         }
         $key = 'tukar|' . $actor['user_id'] . '|' . $remote;
         if ($this->rates->tooMany($key)) {

@@ -185,7 +185,8 @@ final class WhatsAppGateway
     {
         $this->expireDue($actor['business_id']);
         $statement = $this->pdo->prepare(
-            'SELECT token_state, webhook_state, registration_state, messaging_state, display_phone, last_error_code
+            'SELECT token_state, webhook_state, registration_state, messaging_state, sync_contacts, sync_history,
+                    display_phone, last_error_code, sync_deadline_at, disconnected_at
              FROM whatsapp_connections
              WHERE business_id = ? AND disconnected_at IS NULL
              ORDER BY updated_at DESC, id DESC
@@ -193,6 +194,23 @@ final class WhatsAppGateway
         );
         $statement->execute([$actor['business_id']]);
         $row = $statement->fetch();
+        if (!is_array($row)) {
+            $closed = $this->pdo->prepare(
+                'SELECT token_state, webhook_state, registration_state, messaging_state, sync_contacts, sync_history,
+                        display_phone, last_error_code, sync_deadline_at, disconnected_at
+                 FROM whatsapp_connections
+                 WHERE business_id = ? AND disconnected_at IS NOT NULL
+                 ORDER BY disconnected_at DESC, id DESC
+                 LIMIT 1'
+            );
+            $closed->execute([$actor['business_id']]);
+            $row = $closed->fetch();
+            if (is_array($row)) {
+                $card = $this->labels($row, ($actor['role'] ?? '') === 'owner');
+                $card['linked'] = false;
+                return $card;
+            }
+        }
         if (is_array($row)) {
             return $this->labels($row, ($actor['role'] ?? '') === 'owner');
         }
@@ -545,13 +563,13 @@ final class WhatsAppGateway
             $insert = $this->pdo->prepare(
                 'INSERT INTO whatsapp_connections (
                     business_id, waba_id, phone_number_id, display_phone, token_state, webhook_state,
-                    registration_state, messaging_state, token_kind, token_ciphertext, token_nonce, token_tag,
+                    registration_state, messaging_state, sync_contacts, sync_history, token_kind, token_ciphertext, token_nonce, token_tag,
                     token_key_version, token_expires_at, refresh_supported, last_verified_at, last_error_code,
-                    subscribed_at, disconnected_at, created_at, updated_at
+                    subscribed_at, disconnected_at, created_at, updated_at, onboarded_at, sync_deadline_at
                  ) VALUES (
-                    ?, ?, ?, ?, \'verified\', \'not_subscribed\', ?, \'unverified\', ?, UNHEX(?), UNHEX(?), UNHEX(?), ?,
+                    ?, ?, ?, ?, \'verified\', \'not_subscribed\', ?, \'unverified\', \'pending\', \'pending\', ?, UNHEX(?), UNHEX(?), UNHEX(?), ?,
                     CASE WHEN ? > 0 THEN FROM_UNIXTIME(?) ELSE NULL END, 0, UTC_TIMESTAMP(), NULL,
-                    NULL, NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP()
+                    NULL, NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP(), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 24 HOUR)
                  )'
             );
             $insert->execute([
@@ -727,6 +745,50 @@ final class WhatsAppGateway
             'note' => $this->noteFor((string) ($row['last_error_code'] ?? ''), ''),
             'phone' => $phone,
             'linked' => true,
+            'contacts_sync' => $this->syncLabel((string) ($row['sync_contacts'] ?? 'not_applicable')),
+            'history_sync' => $this->syncLabel((string) ($row['sync_history'] ?? 'not_applicable')),
+            'sync_deadline' => is_string($row['sync_deadline_at'] ?? null) ? (string) $row['sync_deadline_at'] : '',
+        ];
+    }
+
+    private function syncLabel(string $status): string
+    {
+        return [
+            'not_applicable' => 'Tidak berkenaan',
+            'pending' => 'Menunggu',
+            'in_progress' => 'Sedang disegerak',
+            'completed' => 'Selesai',
+            'declined' => 'Ditolak',
+            'unavailable' => 'Tidak tersedia',
+            'failed' => 'Gagal',
+        ][$status] ?? 'Tidak berkenaan';
+    }
+
+    /**
+     * @param array{user_id:int,business_id:int,role:string,owner_user_id:int,status:string} $actor
+     * @return array{job_id:int,status:string,calls_graph:bool}
+     */
+    public function authorizeSync(array $actor, string $syncType): array
+    {
+        return (new CoexistenceSync($this->pdo, $this->graph, $this->seal, false))->authorize($actor, $syncType);
+    }
+
+    /**
+     * @param array{user_id:int,business_id:int,role:string,owner_user_id:int,status:string} $actor
+     * @return array{status:string}
+     */
+    public function settleContacts(array $actor): array
+    {
+        return (new CoexistenceSync($this->pdo, $this->graph, $this->seal, false))->settleContacts($actor);
+    }
+
+    /** @return array{ready:bool,calls_graph:bool,fields:list<string>} */
+    public function subscriptionReadiness(): array
+    {
+        return [
+            'ready' => WebhookReadiness::ready(),
+            'calls_graph' => false,
+            'fields' => WebhookReadiness::FIELDS,
         ];
     }
 
@@ -741,6 +803,8 @@ final class WhatsAppGateway
             'coexistence_ambiguous' => 'Lebih daripada satu nombor WhatsApp Business App yang sah. Sambungan tidak diikat.',
             'coexistence_mismatch' => 'Nombor yang dilaporkan tidak sepadan dengan nombor WhatsApp Business App yang sah.',
             'coexistence_unavailable' => 'Pengesahan nombor WhatsApp Business App tidak selesai.',
+            '2593109' => 'Perniagaan tidak berkongsi sejarah sembang.',
+            'PARTNER_REMOVED', 'ACCOUNT_OFFBOARDED', 'ACCOUNT_DISCONNECTED', 'BUSINESS_DOWNGRADE', 'CHANGE_NUMBER', 'COMPANION_INACTIVITY', 'PRIMARY_INACTIVITY', 'USER_RE_REGISTERED' => 'Sambungan platform perniagaan diputuskan.',
             default => match ($status) {
                 'abandoned' => $code === '' ? 'Aliran Meta dibatalkan.' : 'Aliran Meta dibatalkan. Kod ralat ' . $code . '.',
                 'incomplete' => 'Meta tidak memulangkan nombor telefon.',

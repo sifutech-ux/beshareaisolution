@@ -84,7 +84,8 @@ final class MetaGraph
         private string $appId,
         private string $appSecret,
         private string $version,
-        private ?MetaTransport $transport = null
+        private ?MetaTransport $transport = null,
+        private mixed $ready = null
     ) {
         if (preg_match('/\A\d{5,20}\z/', $this->appId) !== 1 || $this->appSecret === '' || preg_match('/\Av\d+\.\d+\z/', $this->version) !== 1) {
             throw new AuthException('Konfigurasi Meta tidak sah.', 503);
@@ -141,6 +142,11 @@ final class MetaGraph
 
     public function subscribe(string $token, string $wabaId): bool
     {
+        $ready = $this->ready;
+        $allowed = $ready === null ? WebhookReadiness::ready() : (is_callable($ready) ? $ready() === true : false);
+        if ($allowed !== true) {
+            return false;
+        }
         $this->assertId($wabaId);
         try {
             $json = $this->request('POST', $wabaId . '/subscribed_apps', $this->bearer($token), '');
@@ -150,10 +156,29 @@ final class MetaGraph
         return ($json['success'] ?? false) === true;
     }
 
+    /** @return array<string,mixed> */
+    public function smbAppData(string $token, string $phoneId, string $syncType): array
+    {
+        if (!$this->transport instanceof MetaTransport) {
+            throw new MetaCallException('disabled', 409);
+        }
+        if (!in_array($syncType, ['smb_app_state_sync', 'history'], true)) {
+            throw new MetaCallException('sync_type', 400);
+        }
+        $this->assertId($phoneId);
+        return $this->request('POST', $phoneId . '/smb_app_data', [
+            'authorization' => 'Bearer ' . $token,
+            'content-type' => 'application/json',
+        ], (string) json_encode([
+            'messaging_product' => 'whatsapp',
+            'sync_type' => $syncType,
+        ], JSON_UNESCAPED_SLASHES));
+    }
+
     /** @param array<string,string> $headers @param array<string,string> $query @return array<string,mixed> */
     private function request(string $method, string $path, array $headers, string $body, array $query = []): array
     {
-        if (preg_match('#\A(?:oauth/access_token|debug_token|\d{5,32}(?:/phone_numbers|/subscribed_apps)?)\z#', $path) !== 1) {
+        if (preg_match('#\A(?:oauth/access_token|debug_token|\d{5,32}(?:/phone_numbers|/subscribed_apps|/smb_app_data)?)\z#', $path) !== 1) {
             throw new MetaCallException('path', 502);
         }
         $url = 'https://graph.facebook.com/' . $this->version . '/' . $path;
