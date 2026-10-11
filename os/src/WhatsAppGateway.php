@@ -69,6 +69,17 @@ final class WhatsAppGateway
             } elseif ($event === 'ERROR') {
                 $this->finishRow((int) $row['id'], $actor['business_id'], 'rejected', $event, $step, $errorCode ?: 'error', $waba, $phone);
                 $this->audit($actor, 'sambungan_ditolak', (int) $row['id'], null);
+            } elseif ($event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING') {
+                if ($waba === null) {
+                    $this->finishRow((int) $row['id'], $actor['business_id'], 'incomplete', $event, $step, 'coexistence_waba', null, null);
+                } else {
+                    $update = $this->pdo->prepare(
+                        'UPDATE onboarding_sessions
+                         SET finish_event = ?, current_step = ?, reported_waba_id = ?, reported_phone_number_id = ?
+                         WHERE id = ? AND business_id = ?'
+                    );
+                    $update->execute([$event, $step, $waba, $phone, $row['id'], $actor['business_id']]);
+                }
             } elseif ($event === 'FINISH_ONLY_WABA' || $phone === null || $waba === null) {
                 $this->finishRow((int) $row['id'], $actor['business_id'], 'incomplete', $event, $step, null, $waba, null);
             } else {
@@ -86,7 +97,9 @@ final class WhatsAppGateway
             }
             throw $error;
         }
-        if (in_array($event, ['FINISH', 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'], true) && $waba !== null && $phone !== null) {
+        if ($event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING' && $waba !== null) {
+            $this->bindIfHeld($actor, $this->text($body, 'state'), $sessionKey);
+        } elseif ($event === 'FINISH' && $waba !== null && $phone !== null) {
             $this->bindIfHeld($actor, $this->text($body, 'state'), $sessionKey);
         }
     }
@@ -320,14 +333,16 @@ final class WhatsAppGateway
      */
     private function bindIfHeld(array $actor, string $state, string $sessionKey): void
     {
+        $coexistence = false;
         $this->pdo->beginTransaction();
         try {
             $row = $this->lock($actor, $state, $sessionKey);
+            $coexistence = (string) ($row['finish_event'] ?? '') === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING';
             $ready = $row['status'] === 'token_held'
                 && is_string($row['reported_waba_id'])
-                && is_string($row['reported_phone_number_id'])
                 && is_string($row['token_ciphertext'])
-                && $row['token_ciphertext'] !== '';
+                && $row['token_ciphertext'] !== ''
+                && ($coexistence || is_string($row['reported_phone_number_id']));
             if (!$ready) {
                 $this->pdo->commit();
                 return;
@@ -344,6 +359,10 @@ final class WhatsAppGateway
                 $this->pdo->rollBack();
             }
             throw $error;
+        }
+        if ($coexistence) {
+            $this->bindCoexistence($actor, $row, $token);
+            return;
         }
         $this->bind($actor, $row, $token);
     }
@@ -462,6 +481,153 @@ final class WhatsAppGateway
         }
     }
 
+    /**
+     * Bind a WhatsApp Business App number without subscribing webhooks or registering the phone.
+     * Eligibility is the Coexistence flag pair, not the number of phone records.
+     *
+     * @param array{user_id:int,business_id:int,role:string,owner_user_id:int,status:string} $actor
+     * @param array<string,mixed> $row
+     */
+    private function bindCoexistence(array $actor, array $row, string $token): void
+    {
+        $wabaId = (string) $row['reported_waba_id'];
+        $reportedPhone = is_string($row['reported_phone_number_id'] ?? null) ? (string) $row['reported_phone_number_id'] : null;
+        try {
+            $debug = $this->graph->debugToken($token);
+            $data = is_array($debug['data'] ?? null) ? $debug['data'] : [];
+            if (($data['is_valid'] ?? false) !== true || (string) ($data['app_id'] ?? '') !== $this->appId) {
+                throw new MetaCallException('190', 401);
+            }
+            $expiresAt = $data['expires_at'] ?? 0;
+            $expiresAt = is_int($expiresAt) ? $expiresAt : (is_numeric($expiresAt) ? (int) $expiresAt : 0);
+            if ($expiresAt > 0 && $expiresAt <= time()) {
+                throw new MetaCallException('190', 401);
+            }
+            if (!in_array($wabaId, $this->targetIds($data, 'whatsapp_business_management'), true)
+                || !in_array($wabaId, $this->targetIds($data, 'whatsapp_business_messaging'), true)) {
+                throw new MetaCallException('waba', 409);
+            }
+            $waba = $this->graph->waba($token, $wabaId);
+            if ((string) ($waba['id'] ?? '') !== $wabaId) {
+                throw new MetaCallException('waba', 409);
+            }
+            $eligible = $this->eligibleCoexistencePhones($this->graph->coexistencePhones($token, $wabaId));
+        } catch (MetaCallException $error) {
+            if ($error->metaCode === '190') {
+                $this->rejectId((int) $row['id'], $actor['business_id'], $error->metaCode);
+                $this->audit($actor, 'sambungan_ditolak', (int) $row['id'], null);
+                throw new AuthException('Kelayakan Meta telah tamat atau tidak sah.', 401);
+            }
+            $this->stopIncomplete((int) $row['id'], $actor['business_id'], $error->metaCode === 'waba' ? 'waba' : 'coexistence_unavailable');
+            return;
+        }
+        if (count($eligible) === 0) {
+            $this->stopIncomplete((int) $row['id'], $actor['business_id'], 'coexistence_absent');
+            return;
+        }
+        if (count($eligible) !== 1) {
+            $this->stopIncomplete((int) $row['id'], $actor['business_id'], 'coexistence_ambiguous');
+            return;
+        }
+        $match = $eligible[0];
+        $phoneId = (string) $match['id'];
+        if ($reportedPhone !== null && $reportedPhone !== $phoneId) {
+            $this->stopIncomplete((int) $row['id'], $actor['business_id'], 'coexistence_mismatch');
+            return;
+        }
+        $display = $match['display_phone_number'] ?? '';
+        $display = is_string($display) && preg_match('/\A[0-9 +\-]{6,32}\z/', $display) === 1 ? $display : null;
+        $registration = $this->registration((string) ($match['status'] ?? ''));
+        $kind = $this->kind($data, $expiresAt);
+        $sealed = $this->seal->seal($token, self::TOKEN_MAX);
+        $this->pdo->beginTransaction();
+        try {
+            $insert = $this->pdo->prepare(
+                'INSERT INTO whatsapp_connections (
+                    business_id, waba_id, phone_number_id, display_phone, token_state, webhook_state,
+                    registration_state, messaging_state, token_kind, token_ciphertext, token_nonce, token_tag,
+                    token_key_version, token_expires_at, refresh_supported, last_verified_at, last_error_code,
+                    subscribed_at, disconnected_at, created_at, updated_at
+                 ) VALUES (
+                    ?, ?, ?, ?, \'verified\', \'not_subscribed\', ?, \'unverified\', ?, UNHEX(?), UNHEX(?), UNHEX(?), ?,
+                    CASE WHEN ? > 0 THEN FROM_UNIXTIME(?) ELSE NULL END, 0, UTC_TIMESTAMP(), NULL,
+                    NULL, NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP()
+                 )'
+            );
+            $insert->execute([
+                $actor['business_id'],
+                $wabaId,
+                $phoneId,
+                $display,
+                $registration,
+                $kind,
+                bin2hex($sealed['ciphertext']),
+                bin2hex($sealed['nonce']),
+                bin2hex($sealed['tag']),
+                $sealed['version'],
+                $expiresAt,
+                $expiresAt,
+            ]);
+            $connectionId = (int) $this->pdo->lastInsertId();
+            $done = $this->pdo->prepare(
+                'UPDATE onboarding_sessions
+                 SET status = \'completed\', consumed_at = UTC_TIMESTAMP(),
+                     token_ciphertext = NULL, token_nonce = NULL, token_tag = NULL, token_key_version = NULL,
+                     reported_phone_number_id = ?
+                 WHERE id = ? AND business_id = ? AND status = \'token_held\''
+            );
+            $done->execute([$phoneId, $row['id'], $actor['business_id']]);
+            if ($done->rowCount() !== 1) {
+                throw new PDOException('onboarding completion rejected');
+            }
+            $this->audit($actor, 'sambungan_diikat', $connectionId, [
+                'waba_id' => $wabaId,
+                'phone_number_id' => $phoneId,
+            ]);
+            $this->pdo->commit();
+        } catch (PDOException $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            $this->rejectId((int) $row['id'], $actor['business_id'], 'phone');
+            if (str_contains($error->getMessage(), 'uq_wa_phone') || str_contains($error->getMessage(), 'Duplicate')) {
+                throw new AuthException('Nombor ini sudah disambungkan.', 409);
+            }
+            throw SqlGuard::translate($error);
+        } catch (\Throwable $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $error;
+        }
+    }
+
+    /**
+     * A phone is eligible only when both Coexistence flags match.
+     *
+     * @param array<string,mixed> $listed
+     * @return list<array<string,mixed>>
+     */
+    private function eligibleCoexistencePhones(array $listed): array
+    {
+        $eligible = [];
+        foreach (is_array($listed['data'] ?? null) ? $listed['data'] : [] as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $id = is_int($item['id'] ?? null) ? (string) $item['id'] : (is_string($item['id'] ?? null) ? $item['id'] : '');
+            if (preg_match('/\A\d{5,32}\z/', $id) !== 1) {
+                continue;
+            }
+            if (($item['is_on_biz_app'] ?? null) !== true || ($item['platform_type'] ?? null) !== 'CLOUD_API') {
+                continue;
+            }
+            $item['id'] = $id;
+            $eligible[] = $item;
+        }
+        return $eligible;
+    }
+
     /** @param array<string,mixed> $data @return list<string> */
     private function targetIds(array $data, string $scope): array
     {
@@ -570,6 +736,11 @@ final class WhatsAppGateway
             'subscribe_failed' => 'Token disahkan, tetapi langganan webhook gagal.',
             'expired', '190' => 'Kelayakan Meta telah tamat atau tidak sah.',
             'waba', 'phone' => 'Aset WhatsApp tidak disahkan untuk tenant ini.',
+            'coexistence_waba' => 'Meta tidak memulangkan akaun WhatsApp.',
+            'coexistence_absent' => 'Nombor WhatsApp Business App yang sah tidak dijumpai.',
+            'coexistence_ambiguous' => 'Lebih daripada satu nombor WhatsApp Business App yang sah. Sambungan tidak diikat.',
+            'coexistence_mismatch' => 'Nombor yang dilaporkan tidak sepadan dengan nombor WhatsApp Business App yang sah.',
+            'coexistence_unavailable' => 'Pengesahan nombor WhatsApp Business App tidak selesai.',
             default => match ($status) {
                 'abandoned' => $code === '' ? 'Aliran Meta dibatalkan.' : 'Aliran Meta dibatalkan. Kod ralat ' . $code . '.',
                 'incomplete' => 'Meta tidak memulangkan nombor telefon.',
@@ -590,7 +761,7 @@ final class WhatsAppGateway
             throw new AuthException('Keadaan tidak sah.', 403);
         }
         $statement = $this->pdo->prepare(
-            'SELECT id, status, session_hash, reported_waba_id, reported_phone_number_id,
+            'SELECT id, status, finish_event, session_hash, reported_waba_id, reported_phone_number_id,
                     HEX(token_ciphertext) AS token_ciphertext, HEX(token_nonce) AS token_nonce,
                     HEX(token_tag) AS token_tag, token_key_version,
                     expires_at <= UTC_TIMESTAMP() AS is_expired
@@ -635,6 +806,18 @@ final class WhatsAppGateway
             $this->pdo->beginTransaction();
         }
         $this->finishRow($id, $businessId, 'rejected', null, null, $safe, null, null);
+        if ($this->pdo->inTransaction()) {
+            $this->pdo->commit();
+        }
+    }
+
+    private function stopIncomplete(int $id, int $businessId, string $code): void
+    {
+        $safe = preg_match('/\A[A-Za-z0-9_-]{1,64}\z/', $code) === 1 ? $code : 'coexistence_unavailable';
+        if (!$this->pdo->inTransaction()) {
+            $this->pdo->beginTransaction();
+        }
+        $this->finishRow($id, $businessId, 'incomplete', null, null, $safe, null, null);
         if ($this->pdo->inTransaction()) {
             $this->pdo->commit();
         }

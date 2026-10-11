@@ -130,6 +130,15 @@ final class MetaGraph
         ]);
     }
 
+    /** @return array<string,mixed> */
+    public function coexistencePhones(string $token, string $wabaId): array
+    {
+        $this->assertId($wabaId);
+        return $this->request('GET', $wabaId . '/phone_numbers', $this->bearer($token), '', [
+            'fields' => 'id,display_phone_number,status,is_on_biz_app,platform_type',
+        ]);
+    }
+
     public function subscribe(string $token, string $wabaId): bool
     {
         $this->assertId($wabaId);

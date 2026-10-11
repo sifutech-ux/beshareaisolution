@@ -56,13 +56,26 @@ check(
 const options = context.signupLoginOptions("1028295100269838", "https://beshareaisolution.com/whatsapp/ruang.html");
 check(
   "v4 login omits an empty feature type and keeps the session version",
-  options.response_type === "code"
+  options.config_id === "1028295100269838"
+    && options.response_type === "code"
     && options.override_default_response_type === true
     && options.fallback_redirect_uri === "https://beshareaisolution.com/whatsapp/ruang.html"
     && options.extras.setup && Object.keys(options.extras.setup).length === 0
     && options.extras.sessionInfoVersion === "3"
     && !Object.hasOwn(options.extras, "featureType")
     && !Object.hasOwn(options, "featureType")
+);
+const coexistence = context.coexistenceLoginOptions("1028295100269838", "https://beshareaisolution.com/whatsapp/ruang.html");
+check(
+  "coexistence launch adds only the business app feature type",
+  coexistence.config_id === options.config_id
+    && coexistence.response_type === "code"
+    && coexistence.override_default_response_type === true
+    && coexistence.fallback_redirect_uri === options.fallback_redirect_uri
+    && coexistence.extras.setup && Object.keys(coexistence.extras.setup).length === 0
+    && coexistence.extras.sessionInfoVersion === "3"
+    && coexistence.extras.featureType === "whatsapp_business_app_onboarding"
+    && !Object.hasOwn(options.extras, "featureType")
 );
 context.location = { origin: "https://beshareaisolution.com", pathname: "/whatsapp/ruang.html" };
 check("redirect target drops the hash and query", context.signupPageRedirect() === "https://beshareaisolution.com/whatsapp/ruang.html");
@@ -77,6 +90,25 @@ const click = source.slice(source.indexOf("function openEmbeddedSignup"), source
 const loginAt = click.indexOf("window.FB.login");
 const fetchAt = click.indexOf('callApi("sambung"');
 check("embedded signup opens before the session request", loginAt > 0 && fetchAt > loginAt);
-check("signup source does not send an empty feature type", !source.includes("featureType:"));
+const standardLaunch = source.slice(source.indexOf("function openEmbeddedSignup"), source.indexOf("function openCoexistenceSignup"));
+const appLaunch = source.slice(source.indexOf("function openCoexistenceSignup"), source.indexOf("function beginSignup"));
+check(
+  "standard signup keeps its own launch options",
+  standardLaunch.includes("signupLoginOptions(") && !standardLaunch.includes("coexistenceLoginOptions") && !standardLaunch.includes("featureType")
+);
+check(
+  "business app signup uses the coexistence launch",
+  appLaunch.includes("coexistenceLoginOptions(") && !appLaunch.includes("signupLoginOptions(")
+);
+check(
+  "signup source sends the named coexistence feature and no empty feature type",
+  source.includes('featureType: "whatsapp_business_app_onboarding"')
+    && !source.includes('featureType: ""')
+    && !source.includes("featureType: ''")
+    && source.includes('data-act="connect"')
+    && source.includes(">Buka tetingkap Meta<")
+    && source.includes('data-act="connect-app"')
+    && source.includes(">Sambung WhatsApp Business App<")
+);
 
 process.exit(failures === 0 ? 0 : 1);

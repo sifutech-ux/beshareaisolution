@@ -55,7 +55,14 @@ $check(
         && str_contains($dashboard, 'response_type: "code"')
         && str_contains($dashboard, 'fallback_redirect_uri')
         && str_contains($dashboard, 'function facebookSdkReady')
-        && !str_contains($dashboard, 'featureType:')
+        && str_contains($dashboard, 'function signupLoginOptions')
+        && str_contains($dashboard, 'function coexistenceLoginOptions')
+        && str_contains($dashboard, 'data-act="connect"')
+        && str_contains($dashboard, 'data-act="connect-app"')
+        && str_contains($dashboard, 'Sambung WhatsApp Business App')
+        && str_contains($dashboard, 'featureType: "whatsapp_business_app_onboarding"')
+        && !str_contains($dashboard, 'featureType: ""')
+        && !str_contains($dashboard, "featureType: ''")
         && str_contains($dashboard, 'function signupDiagnostic')
         && str_contains($dashboard, 'source.error_code')
         && str_contains($dashboard, 'source.error_id')
@@ -67,6 +74,24 @@ $check(
         && !str_contains($dashboard, 'console.')
 );
 $check('inbox proposal is not executed by the migrator', is_file($root . '/os/proposals/0002_inbox.sql') && !str_contains($migrator, '0002_inbox'));
+$gatewaySrc = (string) file_get_contents($root . '/os/src/WhatsAppGateway.php');
+$graphSrc = (string) file_get_contents($root . '/os/src/MetaGraph.php');
+$bindAt = strpos($gatewaySrc, 'private function bind(');
+$coexistAt = strpos($gatewaySrc, 'private function bindCoexistence(');
+$eligibleAt = strpos($gatewaySrc, 'private function eligibleCoexistencePhones(');
+$standardBind = is_int($bindAt) && is_int($coexistAt) ? substr($gatewaySrc, $bindAt, $coexistAt - $bindAt) : '';
+$coexistBind = is_int($coexistAt) && is_int($eligibleAt) ? substr($gatewaySrc, $coexistAt, $eligibleAt - $coexistAt) : '';
+$check(
+    'coexistence bind skips webhook subscription, registration, and history sync',
+    str_contains($standardBind, '$this->graph->subscribe(')
+        && !str_contains($coexistBind, 'graph->subscribe')
+        && !str_contains($coexistBind, 'subscribed_apps')
+        && !str_contains($coexistBind, '/register')
+        && !str_contains($coexistBind, 'smb_app')
+        && str_contains($graphSrc, 'is_on_biz_app,platform_type')
+        && !str_contains($graphSrc, 'smb_app_data')
+        && !str_contains($graphSrc, '/register')
+);
 
 $seal = new TokenSeal(random_bytes(32), 1);
 $round = $seal->seal('rahsia-ujian', 100);
@@ -647,6 +672,298 @@ $check(
     is_array($plainRow) && $plainRow['meta_error_code'] === null && $plainRow['current_step'] === 'BUSINESS_ACCOUNT_SELECTION' && ($plain['body']['connection']['note'] ?? '') === 'Aliran Meta dibatalkan.'
 );
 
+$app = [];
+$appIssued = $http->handle('GET', 'sesi', $app, [], [], $remote, $host, 'app-owner');
+$appCreated = $http->handle('POST', 'daftar', $app, [
+    'name' => 'Pemilik Aplikasi',
+    'email' => 'aplikasi.meta@kedai.test',
+    'password' => 'kata-laluan-yang-panjang',
+    'business' => 'Kedai Aplikasi',
+], ['x-csrf-token' => $appIssued['body']['csrf']], $remote, $host, 'app-owner');
+$appCsrf = (string) $appCreated['body']['csrf'];
+$http->handle('POST', 'ahli', $app, [
+    'name' => 'Staf Aplikasi',
+    'email' => 'staf.aplikasi@kedai.test',
+    'password' => 'staf-laluan-panjang',
+    'role' => 'staff',
+], ['x-csrf-token' => $appCsrf], $remote, $host, 'app-owner');
+$appStaff = [];
+$appStaffIssued = $http->handle('GET', 'sesi', $appStaff, [], [], $remote, $host, 'app-staff');
+$appStaffLogin = $http->handle('POST', 'masuk', $appStaff, [
+    'email' => 'staf.aplikasi@kedai.test',
+    'password' => 'staf-laluan-panjang',
+], ['x-csrf-token' => $appStaffIssued['body']['csrf']], $remote, $host, 'app-staff');
+$appStaffDenied = catchStatus(function () use ($http, &$appStaff, $appStaffLogin, $remote, $host): void {
+    $http->handle('POST', 'sambung', $appStaff, [], ['x-csrf-token' => $appStaffLogin['body']['csrf']], $remote, $host, 'app-staff');
+});
+$check('staff cannot start coexistence onboarding', $appStaffDenied === 403);
+
+$appWaba = '100000000000611';
+$appPhone = '100000000000612';
+$appOtherPhone = '100000000000613';
+$appToken = 'EAA-coexistence-token-not-real';
+$beforeAppLinks = (string) $pdo->query('SELECT COUNT(*) FROM whatsapp_connections')->fetchColumn();
+$script->calls = [];
+$script->script = [oauthResponse($appToken)];
+$appStarted = $http->handle('POST', 'sambung', $app, [], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
+$appState = (string) ($appStarted['body']['state'] ?? '');
+$appHeld = $http->handle('POST', 'tukar', $app, [
+    'state' => $appState,
+    'code' => 'app-code-abcdefghij',
+], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
+$heldRow = latestOnboarding($pdo, 'Kedai Aplikasi');
+$script->script = [
+    debugResponse($appId, $appWaba),
+    ['status' => 200, 'json' => ['id' => $appWaba, 'name' => 'Kedai Aplikasi']],
+    ['status' => 200, 'json' => ['data' => [
+        coexistPhone($appPhone, true, 'CLOUD_API', '+60 12 300 0612'),
+        coexistPhone($appOtherPhone, false, 'CLOUD_API', '+60 13 300 0613'),
+    ]]],
+    ['status' => 200, 'json' => ['success' => true]],
+];
+$appFinished = $http->handle('POST', 'peristiwa', $app, [
+    'state' => $appState,
+    'event' => 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
+    'waba_id' => $appWaba,
+], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
+$appJson = json_encode($appFinished['body'], JSON_UNESCAPED_SLASHES);
+$appTargets = callTargets($script->calls);
+$appRow = $pdo->query('SELECT business_id, waba_id, phone_number_id, webhook_state, registration_state, messaging_state, subscribed_at IS NULL AS unsubscribed, HEX(token_ciphertext) AS token_hex FROM whatsapp_connections WHERE phone_number_id = \'100000000000612\'')->fetch();
+$appBusiness = (string) $pdo->query('SELECT id FROM businesses WHERE name = \'Kedai Aplikasi\'')->fetchColumn();
+$check(
+    'waba-only coexistence finish binds the single flagged phone without subscribing',
+    is_array($heldRow)
+        && $heldRow['status'] === 'token_held'
+        && ($appHeld['body']['connection']['linked'] ?? true) === false
+        && is_array($appRow)
+        && (string) $appRow['business_id'] === $appBusiness
+        && $appRow['waba_id'] === $appWaba
+        && $appRow['phone_number_id'] === $appPhone
+        && $appRow['webhook_state'] === 'not_subscribed'
+        && $appRow['registration_state'] === 'registered'
+        && $appRow['messaging_state'] === 'unverified'
+        && (string) $appRow['unsubscribed'] === '1'
+        && ($appFinished['body']['connection']['token'] ?? '') === 'Disahkan'
+        && ($appFinished['body']['connection']['webhook'] ?? '') === 'Belum dilanggan'
+        && ($appFinished['body']['connection']['phone'] ?? '') === '+60 12 300 0612'
+        && ($appFinished['body']['connection']['messaging'] ?? '') === 'Belum'
+        && is_string($appJson)
+        && !str_contains($appJson, $appToken)
+        && !str_contains($appJson, 'app-code-abcdefghij')
+        && !str_contains(strtoupper((string) $appRow['token_hex']), strtoupper(bin2hex($appToken)))
+        && coexistenceCallsAreSafe($appTargets)
+        && str_contains($appTargets, '/phone_numbers?')
+        && str_contains($appTargets, 'is_on_biz_app')
+        && str_contains($appTargets, 'platform_type')
+        && !str_contains($appTargets, 'subscribed_apps')
+);
+$check('coexistence does not bind the unflagged extra phone', (string) $pdo->query('SELECT COUNT(*) FROM whatsapp_connections WHERE phone_number_id = \'100000000000613\'')->fetchColumn() === '0');
+
+$earlyWaba = '100000000000621';
+$earlyPhone = '100000000000622';
+$earlyToken = 'EAA-coexistence-early-not-real';
+$script->calls = [];
+$script->script = [];
+$earlyStarted = $http->handle('POST', 'sambung', $app, [], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
+$earlyState = (string) ($earlyStarted['body']['state'] ?? '');
+$earlyEvent = $http->handle('POST', 'peristiwa', $app, [
+    'state' => $earlyState,
+    'event' => 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
+    'waba_id' => $earlyWaba,
+], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
+$earlyCalls = $script->calls;
+$earlyPending = latestOnboarding($pdo, 'Kedai Aplikasi');
+$script->script = [
+    oauthResponse($earlyToken),
+    debugResponse($appId, $earlyWaba),
+    ['status' => 200, 'json' => ['id' => $earlyWaba, 'name' => 'Kedai Aplikasi']],
+    ['status' => 200, 'json' => ['data' => [
+        coexistPhone($earlyPhone, true, 'CLOUD_API', '+60 12 300 0622'),
+    ]]],
+];
+$earlyDone = $http->handle('POST', 'tukar', $app, [
+    'state' => $earlyState,
+    'code' => 'early-code-abcdefgh',
+], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
+$earlyRow = $pdo->query('SELECT webhook_state, phone_number_id FROM whatsapp_connections WHERE phone_number_id = \'100000000000622\'')->fetch();
+$check(
+    'coexistence event before the code stays pending and then binds',
+    $earlyCalls === []
+        && is_array($earlyPending)
+        && $earlyPending['status'] === 'pending'
+        && $earlyPending['finish_event'] === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'
+        && $earlyPending['reported_waba_id'] === $earlyWaba
+        && $earlyPending['reported_phone_number_id'] === null
+        && is_array($earlyRow)
+        && $earlyRow['webhook_state'] === 'not_subscribed'
+        && ($earlyDone['body']['connection']['phone'] ?? '') === '+60 12 300 0622'
+        && coexistenceCallsAreSafe(callTargets($script->calls))
+);
+
+$ambiguous = runCoexistence($http, $pdo, $script, $app, $remote, $host, 'app-owner', $appId, '100000000000631', 'EAA-ambiguous-token-not-real', 'ambiguous-code-abcdef', [
+    coexistPhone('100000000000632', true, 'CLOUD_API', '+60 12 300 0632'),
+    coexistPhone('100000000000633', true, 'CLOUD_API', '+60 12 300 0633'),
+], '100000000000631');
+$check(
+    'two flagged phones stay incomplete and unbound',
+    $ambiguous['status'] === 'incomplete'
+        && $ambiguous['code'] === 'coexistence_ambiguous'
+        && $ambiguous['links'] === 0
+        && $ambiguous['safe']
+);
+
+$invalidPlatform = runCoexistence($http, $pdo, $script, $app, $remote, $host, 'app-owner', $appId, '100000000000641', 'EAA-platform-token-not-real', 'platform-code-abcdef', [
+    coexistPhone('100000000000642', true, 'CONSUMER', '+60 12 300 0642'),
+], '100000000000641');
+$check(
+    'a single phone with the wrong platform stays incomplete',
+    $invalidPlatform['status'] === 'incomplete'
+        && $invalidPlatform['code'] === 'coexistence_absent'
+        && $invalidPlatform['links'] === 0
+        && $invalidPlatform['safe']
+);
+
+$invalidFlag = runCoexistence($http, $pdo, $script, $app, $remote, $host, 'app-owner', $appId, '100000000000651', 'EAA-flag-token-not-real', 'flag-code-abcdefghij', [
+    [
+        'id' => '100000000000652',
+        'display_phone_number' => '+60 12 300 0652',
+        'status' => 'CONNECTED',
+        'is_on_biz_app' => 1,
+        'platform_type' => 'CLOUD_API',
+    ],
+], '100000000000651');
+$check(
+    'a non-boolean coexistence flag does not make the only phone eligible',
+    $invalidFlag['status'] === 'incomplete' && $invalidFlag['code'] === 'coexistence_absent' && $invalidFlag['links'] === 0 && $invalidFlag['safe']
+);
+
+$mismatch = runCoexistence($http, $pdo, $script, $app, $remote, $host, 'app-owner', $appId, '100000000000661', 'EAA-mismatch-token-not-real', 'mismatch-code-abcdef', [
+    coexistPhone('100000000000662', true, 'CLOUD_API', '+60 12 300 0662'),
+    coexistPhone('100000000000663', false, 'CLOUD_API', '+60 13 300 0663'),
+], '100000000000661', '100000000000663');
+$check(
+    'a reported phone that is not the flagged phone stays unbound',
+    $mismatch['status'] === 'incomplete'
+        && $mismatch['code'] === 'coexistence_mismatch'
+        && $mismatch['links'] === 0
+        && (string) $pdo->query('SELECT COUNT(*) FROM whatsapp_connections WHERE phone_number_id = \'100000000000662\'')->fetchColumn() === '0'
+        && $mismatch['safe']
+);
+
+$missingPhones = runCoexistence($http, $pdo, $script, $app, $remote, $host, 'app-owner', $appId, '100000000000671', 'EAA-empty-token-not-real', 'empty-code-abcdefgh', [], '100000000000671');
+$check(
+    'an empty phone list stays incomplete',
+    $missingPhones['status'] === 'incomplete' && $missingPhones['code'] === 'coexistence_absent' && $missingPhones['links'] === 0 && $missingPhones['safe']
+);
+
+$script->calls = [];
+$script->script = [oauthResponse('EAA-missing-waba-not-real')];
+$missingStarted = $http->handle('POST', 'sambung', $app, [], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
+$missingState = (string) ($missingStarted['body']['state'] ?? '');
+$http->handle('POST', 'tukar', $app, [
+    'state' => $missingState,
+    'code' => 'missing-waba-code-ab',
+], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
+$callsAfterMissingExchange = count($script->calls);
+$missingEvent = $http->handle('POST', 'peristiwa', $app, [
+    'state' => $missingState,
+    'event' => 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
+], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
+$missingRow = latestOnboarding($pdo, 'Kedai Aplikasi');
+$check(
+    'coexistence without a waba stays incomplete and does not list phones',
+    is_array($missingRow)
+        && $missingRow['status'] === 'incomplete'
+        && $missingRow['meta_error_code'] === 'coexistence_waba'
+        && (string) $missingRow['token_cleared'] === '1'
+        && count($script->calls) === $callsAfterMissingExchange
+        && coexistenceCallsAreSafe(callTargets($script->calls))
+);
+
+$foreign = runCoexistence($http, $pdo, $script, $app, $remote, $host, 'app-owner', $appId, '100000000000681', 'EAA-foreign-waba-not-real', 'foreign-code-abcdef', [
+    coexistPhone('100000000000682', true, 'CLOUD_API', '+60 12 300 0682'),
+], '100000000000681', null, '100000000000699');
+$check(
+    'a waba outside the authorized token stays incomplete',
+    $foreign['status'] === 'incomplete' && $foreign['code'] === 'waba' && $foreign['links'] === 0 && $foreign['safe'] && !str_contains($foreign['targets'], 'subscribed_apps')
+);
+
+$edge = [];
+$edgeIssued = $http->handle('GET', 'sesi', $edge, [], [], $remote, $host, 'edge-owner');
+$edgeCreated = $http->handle('POST', 'daftar', $edge, [
+    'name' => 'Pemilik Sempadan',
+    'email' => 'sempadan.meta@kedai.test',
+    'password' => 'kata-laluan-yang-panjang',
+    'business' => 'Kedai Sempadan',
+], ['x-csrf-token' => $edgeIssued['body']['csrf']], $remote, $host, 'edge-owner');
+$script->calls = [];
+$script->script = [oauthResponse('EAA-edge-should-not-exchange')];
+$edgeCross = catchStatus(function () use ($http, &$edge, $edgeCreated, $appState, $remote, $host): void {
+    $http->handle('POST', 'peristiwa', $edge, [
+        'state' => $appState,
+        'event' => 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
+        'waba_id' => $appWaba,
+    ], ['x-csrf-token' => $edgeCreated['body']['csrf']], $remote, $host, 'edge-owner');
+});
+$edgeExchange = catchStatus(function () use ($http, &$edge, $appState, $remote, $host): void {
+    $http->handle('POST', 'tukar', $edge, [
+        'state' => $appState,
+        'code' => 'edge-code-abcdefghij',
+    ], ['x-csrf-token' => $edge['csrf']], $remote, $host, 'edge-owner');
+});
+$edgeLinks = (string) $pdo->query('SELECT COUNT(*) FROM whatsapp_connections WHERE business_id = (SELECT id FROM businesses WHERE name = \'Kedai Sempadan\')')->fetchColumn();
+$check('another tenant cannot use a coexistence session', $edgeCross === 403 && $edgeExchange === 403 && $edgeLinks === '0' && $script->calls === []);
+
+$cancelApp = $http->handle('POST', 'sambung', $app, [], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
+$cancelAppState = (string) ($cancelApp['body']['state'] ?? '');
+$script->calls = [];
+$script->script = [oauthResponse('EAA-app-cancel-not-real')];
+$cancelAppEvent = $http->handle('POST', 'peristiwa', $app, [
+    'state' => $cancelAppState,
+    'event' => 'CANCEL',
+    'current_step' => 'WHATSAPP_BUSINESS_APP_ONBOARDING',
+    'error_code' => '524126',
+    'error_message' => 'do-not-store-app-cancel',
+], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
+$cancelAppRow = latestOnboarding($pdo, 'Kedai Aplikasi');
+$cancelAppExchange = catchStatus(function () use ($http, &$app, $cancelAppState, $remote, $host): void {
+    $http->handle('POST', 'tukar', $app, [
+        'state' => $cancelAppState,
+        'code' => 'app-cancel-code-abcd',
+    ], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
+});
+$check(
+    'coexistence cancel stays abandoned and does not bind',
+    is_array($cancelAppRow)
+        && $cancelAppRow['status'] === 'abandoned'
+        && $cancelAppRow['meta_error_code'] === '524126'
+        && (string) $cancelAppRow['token_cleared'] === '1'
+        && $cancelAppExchange === 409
+        && $script->calls === []
+        && !str_contains((string) json_encode($cancelAppEvent['body']), 'do-not-store-app-cancel')
+);
+
+$errorApp = $http->handle('POST', 'sambung', $app, [], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
+$errorAppEvent = $http->handle('POST', 'peristiwa', $app, [
+    'state' => (string) ($errorApp['body']['state'] ?? ''),
+    'event' => 'ERROR',
+    'error_code' => 'APP_ERROR',
+    'waba_id' => '100000000000691',
+    'phone_number_id' => '100000000000692',
+], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
+$errorAppRow = latestOnboarding($pdo, 'Kedai Aplikasi');
+$check(
+    'coexistence error is rejected without a connection',
+    is_array($errorAppRow)
+        && $errorAppRow['status'] === 'rejected'
+        && $errorAppRow['finish_event'] === 'ERROR'
+        && (string) $pdo->query('SELECT COUNT(*) FROM whatsapp_connections WHERE phone_number_id = \'100000000000692\'')->fetchColumn() === '0'
+);
+$check(
+    'coexistence added connections only for flagged phones',
+    (string) $pdo->query('SELECT COUNT(*) FROM whatsapp_connections')->fetchColumn() === (string) ((int) $beforeAppLinks + 2)
+);
+
 exit($failures === 0 ? 0 : 1);
 
 /** @param array{method:string,url:string,headers:array<string,string>,body:string} $call */
@@ -712,6 +1029,97 @@ function debugResponse(string $appId, string $waba): array
 function otherBusiness(PDO $pdo): int
 {
     return (int) $pdo->query('SELECT id FROM businesses WHERE name = \'Kedai Lain Meta\'')->fetchColumn();
+}
+
+/** @param array<string,mixed> $phone */
+function coexistPhone(string $id, bool $onApp, string $platform, string $display): array
+{
+    return [
+        'id' => $id,
+        'display_phone_number' => $display,
+        'status' => 'CONNECTED',
+        'is_on_biz_app' => $onApp,
+        'platform_type' => $platform,
+    ];
+}
+
+/** @param list<array{method:string,url:string,headers:array<string,string>,body:string}> $calls */
+function callTargets(array $calls): string
+{
+    $lines = [];
+    foreach ($calls as $call) {
+        $path = parse_url($call['url'], PHP_URL_PATH);
+        $query = parse_url($call['url'], PHP_URL_QUERY);
+        $lines[] = $call['method'] . ' ' . (is_string($path) ? $path : '') . (is_string($query) ? '?' . $query : '');
+    }
+    return implode("\n", $lines);
+}
+
+function coexistenceCallsAreSafe(string $targets): bool
+{
+    return !str_contains($targets, 'subscribed_apps')
+        && !str_contains($targets, 'smb_app_data')
+        && !str_contains($targets, '/register');
+}
+
+/** @return array<string,mixed>|false */
+function latestOnboarding(PDO $pdo, string $business): array|false
+{
+    $statement = $pdo->prepare(
+        'SELECT status, finish_event, meta_error_code, reported_waba_id, reported_phone_number_id,
+                token_ciphertext IS NULL AS token_cleared
+         FROM onboarding_sessions
+         WHERE business_id = (SELECT id FROM businesses WHERE name = ?)
+         ORDER BY id DESC
+         LIMIT 1'
+    );
+    $statement->execute([$business]);
+    $row = $statement->fetch();
+    return is_array($row) ? $row : false;
+}
+
+/**
+ * @param array<string,mixed> $session
+ * @param list<array<string,mixed>> $phones
+ * @return array{status:string,code:string,links:int,note:string,safe:bool,targets:string}
+ */
+function runCoexistence(AuthHttp $http, PDO $pdo, ScriptedMeta $script, array &$session, string $remote, string $host, string $key, string $appId, string $waba, string $token, string $code, array $phones, string $reportedWaba, ?string $reportedPhone = null, ?string $authorizedWaba = null): array
+{
+    $before = (int) $pdo->query('SELECT COUNT(*) FROM whatsapp_connections')->fetchColumn();
+    $script->calls = [];
+    $script->script = [oauthResponse($token)];
+    $started = $http->handle('POST', 'sambung', $session, [], ['x-csrf-token' => (string) $session['csrf']], $remote, $host, $key);
+    $state = (string) ($started['body']['state'] ?? '');
+    $http->handle('POST', 'tukar', $session, [
+        'state' => $state,
+        'code' => $code,
+    ], ['x-csrf-token' => (string) $session['csrf']], $remote, $host, $key);
+    $script->script = [
+        debugResponse($appId, $authorizedWaba ?? $waba),
+        ['status' => 200, 'json' => ['id' => $waba, 'name' => 'Kedai Aplikasi']],
+        ['status' => 200, 'json' => ['data' => $phones]],
+        ['status' => 200, 'json' => ['success' => true]],
+    ];
+    $body = [
+        'state' => $state,
+        'event' => 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
+        'waba_id' => $reportedWaba,
+    ];
+    if ($reportedPhone !== null) {
+        $body['phone_number_id'] = $reportedPhone;
+    }
+    $finished = $http->handle('POST', 'peristiwa', $session, $body, ['x-csrf-token' => (string) $session['csrf']], $remote, $host, $key);
+    $row = latestOnboarding($pdo, 'Kedai Aplikasi');
+    $payload = json_encode($finished['body'], JSON_UNESCAPED_SLASHES);
+    $after = (int) $pdo->query('SELECT COUNT(*) FROM whatsapp_connections')->fetchColumn();
+    return [
+        'status' => is_array($row) ? (string) $row['status'] : '',
+        'code' => is_array($row) ? (string) ($row['meta_error_code'] ?? '') : '',
+        'links' => $after - $before,
+        'note' => (string) ($finished['body']['connection']['note'] ?? ''),
+        'safe' => is_string($payload) && !str_contains($payload, $token) && !str_contains($payload, $code),
+        'targets' => callTargets($script->calls),
+    ];
 }
 
 function lab(): ?PDO

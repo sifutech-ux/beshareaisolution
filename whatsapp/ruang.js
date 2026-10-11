@@ -612,9 +612,11 @@ function connection(state) {
     <p>Ralat terakhir: ${esc(state.connection.note || "Tiada.")}</p>
     <div class="record-actions">
       <button class="btn" type="button" data-act="connect">Buka tetingkap Meta</button>
+      ${role(state) === "owner" ? `<button class="btn btn--ghost" type="button" data-act="connect-app">Sambung WhatsApp Business App</button>` : ""}
       <a class="btn btn--ghost" href="panduan-rakaman.html">Skrip rakaman</a>
     </div>
     <p class="muted" id="signup-hint">Butang ini membuka tetingkap Facebook untuk kebenaran whatsapp_business_management dan whatsapp_business_messaging. Kod ditukar pada pelayan. Token tidak disimpan dalam pelayar.</p>
+    ${role(state) === "owner" ? `<p class="muted" id="signup-app-hint">Sambung WhatsApp Business App membuka aliran rasmi untuk nombor yang sudah ada pada WhatsApp Business App. Ia tidak mendaftarkan nombor baharu dan tidak melanggan webhook.</p>` : ""}
     <h2>Draf templat</h2>
     <p class="muted">Borang ini menyimpan nama, bahasa, dan isi dalam pelayar sahaja. Ia tidak dihantar ke Meta dan tidak mencipta templat sebenar.</p>
     <form id="template-draft">
@@ -822,6 +824,10 @@ function onClick(event) {
   }
   if (act === "connect") {
     openEmbeddedSignup();
+    return;
+  }
+  if (act === "connect-app") {
+    openCoexistenceSignup();
     return;
   }
   if (act === "bill" || act === "step-go" || act === "step-back" || act === "step-next") {
@@ -1087,6 +1093,12 @@ function signupLoginOptions(configId, redirectUri) {
   };
 }
 
+function coexistenceLoginOptions(configId, redirectUri) {
+  const options = signupLoginOptions(configId, redirectUri);
+  options.extras.featureType = "whatsapp_business_app_onboarding";
+  return options;
+}
+
 function metaStatus(response) {
   const status = response && typeof response.status === "string" ? response.status : "";
   return /^[a-z_]{1,40}$/.test(status) ? status : "";
@@ -1121,6 +1133,14 @@ function signupEventFields(data) {
 }
 
 function openEmbeddedSignup() {
+  beginSignup(signupLoginOptions(signupReady.configId, signupPageRedirect()));
+}
+
+function openCoexistenceSignup() {
+  beginSignup(coexistenceLoginOptions(signupReady.configId, signupPageRedirect()));
+}
+
+function beginSignup(options) {
   const state = load();
   if (!state) return;
   if (role(state) !== "owner") {
@@ -1142,7 +1162,7 @@ function openEmbeddedSignup() {
     pending.status = metaStatus(response);
     pending.codeReady = true;
     settleSignup(pending);
-  }, signupLoginOptions(signupReady.configId, signupPageRedirect()));
+  }, options);
   const started = callApi("sambung", {});
   const hint = document.getElementById("signup-hint");
   if (hint) hint.textContent = "Tetingkap Meta dibuka. Biarkan workspace ini terbuka.";
