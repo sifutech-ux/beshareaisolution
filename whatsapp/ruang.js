@@ -22,8 +22,6 @@ const NAV = [
 function blankUi() {
   return {
     theme: "gelap",
-    connection: { token: "Belum", webhook: "Belum", registration: "Belum", messaging: "Belum" },
-    connectionNote: "",
     templateDraft: { name: "", language: "ms", body: "", savedAt: "" },
     inboxQuery: "",
     inboxFilter: "semua",
@@ -50,8 +48,6 @@ function loadUi() {
     return {
       ...base,
       theme: parsed.theme === "cerah" ? "cerah" : "gelap",
-      connection: { ...base.connection, ...(parsed.connection || {}) },
-      connectionNote: typeof parsed.connectionNote === "string" ? parsed.connectionNote : "",
       templateDraft: {
         name: typeof draft.name === "string" ? draft.name : "",
         language: draft.language === "en" ? "en" : "ms",
@@ -95,8 +91,10 @@ function load() {
     memberships: Array.isArray(live.memberships) ? live.memberships : [],
     audit: Array.isArray(live.audit) ? live.audit : [],
     knowledge: [],
-    contacts: [],
-    conversations: [],
+    contacts: Array.isArray(live.contacts) ? live.contacts : [],
+    conversations: Array.isArray(live.conversations) ? live.conversations : [],
+    connection: serverConnection(),
+    inboxReady: live.inbox_ready === true,
     rules: [],
     invoices: [],
     plan: "",
@@ -112,8 +110,6 @@ function save(state) {
   sessionStorage.setItem(UI_KEY, JSON.stringify({
     ...ui,
     theme: state.theme === "cerah" ? "cerah" : "gelap",
-    connection: state.connection || ui.connection,
-    connectionNote: typeof state.connectionNote === "string" ? state.connectionNote : "",
     templateDraft: state.templateDraft || ui.templateDraft,
     inboxQuery: state.inboxQuery || "",
     inboxFilter: state.inboxFilter || "semua",
@@ -129,6 +125,18 @@ function save(state) {
     hours: state.business && typeof state.business.hours === "string" ? state.business.hours : ui.hours,
     active: state.active || ""
   }));
+}
+
+function serverConnection() {
+  const source = live && live.connection && typeof live.connection === "object" ? live.connection : {};
+  return {
+    token: typeof source.token === "string" && source.token ? source.token : "Belum",
+    webhook: typeof source.webhook === "string" && source.webhook ? source.webhook : "Belum",
+    registration: typeof source.registration === "string" && source.registration ? source.registration : "Belum",
+    messaging: typeof source.messaging === "string" && source.messaging ? source.messaging : "Belum",
+    note: typeof source.note === "string" ? source.note : "",
+    phone: typeof source.phone === "string" ? source.phone : ""
+  };
 }
 
 function applyLive(data) {
@@ -229,7 +237,7 @@ function metrics(state) {
 
 function visibleConversations(state) {
   let list = state.conversations.slice();
-  if (role(state) === "staff") list = list.filter((item) => item.assignee === state.user.name);
+  if (role(state) === "staff") list = list.filter((item) => !item.assignee || item.assignee === state.user.name);
   const query = (state.inboxQuery || "").trim().toLowerCase();
   if (query) list = list.filter((item) => (item.name + " " + item.tag).toLowerCase().includes(query));
   const filter = state.inboxFilter || "semua";
@@ -292,6 +300,16 @@ function route() {
   place();
   requestAnimationFrame(place);
   if (hash === "sambungan") prepareSignup();
+  if (state && (hash === "peti" || hash === "kenalan" || hash === "papan" || hash === "sambungan") && inboxLoad !== hash) {
+    const requested = hash;
+    inboxLoad = hash;
+    const action = hash === "peti" || hash === "kenalan" ? "peti" : "sesi";
+    callApi(action).then((data) => {
+      if (data && data.user) applyLive(data);
+      const current = location.hash.replace("#", "") || "papan";
+      if (current === requested || (requested === "papan" && current === "mula")) route();
+    });
+  }
 }
 
 const views = {
@@ -364,7 +382,7 @@ function shell(state, hash, body) {
       </div>
     </aside>
     <section>
-      <p class="demo-banner">Akaun dan pasukan datang dari pelayan. Peti masuk, kenalan, pengetahuan, automasi, analitik, dan bil belum disambung. Meta belum dipanggil.</p>
+      <p class="demo-banner">${state.inboxReady ? "Akaun, pasukan, dan keadaan sambungan datang dari pelayan. Peti masuk hanya memaparkan mesej webhook yang disahkan. Pengetahuan, automasi, analitik, dan bil belum disambung." : "Akaun dan pasukan datang dari pelayan. Sambungan Meta belum dikonfigurasi pada pelayan ini. Peti masuk, pengetahuan, automasi, analitik, dan bil belum disambung."}</p>
       ${state.notice ? `<p class="error">${esc(state.notice)}</p>` : ""}
       ${body}
     </section>
@@ -376,13 +394,13 @@ function board(state) {
   const enabled = state.rules.filter((item) => item.enabled).length;
   return `<article class="panel">
     <h1>Papan ${esc(state.business.name)}</h1>
-    <p class="muted">Status: ${esc(businessStatus(state.business.status))}. Peranan: ${esc(roleLabel(role(state)))}. Automasi hidup: ${enabled}. Peti masuk belum disambung.</p>
+    <p class="muted">Status: ${esc(businessStatus(state.business.status))}. Peranan: ${esc(roleLabel(role(state)))}. Automasi hidup: ${enabled}. ${state.inboxReady ? "Peti masuk memaparkan mesej webhook yang disahkan." : "Peti masuk belum disambung."}</p>
     <div class="states">
       ${Object.entries({ Token: state.connection.token, Webhook: state.connection.webhook, Pendaftaran: state.connection.registration, Mesej: state.connection.messaging }).map(([name, value]) =>
         `<article class="state"><strong>${esc(name)}</strong><span>${esc(value)}</span></article>`).join("")}
     </div>
     <div class="os-kpis">
-      <article class="state os-kpi"><strong>${count.incoming}</strong><span>Perbualan masuk. Belum disambung ke pelayan.</span></article>
+      <article class="state os-kpi"><strong>${count.incoming}</strong><span>${state.inboxReady ? "Perbualan daripada webhook yang disahkan." : "Perbualan masuk. Belum disambung ke pelayan."}</span></article>
       <article class="state os-kpi"><strong>${count.aiReplied}</strong><span>Perbualan yang ada balasan AI.</span></article>
       <article class="state os-kpi"><strong>${count.human}</strong><span>Sedang dipegang manusia.</span></article>
       <article class="state os-kpi"><strong>${count.unanswered}</strong><span>Mesej terakhir daripada pelanggan, belum selesai.</span></article>
@@ -398,7 +416,7 @@ function inbox(state) {
   const current = list.find((item) => item.id === state.active) || null;
   const buttons = list.map((item) =>
     `<button class="thread-item ${item.id === state.active ? "is-on" : ""}" type="button" data-act="open" data-value="${esc(item.id)}"><span>${esc(item.name)}</span><small>${esc(label(item.mode))}${item.unread ? " · belum dibaca" : ""}</small></button>`
-  ).join("") || `<p class="muted">${state.conversations.length ? "Tiada hasil." : "Peti masuk belum disambung ke pelayan."}</p>`;
+  ).join("") || `<p class="muted">${state.conversations.length ? "Tiada hasil." : (state.inboxReady ? "Belum ada mesej webhook yang disahkan." : "Peti masuk belum disambung ke pelayan.")}</p>`;
   const filters = [["semua", "Semua"], ["belum", "Belum dibaca"], ["saya", "Tugasan saya"], ["ai", "AI"], ["manusia", "Manusia"], ["selesai", "Selesai"]];
   return `<article class="panel inbox-screen" data-screen="${esc(state.inboxPane || "list")}">
     <h1>Peti masuk</h1>
@@ -453,14 +471,14 @@ function profile(state, current) {
 function contacts(state) {
   const tags = ["semua", ...new Set(state.contacts.map((item) => item.tag))];
   let list = state.contacts.slice();
-  if (role(state) === "staff") list = list.filter((item) => item.assignee === state.user.name);
+  if (role(state) === "staff") list = list.filter((item) => !item.assignee || item.assignee === state.user.name);
   const query = (state.contactQuery || "").trim().toLowerCase();
   if (query) list = list.filter((item) => (item.name + item.phone + item.tag).toLowerCase().includes(query));
   if (state.contactTag && state.contactTag !== "semua") list = list.filter((item) => item.tag === state.contactTag);
   const current = list.find((item) => item.id === state.activeContact) || list[0] || null;
   const rows = list.map((item) =>
     `<tr><td><button class="btn btn--ghost" type="button" data-act="contact" data-value="${esc(item.id)}">${esc(item.name)}</button></td><td>${esc(item.tag)}</td><td>${esc(item.assignee)}</td></tr>`
-  ).join("") || `<tr><td colspan="3">${state.contacts.length ? "Tiada hasil." : "Kenalan belum disambung ke pelayan."}</td></tr>`;
+  ).join("") || `<tr><td colspan="3">${state.contacts.length ? "Tiada hasil." : (state.inboxReady ? "Belum ada kenalan daripada webhook." : "Kenalan belum disambung ke pelayan.")}</td></tr>`;
   const detail = current
     ? `<h2>${esc(current.name)}</h2><p>${esc(current.phone)}</p><p>Keutamaan: ${esc(current.priority)}</p><p class="muted">${esc(current.note || "Tiada nota.")}</p><p><a href="#peti">Buka perbualan berkaitan</a></p>`
     : `<p class="muted">Tiada profil.</p>`;
@@ -583,19 +601,20 @@ function connection(state) {
       <li>Cipta satu templat mesej dalam aplikasi atau dalam WhatsApp Manager.</li>
     </ol>
     <h2>Empat keadaan</h2>
-    <p class="muted">Token yang tersimpan belum bermaksud nombor sudah berfungsi. Keempat-empat keadaan masih Belum.</p>
+    <p class="muted">Keadaan ini datang dari pelayan. Token yang tersimpan belum bermaksud nombor sudah boleh menghantar mesej. Pendaftaran nombor tidak dijalankan dari skrin ini.</p>
     <div class="states">
       <article class="state"><strong>Token</strong><span>${esc(state.connection.token)}</span></article>
       <article class="state"><strong>Webhook</strong><span>${esc(state.connection.webhook)}</span></article>
       <article class="state"><strong>Pendaftaran</strong><span>${esc(state.connection.registration)}</span></article>
       <article class="state"><strong>Mesej</strong><span>${esc(state.connection.messaging)}</span></article>
     </div>
-    <p>Ralat terakhir: ${esc(state.connectionNote || "Tiada.")}</p>
+    ${state.connection.phone ? `<p>Nombor paparan: ${esc(state.connection.phone)}</p>` : ""}
+    <p>Ralat terakhir: ${esc(state.connection.note || "Tiada.")}</p>
     <div class="record-actions">
       <button class="btn" type="button" data-act="connect">Buka tetingkap Meta</button>
       <a class="btn btn--ghost" href="panduan-rakaman.html">Skrip rakaman</a>
     </div>
-    <p class="muted" id="signup-hint">Butang ini membuka tetingkap Facebook untuk kebenaran whatsapp_business_management. Tetingkap itu belum boleh dibuka kerana App ID dan Configuration ID belum dipasang.</p>
+    <p class="muted" id="signup-hint">Butang ini membuka tetingkap Facebook untuk kebenaran whatsapp_business_management dan whatsapp_business_messaging. Kod ditukar pada pelayan. Token tidak disimpan dalam pelayar.</p>
     <h2>Draf templat</h2>
     <p class="muted">Borang ini menyimpan nama, bahasa, dan isi dalam pelayar sahaja. Ia tidak dihantar ke Meta dan tidak mencipta templat sebenar.</p>
     <form id="template-draft">
@@ -672,7 +691,7 @@ function showError(message) {
 function setMode() {
   const state = load();
   if (!state) return;
-  state.notice = "Peti masuk belum disambung ke pelayan.";
+  state.notice = "Mod perbualan belum disambung. AI tidak membalas automatik.";
   state.modal = "";
   save(state);
   route();
@@ -701,6 +720,8 @@ function onClick(event) {
         return;
       }
       applyLive(data);
+      signupState = "";
+      inboxLoad = "";
       location.hash = "masuk";
       route();
     });
@@ -928,7 +949,6 @@ function onSubmit(event) {
       return;
     }
     state.templateDraft = { name, language, body, savedAt: stamp() };
-    state.connection = { token: "Belum", webhook: "Belum", registration: "Belum", messaging: "Belum" };
     log(state, "Draf templat disimpan dalam pelayar. Meta tidak dipanggil.");
     save(state);
     route();
@@ -958,7 +978,7 @@ function onInput(event) {
     save(state);
     const list = visibleConversations(state).map((item) =>
       `<button class="thread-item ${item.id === state.active ? "is-on" : ""}" type="button" data-act="open" data-value="${esc(item.id)}"><span>${esc(item.name)}</span><small>${esc(label(item.mode))}${item.unread ? " · belum dibaca" : ""}</small></button>`
-    ).join("") || `<p class="muted">${state.conversations.length ? "Tiada hasil." : "Peti masuk belum disambung ke pelayan."}</p>`;
+    ).join("") || `<p class="muted">${state.conversations.length ? "Tiada hasil." : (state.inboxReady ? "Belum ada mesej webhook yang disahkan." : "Peti masuk belum disambung ke pelayan.")}</p>`;
     const thread = document.getElementById("thread");
     if (thread) thread.innerHTML = list;
     return;
@@ -976,6 +996,8 @@ function onInput(event) {
 }
 
 let signupReady = { appId: "", configId: "", version: "v26.0" };
+let signupState = "";
+let inboxLoad = "";
 
 function facebookHost(origin) {
   try {
@@ -986,11 +1008,12 @@ function facebookHost(origin) {
   }
 }
 
-function keepUnconnected(state, note, action) {
-  state.connection = { token: "Belum", webhook: "Belum", registration: "Belum", messaging: "Belum" };
-  state.connectionNote = note;
-  if (action) log(state, action);
+function showSignupNote(note) {
+  const state = load();
+  if (!state) return;
+  state.notice = note;
   save(state);
+  inboxLoad = "";
   if ((location.hash.replace("#", "") || "") === "sambungan") route();
 }
 
@@ -1003,6 +1026,8 @@ function prepareSignup() {
         return;
       }
       signupReady = { appId: data.appId, configId: data.configId, version: data.version || "v26.0" };
+      const hint = document.getElementById("signup-hint");
+      if (hint) hint.textContent = "App ID dan Configuration ID sedia. Tetingkap Meta dibuka dari butang. Rahsia aplikasi tidak berada dalam pelayar.";
       loadFacebookSdk(signupReady);
     })
     .catch(() => {
@@ -1038,54 +1063,55 @@ function loadFacebookSdk(cfg) {
 function openEmbeddedSignup() {
   const state = load();
   if (!state) return;
-  if (!signupReady.appId || !signupReady.configId || !window.FB) {
-    keepUnconnected(
-      state,
-      signupReady.appId
-        ? "SDK Meta masih dimuat. Tekan butang sekali lagi."
-        : "Tetingkap Meta tidak dibuka. App ID dan Configuration ID belum dipasang pada pelayan.",
-      "Tetingkap Embedded Signup tidak dibuka."
-    );
+  if (role(state) !== "owner") {
+    showSignupNote("Hanya pemilik boleh menyambung WhatsApp.");
     return;
   }
-  window.FB.login((response) => {
-    const current = load();
-    if (!current) return;
-    const code = response && response.authResponse ? response.authResponse.code : "";
-    if (!code) {
-      keepUnconnected(current, "Tetingkap Meta ditutup sebelum kebenaran diberi. Empat keadaan kekal Belum.", "Embedded Signup ditutup tanpa kod.");
+  if (!signupReady.appId || !signupReady.configId || !window.FB) {
+    showSignupNote(signupReady.appId
+      ? "SDK Meta masih dimuat. Tekan butang sekali lagi."
+      : "Tetingkap Meta tidak dibuka. App ID dan Configuration ID belum dipasang pada pelayan.");
+    return;
+  }
+  callApi("sambung", {}).then((started) => {
+    if (!started.ok || !/^[0-9a-f]{64}$/.test(started.state || "")) {
+      showSignupNote(started.error || "Sesi sambungan tidak dapat dibuka.");
       return;
     }
-    keepUnconnected(current, "Tetingkap Meta dibuka. Kod dihantar ke pelayan. Empat keadaan kekal Belum.", "Kod Embedded Signup dihantar ke pelayan. Token tidak disimpan dalam pelayar.");
-    exchangeSignupCode(code);
-  }, {
-    config_id: signupReady.configId,
-    response_type: "code",
-    override_default_response_type: true,
-    extras: { setup: {} }
+    signupState = started.state;
+    window.FB.login((response) => {
+      const code = response && response.authResponse ? response.authResponse.code : "";
+      if (!code) {
+        showSignupNote("Tetingkap Meta ditutup sebelum kebenaran diberi.");
+        return;
+      }
+      exchangeSignupCode(code);
+    }, {
+      config_id: signupReady.configId,
+      response_type: "code",
+      override_default_response_type: true,
+      extras: {
+        setup: {},
+        featureType: "",
+        sessionInfoVersion: "3"
+      }
+    });
   });
 }
 
 function exchangeSignupCode(code) {
-  fetch("sambungan/tukar.php", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code })
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      const state = load();
-      if (!state) return;
-      const note = data && data.ok && data.stored
-        ? "Kod ditukar dan disimpan di luar tapak awam. Empat keadaan kekal Belum sehingga nombor disahkan."
-        : "Tetingkap Meta dibuka, tetapi pelayan belum boleh menyimpan token. Empat keadaan kekal Belum.";
-      keepUnconnected(state, note, "");
-    })
-    .catch(() => {
-      const state = load();
-      if (!state) return;
-      keepUnconnected(state, "Tetingkap Meta dibuka, tetapi pertukaran kod gagal. Empat keadaan kekal Belum.", "");
-    });
+  const state = signupState;
+  if (!state) {
+    showSignupNote("Sesi sambungan tidak sah. Buka tetingkap Meta sekali lagi.");
+    return;
+  }
+  callApi("tukar", { state, code }).then((data) => {
+    if (data && data.user) applyLive(data);
+    inboxLoad = "";
+    showSignupNote(data && data.ok
+      ? "Kod dihantar ke pelayan. Keadaan sambungan dikemas kini daripada pelayan."
+      : ((data && data.error) || "Pertukaran kod gagal."));
+  });
 }
 
 window.addEventListener("message", (event) => {
@@ -1098,14 +1124,27 @@ window.addEventListener("message", (event) => {
       return;
     }
   }
-  if (!data || data.type !== "WA_EMBEDDED_SIGNUP") return;
-  const state = load();
-  if (!state) return;
+  if (!data || data.type !== "WA_EMBEDDED_SIGNUP" || !signupState) return;
+  const info = data.data && typeof data.data === "object" ? data.data : {};
   const eventName = typeof data.event === "string" ? data.event : "";
-  const note = eventName === "FINISH" || eventName.indexOf("FINISH") === 0
-    ? "Meta menandakan aliran selesai. Empat keadaan kekal Belum sehingga nombor disahkan."
-    : "Aliran Meta berhenti pada " + (eventName || "langkah semasa") + ". Empat keadaan kekal Belum.";
-  keepUnconnected(state, note, "Peristiwa Embedded Signup: " + (eventName || "tanpa nama") + ".");
+  callApi("peristiwa", {
+    state: signupState,
+    event: eventName,
+    waba_id: typeof info.waba_id === "string" ? info.waba_id : "",
+    phone_number_id: typeof info.phone_number_id === "string" ? info.phone_number_id : "",
+    current_step: typeof info.current_step === "string" ? info.current_step : "",
+    error_code: typeof info.error_id === "string" ? info.error_id : ""
+  }).then((result) => {
+    if (result && result.user) applyLive(result);
+    inboxLoad = "";
+    const current = load();
+    if (!current) return;
+    current.notice = result && result.ok
+      ? "Peristiwa Meta direkod pada pelayan."
+      : ((result && result.error) || "Peristiwa Meta tidak dapat direkod.");
+    save(current);
+    if ((location.hash.replace("#", "") || "") === "sambungan") route();
+  });
 });
 
 async function boot() {

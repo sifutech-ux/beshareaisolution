@@ -20,6 +20,7 @@ final class Db
             PDO::MYSQL_ATTR_FOUND_ROWS => true,
             PDO::MYSQL_ATTR_MULTI_STATEMENTS => false,
         ]);
+        $pdo->exec("SET time_zone = '+00:00'");
         $current = $pdo->query('SELECT DATABASE() AS name');
         $row = $current === false ? false : $current->fetch();
         if (!is_array($row) || (string) $row['name'] !== Contract::DATABASE) {

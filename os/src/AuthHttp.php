@@ -7,7 +7,7 @@ use PDO;
 
 final class AuthHttp
 {
-    public function __construct(private PDO $pdo, private RateLimit $rates)
+    public function __construct(private PDO $pdo, private RateLimit $rates, private ?WhatsAppGateway $whatsapp = null)
     {
     }
 
@@ -17,7 +17,7 @@ final class AuthHttp
      * @param array<string,string> $headers
      * @return array{status:int,regenerate:bool,body:array<string,mixed>}
      */
-    public function handle(string $method, string $action, array &$session, array $body, array $headers, string $remote, string $host): array
+    public function handle(string $method, string $action, array &$session, array $body, array $headers, string $remote, string $host, string $sessionKey = ''): array
     {
         unset($body['business_id'], $body['user_id'], $body['role_id'], $body['owner_user_id']);
         $method = strtoupper($method);
@@ -38,6 +38,10 @@ final class AuthHttp
         if ($method === 'GET' && $action === 'audit') {
             $actor = $this->actor($session);
             return $this->respond($session, false, $this->payload($actor));
+        }
+        if ($method === 'GET' && $action === 'peti') {
+            $actor = $this->actor($session);
+            return $this->respond($session, false, $this->withInbox($actor));
         }
         if ($method !== 'POST') {
             throw new AuthException('Kaedah tidak dibenarkan.', 405);
@@ -102,6 +106,9 @@ final class AuthHttp
         if ($action === 'tetapan') {
             Tenants::rename($this->pdo, $actor, $this->text($body, 'name'));
             return $this->respond($session, false, $this->payload($this->actor($session)));
+        }
+        if ($action === 'sambung' || $action === 'peristiwa' || $action === 'tukar') {
+            return $this->whatsapp($action, $session, $actor, $body, $remote, $sessionKey);
         }
         throw new AuthException('Tindakan tidak dikenali.', 404);
     }
@@ -233,7 +240,79 @@ final class AuthHttp
             'memberships' => $memberships,
             'members' => $members,
             'audit' => $audit,
+            'connection' => $this->connection($context),
+            'inbox_ready' => $this->whatsapp instanceof WhatsAppGateway,
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $session
+     * @param array{user_id:int,business_id:int,role:string,owner_user_id:int,status:string,email:string,name:string,business_name:string,public_id:string} $actor
+     * @param array<string,mixed> $body
+     * @return array{status:int,regenerate:bool,body:array<string,mixed>}
+     */
+    private function whatsapp(string $action, array &$session, array $actor, array $body, string $remote, string $sessionKey): array
+    {
+        if (!$this->whatsapp instanceof WhatsAppGateway) {
+            throw new AuthException('Sambungan Meta belum dikonfigurasi.', 503);
+        }
+        if ($action === 'sambung') {
+            $key = 'sambung|' . $actor['user_id'] . '|' . $remote;
+            if ($this->rates->tooMany($key)) {
+                throw new AuthException('Terlalu banyak percubaan. Cuba lagi kemudian.', 429);
+            }
+            $this->rates->hit($key);
+            $started = $this->whatsapp->begin($actor, $sessionKey);
+            $payload = $this->payload($actor);
+            $payload['state'] = $started['state'];
+            return $this->respond($session, false, $payload);
+        }
+        if ($action === 'peristiwa') {
+            $this->whatsapp->record($actor, $sessionKey, $body);
+            return $this->respond($session, false, $this->payload($this->actor($session)));
+        }
+        $key = 'tukar|' . $actor['user_id'] . '|' . $remote;
+        if ($this->rates->tooMany($key)) {
+            throw new AuthException('Terlalu banyak percubaan. Cuba lagi kemudian.', 429);
+        }
+        $this->rates->hit($key);
+        $this->whatsapp->exchangeCode($actor, $sessionKey, $this->text($body, 'state'), $this->text($body, 'code'));
+        return $this->respond($session, false, $this->payload($this->actor($session)));
+    }
+
+    /**
+     * @param array{user_id:int,business_id:int,role:string,owner_user_id:int,status:string,email:string,name:string,business_name:string,public_id:string} $actor
+     * @return array<string,mixed>
+     */
+    private function withInbox(array $actor): array
+    {
+        $payload = $this->payload($actor);
+        $inbox = $this->whatsapp instanceof WhatsAppGateway
+            ? $this->whatsapp->inbox($actor)
+            : ['conversations' => [], 'contacts' => []];
+        $payload['conversations'] = $inbox['conversations'];
+        $payload['contacts'] = $inbox['contacts'];
+        return $payload;
+    }
+
+    /**
+     * @param array{user_id:int,business_id:int,role:string,owner_user_id:int,status:string} $actor
+     * @return array{token:string,webhook:string,registration:string,messaging:string,note:string,phone:string,linked:bool}
+     */
+    private function connection(array $actor): array
+    {
+        if (!$this->whatsapp instanceof WhatsAppGateway) {
+            return [
+                'token' => 'Belum',
+                'webhook' => 'Belum',
+                'registration' => 'Belum',
+                'messaging' => 'Belum',
+                'note' => '',
+                'phone' => '',
+                'linked' => false,
+            ];
+        }
+        return $this->whatsapp->view($actor);
     }
 
     /**
