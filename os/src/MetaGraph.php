@@ -54,8 +54,17 @@ final class StreamMetaTransport implements MetaTransport
                 'max_redirects' => 0,
             ],
         ]);
-        $raw = @file_get_contents($url, false, $context);
-        if (!is_string($raw) || strlen($raw) > 1048576) {
+        set_error_handler(static function (): bool {
+            return true;
+        });
+        try {
+            $fetched = file_get_contents($url, false, $context);
+        } finally {
+            restore_error_handler();
+            error_clear_last();
+        }
+        $raw = is_string($fetched) ? $fetched : null;
+        if ($raw === null || strlen($raw) > 1048576) {
             throw new MetaCallException('transport', 502);
         }
         $status = 0;
@@ -84,13 +93,11 @@ final class MetaGraph
 
     public function exchangeCode(string $code): string
     {
-        $json = $this->request('POST', 'oauth/access_token', [
-            'content-type' => 'application/x-www-form-urlencoded',
-        ], http_build_query([
+        $json = $this->request('GET', 'oauth/access_token', [], '', [
             'client_id' => $this->appId,
             'client_secret' => $this->appSecret,
             'code' => $code,
-        ]));
+        ]);
         $token = $json['access_token'] ?? '';
         if (!is_string($token) || $token === '' || strlen($token) > 1800) {
             throw new MetaCallException('token', 502);

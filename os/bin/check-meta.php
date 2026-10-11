@@ -4,6 +4,7 @@ declare(strict_types=1);
 use BesharOs\AuthException;
 use BesharOs\AuthHttp;
 use BesharOs\Csrf;
+use BesharOs\MetaCallException;
 use BesharOs\MetaGraph;
 use BesharOs\MetaTransport;
 use BesharOs\PrivateConfig;
@@ -113,6 +114,44 @@ $token = 'EAA-test-token-not-real';
 $waba = '100000000000101';
 $phone = '100000000000202';
 $code = 'test-code-abcdefgh';
+$direct = new ScriptedMeta();
+$direct->script = [oauthResponse($token)];
+$directGraph = new MetaGraph($appId, $secret, BESHARE_META_GRAPH, $direct);
+$exchanged = $directGraph->exchangeCode($code);
+$check(
+    'documented get exchange returns the business token',
+    $exchanged === $token && isset($direct->calls[0]) && oauthExchangeIsDocumented($direct->calls[0], $appId, $secret, $code)
+);
+$failScript = new ScriptedMeta();
+$failScript->script = [['status' => 400, 'json' => ['error' => ['code' => 100, 'message' => 'bad ' . $secret . ' ' . $code]]]];
+$failGraph = new MetaGraph($appId, $secret, BESHARE_META_GRAPH, $failScript);
+$failedDirect = false;
+try {
+    $failGraph->exchangeCode($code);
+} catch (MetaCallException $error) {
+    $failedDirect = $error->metaCode === '100'
+        && $error->httpStatus === 400
+        && $error->getMessage() === 'meta'
+        && credentialTextIsRedacted($error->getMessage(), $secret, $code);
+}
+$check(
+    'failed oauth exchange hides graph error text',
+    $failedDirect && isset($failScript->calls[0]) && oauthExchangeIsDocumented($failScript->calls[0], $appId, $secret, $code)
+);
+$redacted = false;
+try {
+    (new MetaGraph($appId, $secret, BESHARE_META_GRAPH, new class implements MetaTransport {
+        public function call(string $method, string $url, array $headers, string $body): array
+        {
+            throw new RuntimeException($url);
+        }
+    }))->exchangeCode($code);
+} catch (Throwable $error) {
+    $redacted = $error instanceof MetaCallException
+        && $error->getMessage() === 'meta'
+        && credentialTextIsRedacted($error->getMessage(), $secret, $code);
+}
+$check('oauth transport errors redact the credential url', $redacted);
 $host = 'lab.test';
 $remote = '127.0.0.1';
 $rates = new RateLimit(sys_get_temp_dir() . '/beshare-os-meta-rate-' . bin2hex(random_bytes(4)), 20, 900);
@@ -201,7 +240,7 @@ $early = $http->handle('POST', 'tukar', $owner, [
 $csrf = (string) $early['body']['csrf'];
 $earlyJson = json_encode($early['body'], JSON_UNESCAPED_SLASHES);
 $check('code exchange before the finish event stores no browser token', ($early['body']['connection']['token'] ?? '') === 'Tersimpan' && is_string($earlyJson) && !str_contains($earlyJson, $token) && !str_contains($earlyJson, $code) && !str_contains($earlyJson, $secret));
-$check('oauth url does not carry the app secret', count($script->calls) === 1 && str_starts_with($script->calls[0]['url'], 'https://graph.facebook.com/v26.0/oauth/access_token') && !str_contains($script->calls[0]['url'], $secret) && str_contains($script->calls[0]['body'], 'client_secret='));
+$check('oauth exchange uses the documented get query', count($script->calls) === 1 && oauthExchangeIsDocumented($script->calls[0], $appId, $secret, $code) && credentialTextIsRedacted((string) $earlyJson, $secret, $code));
 
 $script->script = [
     debugResponse($appId, $waba),
@@ -236,14 +275,19 @@ $check('authorization code cannot be exchanged twice', $again === 409);
 $badState = (string) $http->handle('POST', 'sambung', $owner, [], ['x-csrf-token' => $owner['csrf']], $remote, $host, 'owner-session')['body']['state'];
 $script->calls = [];
 $script->script = [['status' => 400, 'json' => ['error' => ['code' => 190, 'message' => 'should-not-leak ' . $token]]]];
-$failed = catchStatus(function () use ($http, &$owner, $badState, $remote, $host): void {
+$failed = 0;
+$failedMessage = '';
+try {
     $http->handle('POST', 'tukar', $owner, [
         'state' => $badState,
         'code' => 'failed-code-abcdefgh',
     ], ['x-csrf-token' => $owner['csrf']], $remote, $host, 'owner-session');
-});
+} catch (AuthException $error) {
+    $failed = $error->status();
+    $failedMessage = $error->getMessage();
+}
 $failedRow = $pdo->query("SELECT status, token_ciphertext IS NULL AS empty_token FROM onboarding_sessions ORDER BY id DESC LIMIT 1")->fetch();
-$check('failed oauth exchange stores nothing', $failed === 502 && is_array($failedRow) && $failedRow['status'] === 'rejected' && (int) $failedRow['empty_token'] === 1);
+$check('failed oauth exchange stores nothing', $failed === 502 && $failedMessage === 'Pertukaran kod Meta gagal.' && credentialTextIsRedacted($failedMessage, $secret, 'failed-code-abcdefgh') && isset($script->calls[0]) && oauthExchangeIsDocumented($script->calls[0], $appId, $secret, 'failed-code-abcdefgh') && is_array($failedRow) && $failedRow['status'] === 'rejected' && (int) $failedRow['empty_token'] === 1);
 $check('failed oauth does not subscribe the waba', count($script->calls) === 1);
 
 $forgedStart = $http->handle('POST', 'sambung', $owner, [], ['x-csrf-token' => $owner['csrf']], $remote, $host, 'owner-session');
@@ -416,6 +460,35 @@ $staleStaff = catchStatus(function () use ($http, &$staff, $remote, $host): void
 $check('removed member cannot start signup', $staleStaff === 401);
 
 exit($failures === 0 ? 0 : 1);
+
+/** @param array{method:string,url:string,headers:array<string,string>,body:string} $call */
+function oauthExchangeIsDocumented(array $call, string $appId, string $secret, string $code): bool
+{
+    if ($call['method'] !== 'GET' || $call['body'] !== '') {
+        return false;
+    }
+    $parts = parse_url($call['url']);
+    if (!is_array($parts) || ($parts['scheme'] ?? '') !== 'https' || ($parts['host'] ?? '') !== 'graph.facebook.com') {
+        return false;
+    }
+    if (($parts['path'] ?? '') !== '/v26.0/oauth/access_token') {
+        return false;
+    }
+    parse_str((string) ($parts['query'] ?? ''), $query);
+    return ($query['client_id'] ?? '') === $appId
+        && ($query['client_secret'] ?? '') === $secret
+        && ($query['code'] ?? '') === $code
+        && !array_key_exists('redirect_uri', $query)
+        && count($query) === 3;
+}
+
+function credentialTextIsRedacted(string $text, string $secret, string $code): bool
+{
+    return !str_contains($text, $secret)
+        && !str_contains($text, $code)
+        && !str_contains($text, 'client_secret=')
+        && !str_contains($text, 'graph.facebook.com');
+}
 
 function catchStatus(callable $action): int
 {
