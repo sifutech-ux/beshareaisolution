@@ -1,4 +1,8 @@
-const KEY = "beshare-os-demo";
+const UI_KEY = "beshare-os-ui";
+let live = null;
+let csrf = "";
+let ready = false;
+let paintedHash = "";
 
 const NAV = [
   ["papan", "Papan", "workspace"],
@@ -15,163 +19,147 @@ const NAV = [
   ["pengendali", "Pengendali", "operator"]
 ];
 
-function seed() {
+function blankUi() {
   return {
-    user: { name: "Demo Pemilik", email: "demo@beshare.test", role: "owner", verified: true },
-    business: { name: "Kedai Demo Melur", industry: "Fesyen", language: "ms", hours: "10:00–22:00" },
-    plan: "Standard",
-    billStatus: "aktif",
-    persona: "Mesra, ringkas, Bahasa Melayu.",
-    version: 2,
     theme: "gelap",
     connection: { token: "Belum", webhook: "Belum", registration: "Belum", messaging: "Belum" },
     connectionNote: "",
     templateDraft: { name: "", language: "ms", body: "", savedAt: "" },
-    onboarding: { step: 6, done: true },
     inboxQuery: "",
     inboxFilter: "semua",
     inboxPane: "list",
     contactQuery: "",
     contactTag: "semua",
-    activeContact: "k1",
+    activeContact: "",
     editingRule: "",
     notice: "",
     modal: "",
-    knowledge: [
-      { id: "n1", section: "Harga", title: "Tudung bawal", body: "Tudung bawal RM49.", enabled: true },
-      { id: "n2", section: "Stok", title: "Stok warna", body: "Stok tidak direkodkan.", enabled: false }
-    ],
-    contacts: [
-      { id: "k1", name: "Aina", phone: "+60 12-000 1001", tag: "Harga", assignee: "Demo Pemilik", note: "Tanya harga tudung.", priority: "Biasa", conversationId: "c1" },
-      { id: "k2", name: "Farid", phone: "+60 12-000 1002", tag: "Stok", assignee: "Demo Staf", note: "Menunggu semakan stok.", priority: "Tinggi", conversationId: "c2" },
-      { id: "k3", name: "Lina", phone: "+60 12-000 1003", tag: "Umum", assignee: "Demo Pemilik", note: "", priority: "Biasa", conversationId: "c3" },
-      { id: "k4", name: "Hakim", phone: "+60 12-000 1004", tag: "Susulan", assignee: "Demo Staf", note: "Tetingkap perkhidmatan sudah tamat.", priority: "Biasa", conversationId: "c4" }
-    ],
-    conversations: [
-      {
-        id: "c1",
-        name: "Aina",
-        mode: "ai_active",
-        unread: true,
-        assignee: "Demo Pemilik",
-        tag: "Harga",
-        window: "open",
-        note: "",
-        messages: [
-          { from: "customer", text: "Harga tudung bawal berapa?", wamid: "wamid.demo.1001", status: "delivered" },
-          { from: "ai", text: "Tudung bawal dalam pengetahuan demo ialah RM49.", wamid: "wamid.demo.1002", status: "sent" }
-        ]
-      },
-      {
-        id: "c2",
-        name: "Farid",
-        mode: "human_takeover",
-        unread: false,
-        assignee: "Demo Staf",
-        tag: "Stok",
-        window: "open",
-        note: "Jangan mereka angka stok.",
-        messages: [
-          { from: "customer", text: "Masih ada stok warna hitam?", wamid: "wamid.demo.2001", status: "delivered" },
-          { from: "staff", text: "Saya semak dengan pemilik dulu.", wamid: "wamid.demo.2002", status: "sent" }
-        ]
-      },
-      {
-        id: "c3",
-        name: "Lina",
-        mode: "resolved",
-        unread: false,
-        assignee: "Demo Pemilik",
-        tag: "Umum",
-        window: "open",
-        note: "",
-        messages: [
-          { from: "customer", text: "Terima kasih.", wamid: "wamid.demo.3001", status: "read" },
-          { from: "ai", text: "Sama-sama. Perbualan demo ini ditutup.", wamid: "wamid.demo.3002", status: "sent" }
-        ]
-      },
-      {
-        id: "c4",
-        name: "Hakim",
-        mode: "human_takeover",
-        unread: false,
-        assignee: "Demo Staf",
-        tag: "Susulan",
-        window: "closed",
-        note: "Perlu templat jika mahu menyambung.",
-        messages: [
-          { from: "customer", text: "Boleh hantar esok?", wamid: "wamid.demo.4001", status: "delivered" },
-          { from: "staff", text: "Percubaan mesej biasa selepas tetingkap.", wamid: "wamid.demo.4002", status: "failed" }
-        ]
-      }
-    ],
-    active: "c1",
-    rules: [
-      { id: "r1", name: "Sambutan", keyword: "", action: "sambutan", enabled: true },
-      { id: "r2", name: "Kata kunci harga", keyword: "harga", action: "balas_pengetahuan", enabled: true },
-      { id: "r3", name: "Serahan stok", keyword: "stok", action: "serahan", enabled: true },
-      { id: "r4", name: "Luar waktu", keyword: "", action: "luar_waktu", enabled: false }
-    ],
-    team: [
-      { name: "Demo Pemilik", email: "demo@beshare.test", role: "owner" },
-      { name: "Demo Staf", email: "staf@beshare.test", role: "staff" }
-    ],
-    invoices: [
-      { id: "INV-DEMO-1", item: "Pemasangan Standard", amount: "RM1,200", status: "Demo" },
-      { id: "INV-DEMO-2", item: "Langganan bulan ini", amount: "RM800", status: "Demo" }
-    ],
-    audit: [
-      { at: "2026-10-10 07:00", actor: "Demo Pemilik", action: "Workspace demo dibuka." }
-    ]
+    industry: "",
+    language: "ms",
+    hours: "",
+    active: ""
   };
 }
 
-function load() {
-  const raw = sessionStorage.getItem(KEY);
-  if (!raw) return null;
+function loadUi() {
+  const base = blankUi();
   try {
-    return normalize(JSON.parse(raw));
+    const parsed = JSON.parse(sessionStorage.getItem(UI_KEY) || "null");
+    if (!parsed || typeof parsed !== "object") return base;
+    const draft = parsed.templateDraft && typeof parsed.templateDraft === "object" ? parsed.templateDraft : {};
+    return {
+      ...base,
+      theme: parsed.theme === "cerah" ? "cerah" : "gelap",
+      connection: { ...base.connection, ...(parsed.connection || {}) },
+      connectionNote: typeof parsed.connectionNote === "string" ? parsed.connectionNote : "",
+      templateDraft: {
+        name: typeof draft.name === "string" ? draft.name : "",
+        language: draft.language === "en" ? "en" : "ms",
+        body: typeof draft.body === "string" ? draft.body : "",
+        savedAt: typeof draft.savedAt === "string" ? draft.savedAt : ""
+      },
+      inboxQuery: typeof parsed.inboxQuery === "string" ? parsed.inboxQuery : "",
+      inboxFilter: typeof parsed.inboxFilter === "string" ? parsed.inboxFilter : "semua",
+      inboxPane: typeof parsed.inboxPane === "string" ? parsed.inboxPane : "list",
+      contactQuery: typeof parsed.contactQuery === "string" ? parsed.contactQuery : "",
+      contactTag: typeof parsed.contactTag === "string" ? parsed.contactTag : "semua",
+      activeContact: typeof parsed.activeContact === "string" ? parsed.activeContact : "",
+      editingRule: typeof parsed.editingRule === "string" ? parsed.editingRule : "",
+      notice: typeof parsed.notice === "string" ? parsed.notice : "",
+      modal: typeof parsed.modal === "string" ? parsed.modal : "",
+      industry: typeof parsed.industry === "string" ? parsed.industry : "",
+      language: parsed.language === "en" ? "en" : "ms",
+      hours: typeof parsed.hours === "string" ? parsed.hours : "",
+      active: typeof parsed.active === "string" ? parsed.active : ""
+    };
   } catch {
-    return null;
+    return base;
   }
 }
 
-function save(state) {
-  sessionStorage.setItem(KEY, JSON.stringify(state));
+function load() {
+  if (!live || !live.user || !live.business) return null;
+  const ui = loadUi();
+  return {
+    ...ui,
+    user: live.user,
+    business: {
+      name: live.business.name,
+      public_id: live.business.public_id,
+      status: live.business.status,
+      industry: ui.industry,
+      language: ui.language,
+      hours: ui.hours
+    },
+    team: Array.isArray(live.members) ? live.members : [],
+    memberships: Array.isArray(live.memberships) ? live.memberships : [],
+    audit: Array.isArray(live.audit) ? live.audit : [],
+    knowledge: [],
+    contacts: [],
+    conversations: [],
+    rules: [],
+    invoices: [],
+    plan: "",
+    billStatus: "",
+    persona: "",
+    onboarding: { step: 1, done: true }
+  };
 }
 
-function normalize(state) {
-  const base = seed();
-  if (!state || typeof state !== "object") return base;
-  const next = { ...base, ...state };
-  next.user = { ...base.user, ...(state.user || {}) };
-  next.business = { ...base.business, ...(state.business || {}) };
-  next.connection = { ...base.connection, ...(state.connection || {}) };
-  const draft = state.templateDraft && typeof state.templateDraft === "object" ? state.templateDraft : {};
-  next.templateDraft = {
-    name: typeof draft.name === "string" ? draft.name : "",
-    language: draft.language === "en" ? "en" : "ms",
-    body: typeof draft.body === "string" ? draft.body : "",
-    savedAt: typeof draft.savedAt === "string" ? draft.savedAt : ""
-  };
-  next.onboarding = { ...base.onboarding, ...(state.onboarding || {}) };
-  next.knowledge = Array.isArray(state.knowledge) ? state.knowledge : base.knowledge;
-  next.contacts = Array.isArray(state.contacts) ? state.contacts : base.contacts;
-  next.rules = Array.isArray(state.rules) ? state.rules : base.rules;
-  next.team = Array.isArray(state.team) ? state.team : base.team;
-  next.invoices = Array.isArray(state.invoices) ? state.invoices : base.invoices;
-  next.audit = Array.isArray(state.audit) ? state.audit : base.audit;
-  const conversations = Array.isArray(state.conversations) ? state.conversations : base.conversations;
-  next.conversations = conversations.map((item) => ({
-    unread: false,
-    assignee: "Demo Pemilik",
-    tag: "Umum",
-    window: "open",
-    note: "",
-    ...item,
-    messages: (item.messages || []).map((message) => ({ status: "sent", ...message }))
+function save(state) {
+  if (!state) return;
+  const ui = loadUi();
+  sessionStorage.setItem(UI_KEY, JSON.stringify({
+    ...ui,
+    theme: state.theme === "cerah" ? "cerah" : "gelap",
+    connection: state.connection || ui.connection,
+    connectionNote: typeof state.connectionNote === "string" ? state.connectionNote : "",
+    templateDraft: state.templateDraft || ui.templateDraft,
+    inboxQuery: state.inboxQuery || "",
+    inboxFilter: state.inboxFilter || "semua",
+    inboxPane: state.inboxPane || "list",
+    contactQuery: state.contactQuery || "",
+    contactTag: state.contactTag || "semua",
+    activeContact: state.activeContact || "",
+    editingRule: state.editingRule || "",
+    notice: state.notice || "",
+    modal: state.modal || "",
+    industry: state.business && typeof state.business.industry === "string" ? state.business.industry : ui.industry,
+    language: state.business && state.business.language === "en" ? "en" : "ms",
+    hours: state.business && typeof state.business.hours === "string" ? state.business.hours : ui.hours,
+    active: state.active || ""
   }));
-  return next;
+}
+
+function applyLive(data) {
+  if (data && typeof data.csrf === "string") csrf = data.csrf;
+  if (!data || data.ok !== true || !data.user || !data.business) {
+    live = null;
+    return;
+  }
+  live = data;
+}
+
+async function callApi(action, body) {
+  const headers = { Accept: "application/json" };
+  const init = { method: body ? "POST" : "GET", credentials: "same-origin", headers, cache: "no-store" };
+  if (body) {
+    headers["Content-Type"] = "application/json";
+    headers["X-CSRF-Token"] = csrf;
+    init.body = JSON.stringify(body);
+  }
+  let data = { ok: false, error: "Pelayan tidak menjawab." };
+  try {
+    const response = await fetch("akaun/pintu.php?tindakan=" + encodeURIComponent(action), init);
+    const parsed = await response.json();
+    data = parsed && typeof parsed === "object" ? parsed : data;
+    if (!response.ok && data.ok !== false) data.ok = false;
+    if (!response.ok && !data.error) data.error = "Permintaan gagal.";
+  } catch {
+    data = { ok: false, error: "Pelayan tidak menjawab." };
+  }
+  if (typeof data.csrf === "string") csrf = data.csrf;
+  return data;
 }
 
 function esc(value) {
@@ -256,15 +244,12 @@ function currentConversation(state) {
   return state.conversations.find((item) => item.id === state.active) || null;
 }
 
-function ensureDemo() {
-  if (new URLSearchParams(location.search).get("demo") !== "1") return;
-  let version = 0;
-  try {
-    version = JSON.parse(sessionStorage.getItem(KEY) || "{}").version || 0;
-  } catch {
-    version = 0;
-  }
-  if (version !== 2) save(seed());
+function businessStatus(status) {
+  return { provisioning: "Sedang disediakan", active: "Aktif", suspended: "Digantung" }[status] || status;
+}
+
+function roleLabel(value) {
+  return { owner: "Pemilik", admin: "Admin", staff: "Staf" }[value] || value;
 }
 
 function applyTheme(state) {
@@ -272,15 +257,17 @@ function applyTheme(state) {
 }
 
 function route() {
+  if (!ready) return;
   const bar = document.querySelector(".nav-links");
   const kept = bar ? bar.scrollLeft : 0;
   const state = load();
   applyTheme(state);
   const hash = location.hash.replace("#", "") || (state ? "papan" : "masuk");
-  if (state && hash !== "automasi" && state.notice) {
+  if (state && paintedHash && paintedHash !== hash && state.notice) {
     state.notice = "";
     save(state);
   }
+  paintedHash = hash;
   const root = document.getElementById("app");
   const open = ["daftar", "masuk", "lupa", "sahkan"];
   if (!open.includes(hash) && !state) {
@@ -288,14 +275,14 @@ function route() {
     return;
   }
   if (hash === "daftar" || hash === "masuk" || hash === "lupa") root.innerHTML = authView(hash, state);
-  else if (hash === "sahkan") root.innerHTML = verifyView(state);
-  else if (hash === "mula") root.innerHTML = shell(state, "mula", onboarding(state));
+  else if (hash === "sahkan") root.innerHTML = `<main class="page"><section class="panel" style="max-width:560px;margin:2rem auto;"><h1>Pengesahan e-mel</h1><p class="muted">Pengesahan e-mel tidak digunakan. Tiada e-mel dihantar.</p><p><a href="#masuk">Masuk</a></p></section></main>`;
+  else if (hash === "mula") root.innerHTML = shell(state, "papan", board(state));
   else if (!NAV.some(([id]) => id === hash)) root.innerHTML = shell(state, "papan", board(state));
   else {
     const item = NAV.find(([id]) => id === hash);
     root.innerHTML = allow(state, item[2])
       ? shell(state, hash, views[hash](state))
-      : shell(state, hash, `<article class="panel"><h1>Skrin dikunci</h1><p class="muted">Peranan demo ini tidak membuka skrin tersebut.</p></article>`);
+      : shell(state, hash, `<article class="panel"><h1>Skrin dikunci</h1><p class="muted">Peranan anda tidak membuka skrin ini.</p></article>`);
   }
   const place = () => {
     const next = document.querySelector(".nav-links");
@@ -321,41 +308,30 @@ const views = {
   pengendali: operator
 };
 
-function authView(kind, state) {
-  const title = { daftar: "Daftar demo", masuk: "Masuk demo", lupa: "Lupa kata laluan" }[kind];
+function authView(kind) {
+  const title = { daftar: "Daftar", masuk: "Masuk", lupa: "Lupa kata laluan" }[kind];
   const extra = kind === "daftar"
-    ? `<label class="field">Sahkan kata laluan<input name="password2" type="password" required minlength="8"></label>
-       <label class="field"><span><input name="terms" type="checkbox" required> Saya terima bahawa ini demo, bukan pendaftaran sebenar.</span></label>`
+    ? `<label class="field">Sahkan kata laluan<input name="password2" type="password" required minlength="10" autocomplete="new-password"></label>`
     : "";
   const nameField = kind === "daftar"
-    ? `<label class="field">Nama<input name="name" value="Demo Pemilik" required></label>`
+    ? `<label class="field">Nama<input name="name" required autocomplete="name"></label>
+       <label class="field">Nama perniagaan<input name="business" required autocomplete="organization"></label>`
     : "";
   const fields = kind === "lupa"
-    ? `<label class="field">E-mel<input name="email" type="email" required></label>`
+    ? `<label class="field">E-mel<input name="email" type="email" required autocomplete="username"></label>`
     : `${nameField}
-       <label class="field">E-mel<input name="email" type="email" required placeholder="nama@kedai.com"></label>
-       <label class="field">Kata laluan<input name="password" type="password" required minlength="8"></label>
+       <label class="field">E-mel<input name="email" type="email" required placeholder="nama@kedai.com" autocomplete="username"></label>
+       <label class="field">Kata laluan<input name="password" type="password" required minlength="10" maxlength="72" autocomplete="${kind === "daftar" ? "new-password" : "current-password"}"></label>
        ${extra}`;
   return `<main class="page"><section class="panel" style="max-width:480px;margin:2rem auto;">
-    <p class="demo-banner">Akaun ini disimpan dalam pelayar sahaja. Tiada pelayan, tiada e-mel, dan tiada WhatsApp sebenar.</p>
+    <p class="demo-banner">Akaun disimpan di pelayan. Kata laluan tidak disimpan dalam pelayar.</p>
     <h1>${title}</h1>
     <form id="auth" data-kind="${kind}">
-      ${kind === "masuk" ? "" : ""}
       ${fields}
       <p class="error" id="form-error" hidden></p>
       <button class="btn" type="submit">${title}</button>
     </form>
     <p class="muted"><a href="#daftar">Daftar</a> · <a href="#masuk">Masuk</a> · <a href="#lupa">Lupa kata laluan</a></p>
-    ${state && state.user && !state.user.verified ? `<p><button class="btn btn--ghost" type="button" data-act="resend">Hantar semula semakan demo</button></p>` : ""}
-  </section></main>`;
-}
-
-function verifyView(state) {
-  if (!state) return authView("masuk", null);
-  return `<main class="page"><section class="panel" style="max-width:560px;margin:2rem auto;">
-    <h1>Semak peti e-mel</h1>
-    <p class="muted">Tiada e-mel dihantar. Untuk demo, sahkan terus pada skrin ini. Akaun yang belum disahkan tidak masuk ke workspace.</p>
-    <button class="btn" type="button" data-act="verify">Saya sudah semak (demo)</button>
   </section></main>`;
 }
 
@@ -377,16 +353,17 @@ function shell(state, hash, body) {
       </div>
       <div class="nav-links">${links}</div>
       <div class="nav-tools">
-        <label class="muted">Peranan demo
-          <select data-act="role" aria-label="Peranan demo">
-            ${["owner", "admin", "staff"].map((item) => `<option value="${item}" ${role(state) === item ? "selected" : ""}>${item === "owner" ? "Pemilik" : item === "admin" ? "Admin" : "Staf"}</option>`).join("")}
+        ${(state.memberships || []).length > 1 ? `<label class="muted">Perniagaan
+          <select data-act="pilih" aria-label="Perniagaan">
+            ${state.memberships.map((item) => `<option value="${esc(item.public_id)}" ${item.public_id === state.business.public_id ? "selected" : ""}>${esc(item.name)}</option>`).join("")}
           </select>
-        </label>
+        </label>` : ""}
         <button class="btn btn--ghost" type="button" data-act="theme">${state.theme === "cerah" ? "Mod gelap" : "Mod cerah"}</button>
+        <button class="btn btn--ghost" type="button" data-act="logout">Keluar</button>
       </div>
     </aside>
     <section>
-      <p class="demo-banner">Data demo dalam pelayar. Nombor lama tidak dipindahkan. Meta belum dipanggil. Angka dikira daripada rekod demo ini, bukan prestasi kedai sebenar.</p>
+      <p class="demo-banner">Akaun dan pasukan datang dari pelayan. Peti masuk, kenalan, pengetahuan, automasi, analitik, dan bil belum disambung. Meta belum dipanggil.</p>
       ${state.notice ? `<p class="error">${esc(state.notice)}</p>` : ""}
       ${body}
     </section>
@@ -398,13 +375,13 @@ function board(state) {
   const enabled = state.rules.filter((item) => item.enabled).length;
   return `<article class="panel">
     <h1>Papan ${esc(state.business.name)}</h1>
-    <p class="muted">Pakej ${esc(state.plan)}. Langganan demo: ${esc(billLabel(state.billStatus))}. Automasi hidup: ${enabled}.</p>
+    <p class="muted">Status: ${esc(businessStatus(state.business.status))}. Peranan: ${esc(roleLabel(role(state)))}. Automasi hidup: ${enabled}. Peti masuk belum disambung.</p>
     <div class="states">
       ${Object.entries({ Token: state.connection.token, Webhook: state.connection.webhook, Pendaftaran: state.connection.registration, Mesej: state.connection.messaging }).map(([name, value]) =>
         `<article class="state"><strong>${esc(name)}</strong><span>${esc(value)}</span></article>`).join("")}
     </div>
     <div class="os-kpis">
-      <article class="state os-kpi"><strong>${count.incoming}</strong><span>Perbualan masuk pada data demo.</span></article>
+      <article class="state os-kpi"><strong>${count.incoming}</strong><span>Perbualan masuk. Belum disambung ke pelayan.</span></article>
       <article class="state os-kpi"><strong>${count.aiReplied}</strong><span>Perbualan yang ada balasan AI.</span></article>
       <article class="state os-kpi"><strong>${count.human}</strong><span>Sedang dipegang manusia.</span></article>
       <article class="state os-kpi"><strong>${count.unanswered}</strong><span>Mesej terakhir daripada pelanggan, belum selesai.</span></article>
@@ -420,7 +397,7 @@ function inbox(state) {
   const current = list.find((item) => item.id === state.active) || null;
   const buttons = list.map((item) =>
     `<button class="thread-item ${item.id === state.active ? "is-on" : ""}" type="button" data-act="open" data-value="${esc(item.id)}"><span>${esc(item.name)}</span><small>${esc(label(item.mode))}${item.unread ? " · belum dibaca" : ""}</small></button>`
-  ).join("") || `<p class="muted">Tiada hasil.</p>`;
+  ).join("") || `<p class="muted">${state.conversations.length ? "Tiada hasil." : "Peti masuk belum disambung ke pelayan."}</p>`;
   const filters = [["semua", "Semua"], ["belum", "Belum dibaca"], ["saya", "Tugasan saya"], ["ai", "AI"], ["manusia", "Manusia"], ["selesai", "Selesai"]];
   return `<article class="panel inbox-screen" data-screen="${esc(state.inboxPane || "list")}">
     <h1>Peti masuk</h1>
@@ -465,7 +442,7 @@ function profile(state, current) {
   const contact = state.contacts.find((item) => item.conversationId === current.id);
   return `<div class="phone-bar"><button class="btn btn--ghost" type="button" data-act="pane" data-value="talk">Perbualan</button><strong>${esc(current.name)}</strong><button class="btn btn--ghost" type="button" data-act="pane" data-value="list">Senarai</button></div>
     <h2>${esc(current.name)}</h2>
-    <p class="muted">${esc(contact ? contact.phone : "Tiada telefon demo")}</p>
+    <p class="muted">${esc(contact ? contact.phone : "Tiada telefon.")}</p>
     <p>Tag: ${esc(current.tag)}<br>Ejen: ${esc(current.assignee)}<br>Tetingkap: ${current.window === "open" ? "dibuka" : "tamat"}</p>
     <p class="muted">${esc(current.note || "Tiada nota.")}</p>
     <p class="muted">Status penghantaran dipadankan dengan id mesej, bukan nombor telefon.</p>
@@ -482,7 +459,7 @@ function contacts(state) {
   const current = list.find((item) => item.id === state.activeContact) || list[0] || null;
   const rows = list.map((item) =>
     `<tr><td><button class="btn btn--ghost" type="button" data-act="contact" data-value="${esc(item.id)}">${esc(item.name)}</button></td><td>${esc(item.tag)}</td><td>${esc(item.assignee)}</td></tr>`
-  ).join("") || `<tr><td colspan="3">Tiada hasil.</td></tr>`;
+  ).join("") || `<tr><td colspan="3">${state.contacts.length ? "Tiada hasil." : "Kenalan belum disambung ke pelayan."}</td></tr>`;
   const detail = current
     ? `<h2>${esc(current.name)}</h2><p>${esc(current.phone)}</p><p>Keutamaan: ${esc(current.priority)}</p><p class="muted">${esc(current.note || "Tiada nota.")}</p><p><a href="#peti">Buka perbualan berkaitan</a></p>`
     : `<p class="muted">Tiada profil.</p>`;
@@ -509,32 +486,17 @@ function knowledge(state) {
       <label class="field">Seksyen<select name="section"><option>Harga</option><option>Stok</option><option>FAQ</option><option>Penghantaran</option></select></label>
       <label class="field">Tajuk<input name="title" required></label>
       <label class="field">Fakta<textarea name="body" required></textarea></label>
-      <button class="btn" type="submit">Simpan draf demo</button>
+      <button class="btn" type="submit">Simpan</button>
     </form>
+    <p class="muted">Pengetahuan belum disambung ke pelayan. Borang ini tidak menyimpan rekod.</p>
     <h2>Playground</h2>
     <form id="play">
       <label class="field">Mesej pelanggan<input name="text" required placeholder="Tanya harga atau stok"></label>
-      <button class="btn" type="submit">Jana jawapan demo</button>
+      <button class="btn" type="submit">Jana jawapan</button>
     </form>
     <p id="answer" class="muted"></p>
     <p id="source" class="muted"></p>
   </article>`;
-}
-
-function answerFor(state, text) {
-  const enabled = state.knowledge.filter((item) => item.enabled);
-  const lower = text.toLowerCase();
-  if (lower.includes("harga") || lower.includes("bawal")) {
-    const source = enabled.find((item) => item.section === "Harga" || item.body.toLowerCase().includes("rm"));
-    if (!source) return { text: "Maklumat tidak cukup. AI demo tidak mereka harga.", source: "Tiada sumber hidup.", handover: true };
-    return { text: "Jawapan demo: " + source.body, source: source.section + " · " + source.title, handover: false };
-  }
-  if (lower.includes("stok")) {
-    const source = enabled.find((item) => item.section === "Stok");
-    if (!source) return { text: "Maklumat tidak cukup. AI demo tidak mereka stok dan akan menyerahkan kepada manusia.", source: "Tiada sumber stok yang hidup.", handover: true };
-    return { text: "Jawapan demo: " + source.body, source: source.section + " · " + source.title, handover: false };
-  }
-  return { text: "Jawapan demo umum. Tiada fakta tambahan dalam pengetahuan.", source: "Tiada padanan.", handover: false };
 }
 
 function automation(state) {
@@ -569,34 +531,38 @@ function automation(state) {
 function analytics(state) {
   const count = metrics(state);
   const cards = [
-    [String(count.incoming), "Perbualan masuk", "Bilangan perbualan dalam data demo."],
-    [String(count.aiReplied), "Dibalas AI", "Perbualan yang mengandungi sekurang-kurangnya satu mesej AI."],
-    [String(count.human), "Dipegang manusia", "Mod semasa ialah manusia mengambil alih."],
-    [String(count.unanswered), "Belum dibalas", "Mesej terakhir daripada pelanggan dan perbualan belum selesai."],
-    [count.sent + " dihantar · " + count.failed + " gagal", "Hasil penghantaran", "Dikira daripada status pada id mesej demo."],
-    [count.handover + "%", "Kadar serahan", "Perbualan mod manusia dibahagi semua perbualan demo."]
+    [String(count.incoming), "Perbualan masuk", "Belum disambung ke pelayan."],
+    [String(count.aiReplied), "Dibalas AI", "Belum disambung ke pelayan."],
+    [String(count.human), "Dipegang manusia", "Belum disambung ke pelayan."],
+    [String(count.unanswered), "Belum dibalas", "Belum disambung ke pelayan."],
+    [count.sent + " dihantar · " + count.failed + " gagal", "Hasil penghantaran", "Belum disambung ke pelayan."],
+    [count.handover + "%", "Kadar serahan", "Belum disambung ke pelayan."]
   ];
   return `<article class="panel">
     <h1>Analitik</h1>
-    <p class="muted">Masa tindak balas purata tidak dikira kerana data demo belum ada cap masa mula dan balasan pertama. Kadar konversi tidak dipaparkan.</p>
+    <p class="muted">Analitik belum disambung ke pelayan. Kadar konversi tidak dipaparkan.</p>
     <div class="os-kpis">${cards.map(([value, name, note]) => `<article class="state os-kpi"><strong>${esc(value)}</strong><span>${esc(name)}. ${esc(note)}</span></article>`).join("")}</div>
   </article>`;
 }
 
 function team(state) {
+  const owner = role(state) === "owner";
   const rows = state.team.map((item) =>
-    `<tr><td>${esc(item.name)}</td><td>${esc(item.email)}</td><td>${esc(item.role)}</td><td>${item.role === "owner" ? "" : `<button class="btn btn--ghost" type="button" data-act="remove-member" data-value="${esc(item.email)}">Buang akses</button>`}</td></tr>`
-  ).join("");
-  return `<article class="panel">
-    <h1>Pasukan</h1>
-    <p class="muted">Jemputan demo menambah senarai dalam pelayar. Tiada e-mel dihantar.</p>
-    <table class="os-table"><thead><tr><th>Nama</th><th>E-mel</th><th>Peranan</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-    <form id="invite">
+    `<tr><td>${esc(item.name)}</td><td>${esc(item.email)}</td><td>${esc(roleLabel(item.role))}</td><td>${owner && item.role !== "owner" ? `<button class="btn btn--ghost" type="button" data-act="remove-member" data-value="${esc(item.email)}">Buang akses</button>` : ""}</td></tr>`
+  ).join("") || `<tr><td colspan="4">Tiada ahli.</td></tr>`;
+  const form = owner ? `<form id="invite">
+      <p class="error" id="form-error" hidden></p>
       <label class="field">Nama<input name="name" required></label>
       <label class="field">E-mel<input name="email" type="email" required></label>
+      <label class="field">Kata laluan awal<input name="password" type="password" required minlength="10" maxlength="72" autocomplete="new-password"></label>
       <label class="field">Peranan<select name="role"><option value="staff">Staf</option><option value="admin">Admin</option></select></label>
-      <button class="btn" type="submit">Jemput (demo)</button>
+      <button class="btn" type="submit">Tambah ahli</button>
     </form>
+    <p class="muted">Tiada e-mel dihantar. Jika e-mel itu sudah ada, kata laluan sedia ada dikekalkan.</p>` : `<p class="muted">Hanya pemilik boleh menambah atau membuang ahli.</p>`;
+  return `<article class="panel">
+    <h1>Pasukan</h1>
+    <table class="os-table"><thead><tr><th>Nama</th><th>E-mel</th><th>Peranan</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    ${form}
   </article>`;
 }
 
@@ -650,81 +616,49 @@ function connection(state) {
   </article>`;
 }
 
-function billLabel(status) {
-  return { aktif: "Aktif (demo)", ihsan: "Tempoh ihsan (paparan)", gantung: "Digantung (paparan)" }[status] || status;
-}
-
-function billing(state) {
-  const monthly = state.plan === "Ultimate" ? "RM1,000" : "RM800";
-  const setup = state.plan === "Ultimate" ? "RM1,800" : "RM1,200";
-  const rows = state.invoices.map((item) => `<tr><td>${esc(item.id)}</td><td>${esc(item.item)}</td><td>${esc(item.amount)}</td><td>${esc(item.status)}</td></tr>`).join("");
+function billing() {
   return `<article class="panel">
     <h1>Bil</h1>
-    <p>Pakej ${esc(state.plan)}. Pemasangan ${setup}. Bulanan ${monthly}. Status: ${esc(billLabel(state.billStatus))}.</p>
-    <p class="muted">Kos mesej Meta tidak termasuk. Caj payment gateway tidak termasuk. Tiada bayaran sebenar diambil.</p>
-    <div class="chips">
-      <button class="btn btn--ghost" type="button" data-act="bill" data-value="aktif">Paparan aktif</button>
-      <button class="btn btn--ghost" type="button" data-act="bill" data-value="ihsan">Paparan ihsan</button>
-      <button class="btn btn--ghost" type="button" data-act="bill" data-value="gantung">Paparan gantung</button>
-    </div>
-    <table class="os-table"><thead><tr><th>Invois</th><th>Item</th><th>Amaun</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
+    <p>Standard: pemasangan RM1,200 dan RM800 sebulan. Ultimate: pemasangan RM1,800 dan RM1,000 sebulan. Fungsi sama sehingga had diluluskan.</p>
+    <p class="muted">Bil kedai ini belum disambung ke pelayan. Tiada invois. Kos mesej Meta dan caj payment gateway tidak termasuk.</p>
   </article>`;
 }
 
 function settings(state) {
+  const owner = role(state) === "owner";
+  const toggle = owner && state.business.status === "suspended"
+    ? `<button class="btn" type="button" data-act="resume">Aktifkan semula</button>`
+    : owner && state.business.status === "active"
+      ? `<button class="btn btn--ghost" type="button" data-act="suspend">Gantung perniagaan</button>`
+      : "";
   return `<article class="panel">
     <h1>Tetapan</h1>
+    <p class="muted">Status pelayan: ${esc(businessStatus(state.business.status))}.</p>
     <form id="settings">
+      <p class="error" id="form-error" hidden></p>
       <label class="field">Nama perniagaan<input name="name" required value="${esc(state.business.name)}"></label>
-      <label class="field">Industri<input name="industry" required value="${esc(state.business.industry)}"></label>
+      <label class="field">Industri<input name="industry" value="${esc(state.business.industry)}"></label>
       <label class="field">Bahasa<select name="language"><option value="ms" ${state.business.language === "ms" ? "selected" : ""}>Bahasa Melayu</option><option value="en" ${state.business.language === "en" ? "selected" : ""}>English kemudian</option></select></label>
       <label class="field">Waktu<input name="hours" value="${esc(state.business.hours)}"></label>
-      <button class="btn" type="submit">Simpan draf demo</button>
+      <button class="btn" type="submit">Simpan nama</button>
     </form>
+    <p class="muted">Pelayan menyimpan nama perniagaan. Industri, bahasa, dan waktu kekal dalam pelayar ini.</p>
+    <p class="actions">${toggle}</p>
     <h2>Pemindahan pemilikan</h2>
     <p class="muted">Pemindahan pemilikan belum dibuka.</p>
   </article>`;
 }
 
 function auditView(state) {
-  const rows = state.audit.map((item) => `<tr><td>${esc(item.at)}</td><td>${esc(item.actor)}</td><td>${esc(item.action)}</td></tr>`).join("");
+  const rows = state.audit.map((item) => `<tr><td>${esc(item.at)}</td><td>${esc(item.actor)}</td><td>${esc(item.action)}</td></tr>`).join("") || `<tr><td colspan="3">Tiada rekod.</td></tr>`;
   return `<article class="panel"><h1>Audit</h1><table class="os-table"><thead><tr><th>Masa</th><th>Pelaku</th><th>Tindakan</th></tr></thead><tbody>${rows}</tbody></table></article>`;
 }
 
 function operator() {
   return `<article class="panel">
     <h1>Pengendali</h1>
-    <p class="demo-banner">Skrin ini tidak memaparkan transkrip perbualan.</p>
-    <table class="os-table">
-      <thead><tr><th>Tenant</th><th>Onboarding</th><th>Langganan</th><th>Sambungan</th></tr></thead>
-      <tbody>
-        <tr><td>Kedai Demo Melur</td><td>Selesai pada demo</td><td>Demo</td><td>Token, webhook, pendaftaran, dan mesej masih belum</td></tr>
-        <tr><td>Kedai Demo Sungai</td><td>Tersangkut di langkah WhatsApp</td><td>Belum</td><td>Belum bermula</td></tr>
-      </tbody>
-    </table>
-    <p class="muted">Amaran: satu tenant tersekat. Log audit platform kosong. Tiada tindakan untuk membaca data tenant.</p>
+    <p class="muted">Senarai platform belum disambung. Tiada tenant dipaparkan.</p>
   </article>`;
-}
-
-function onboarding(state) {
-  const step = state.onboarding.step || 1;
-  const pills = ["Akaun", "Perniagaan", "Pakej", "WhatsApp", "AI", "Ujian"].map((name, index) => {
-    const number = index + 1;
-    const locked = number > step;
-    return `<button type="button" class="${number === step ? "is-on" : ""}" data-act="step-go" data-value="${number}" ${locked ? "disabled" : ""}>${number}. ${name}</button>`;
-  }).join("");
-  const bodies = {
-    1: `<p class="muted">Akaun demo ${esc(state.user.email)} sudah ada pada pelayar ini.</p>`,
-    2: `<form id="step-form"><label class="field">Nama perniagaan<input name="name" required value="${esc(state.business.name)}"></label><label class="field">Industri<input name="industry" required value="${esc(state.business.industry)}"></label></form>`,
-    3: `<form id="step-form"><label class="field"><span><input type="radio" name="plan" value="Standard" ${state.plan !== "Ultimate" ? "checked" : ""}> Standard · RM1,200 sekali, kemudian RM800 sebulan</span></label><label class="field"><span><input type="radio" name="plan" value="Ultimate" ${state.plan === "Ultimate" ? "checked" : ""}> Ultimate · RM1,800 sekali, kemudian RM1,000 sebulan</span></label><p class="muted">Fungsi sama sehingga had diluluskan. Kos Meta dan gateway tidak termasuk.</p></form>`,
-    4: `<div class="states"><article class="state"><strong>Token</strong><span>Belum</span></article><article class="state"><strong>Webhook</strong><span>Belum</span></article><article class="state"><strong>Pendaftaran</strong><span>Belum</span></article><article class="state"><strong>Mesej</strong><span>Belum</span></article></div><p class="muted">Embedded Signup tidak dipanggil pada langkah ini.</p>`,
-    5: `<form id="step-form"><label class="field">Persona<textarea name="persona" required>${esc(state.persona)}</textarea></label><p class="muted">Sekurang-kurangnya satu fakta harga sudah ada dalam pengetahuan demo.</p></form>`,
-    6: `<ul><li>Ujian keluar: belum</li><li>Ujian masuk: belum</li><li>Tingkah laku AI: belum</li></ul><p class="muted">Skrin ini tidak menandakan ujian sebagai lulus.</p>`
-  };
-  return `<article class="panel"><h1>Mula</h1><div class="steps">${pills}</div>${bodies[step] || ""}
-    <p class="error" id="step-error" hidden></p>
-    <p class="actions">${step > 1 ? `<button class="btn btn--ghost" type="button" data-act="step-back">Kembali</button>` : ""}
-    <button class="btn" type="button" data-act="step-next">${step === 6 ? "Buka workspace" : "Teruskan"}</button></p></article>`;
 }
 
 function showError(message) {
@@ -734,29 +668,10 @@ function showError(message) {
   error.textContent = message || "";
 }
 
-function readStep(state) {
-  const form = document.getElementById("step-form");
-  if (!form) return "";
-  const data = new FormData(form);
-  if (state.onboarding.step === 2) {
-    state.business.name = String(data.get("name") || "").trim();
-    state.business.industry = String(data.get("industry") || "").trim();
-    if (!state.business.name || !state.business.industry) return "Nama dan industri diperlukan.";
-  }
-  if (state.onboarding.step === 3) state.plan = String(data.get("plan") || "Standard");
-  if (state.onboarding.step === 5) {
-    state.persona = String(data.get("persona") || "").trim();
-    if (state.persona.length < 8) return "Tulis persona sekurang-kurangnya 8 aksara.";
-  }
-  return "";
-}
-
-function setMode(mode) {
+function setMode() {
   const state = load();
-  const current = currentConversation(state);
-  if (!current) return;
-  current.mode = mode;
-  log(state, "Mod perbualan " + current.name + " menjadi " + label(mode) + ".");
+  if (!state) return;
+  state.notice = "Peti masuk belum disambung ke pelayan.";
   state.modal = "";
   save(state);
   route();
@@ -770,18 +685,43 @@ function onClick(event) {
   const act = button.getAttribute("data-act");
   const value = button.getAttribute("data-value") || "";
   const state = load();
-  if (act === "verify" && state) {
-    state.user.verified = true;
-    log(state, "E-mel demo disahkan pada skrin.");
-    save(state);
-    location.hash = "mula";
+  if (act === "verify" || act === "resend") {
+    location.hash = "masuk";
     return;
   }
-  if (act === "resend") {
-    location.hash = "sahkan";
+  if (act === "logout") {
+    callApi("keluar", {}).then((data) => {
+      if (!data.ok) {
+        if (state) {
+          state.notice = data.error || "Keluar gagal.";
+          save(state);
+          route();
+        }
+        return;
+      }
+      applyLive(data);
+      location.hash = "masuk";
+      route();
+    });
     return;
   }
   if (!state) return;
+  if (act === "suspend" || act === "resume") {
+    callApi("status", {
+      kind: "suspend_or_resume",
+      next_status: act === "suspend" ? "suspended" : "active"
+    }).then((data) => {
+      if (!data.ok) {
+        state.notice = data.error || "Status tidak dapat ditukar.";
+        save(state);
+        route();
+        return;
+      }
+      applyLive(data);
+      route();
+    });
+    return;
+  }
   if (act === "theme") {
     state.theme = state.theme === "cerah" ? "gelap" : "cerah";
     save(state);
@@ -825,14 +765,10 @@ function onClick(event) {
   }
   if (act === "resolve") return setMode("resolved");
   if (act === "reopen") return setMode(value);
-  if (act === "assign-me") {
-    const current = currentConversation(state);
-    if (current) {
-      current.assignee = state.user.name;
-      log(state, "Perbualan " + current.name + " ditugaskan kepada " + state.user.name + ".");
-      save(state);
-      route();
-    }
+  if (act === "assign-me" || act === "know-toggle" || act === "rule-toggle" || act === "rule-edit") {
+    state.notice = "Bahagian ini belum disambung ke pelayan.";
+    save(state);
+    route();
     return;
   }
   if (act === "tag") {
@@ -849,95 +785,38 @@ function onClick(event) {
     route();
     return;
   }
-  if (act === "know-toggle") {
-    const item = state.knowledge.find((entry) => entry.id === value);
-    if (item) item.enabled = !item.enabled;
-    log(state, "Entri pengetahuan demo dikemas kini.");
-    save(state);
-    route();
-    return;
-  }
-  if (act === "rule-toggle") {
-    const item = state.rules.find((entry) => entry.id === value);
-    if (item) item.enabled = !item.enabled;
-    log(state, "Peraturan automasi demo dikemas kini.");
-    save(state);
-    route();
-    return;
-  }
-  if (act === "rule-edit") {
-    state.editingRule = value;
-    state.notice = "";
-    save(state);
-    route();
-    return;
-  }
   if (act === "remove-member") {
-    state.team = state.team.filter((item) => item.email !== value || item.role === "owner");
-    log(state, "Akses demo dibuang untuk " + value + ".");
-    save(state);
-    route();
+    callApi("buang", { email: value }).then((data) => {
+      if (!data.ok) {
+        state.notice = data.error || "Ahli tidak dapat dibuang.";
+        save(state);
+        route();
+        return;
+      }
+      applyLive(data);
+      route();
+    });
     return;
   }
   if (act === "connect") {
     openEmbeddedSignup();
     return;
   }
-  if (act === "bill") {
-    state.billStatus = value;
-    log(state, "Paparan status bil ditukar kepada " + billLabel(value) + ".");
-    save(state);
-    route();
-    return;
-  }
-  if (act === "step-go") {
-    const next = Number(value);
-    if (next <= state.onboarding.step) {
-      state.onboarding.step = next;
-      save(state);
-      route();
-    }
-    return;
-  }
-  if (act === "step-back") {
-    state.onboarding.step = Math.max(1, state.onboarding.step - 1);
-    save(state);
-    route();
-    return;
-  }
-  if (act === "step-next") {
-    const error = readStep(state);
-    if (error) {
-      save(state);
-      showError(error);
-      return;
-    }
-    if (state.onboarding.step >= 6) {
-      state.onboarding.done = true;
-      log(state, "Onboarding demo dibuka ke workspace. Ujian Meta kekal belum.");
-      save(state);
-      location.hash = "papan";
-      return;
-    }
-    state.onboarding.step += 1;
+  if (act === "bill" || act === "step-go" || act === "step-back" || act === "step-next") {
+    state.notice = "Bahagian ini belum disambung ke pelayan.";
     save(state);
     route();
   }
 }
 
 function onChange(event) {
-  const select = event.target.closest("select[data-act='role']");
+  const select = event.target.closest("select[data-act='pilih']");
   if (!select) return;
-  const state = load();
-  if (!state) return;
-  const value = select.value;
-  state.user.role = value;
-  if (value === "staff") state.user.name = "Demo Staf";
-  else if (value === "admin") state.user.name = "Demo Admin";
-  else state.user.name = "Demo Pemilik";
-  log(state, "Peranan demo ditukar kepada " + value + ".");
-  save(state);
-  route();
+  callApi("pilih", { public_id: select.value }).then((data) => {
+    if (!data.ok) return;
+    applyLive(data);
+    route();
+  });
 }
 
 function onSubmit(event) {
@@ -951,103 +830,84 @@ function onSubmit(event) {
     const email = String(data.get("email") || "").trim();
     const password = String(data.get("password") || "");
     if (kind === "lupa") {
-      showError("");
-      form.insertAdjacentHTML("beforeend", `<p class="muted">Jika e-mel itu wujud, arahan set semula dipaparkan di skrin ini. Tiada e-mel dihantar.</p>`);
+      showError("Set semula kata laluan belum tersedia. Tiada e-mel dihantar.");
       return;
     }
-    if (!email.includes("@") || password.length < 8) {
-      showError("Gunakan e-mel yang sah dan kata laluan sekurang-kurangnya 8 aksara.");
+    if (!email.includes("@") || password.length < 10 || password.length > 72) {
+      showError("Gunakan e-mel yang sah dan kata laluan 10 hingga 72 aksara.");
       return;
     }
     if (kind === "daftar") {
-      if (!data.get("terms")) {
-        showError("Terma demo perlu diterima.");
-        return;
-      }
       if (String(data.get("password2") || "") !== password) {
         showError("Kata laluan tidak sepadan.");
         return;
       }
-      const next = seed();
-      next.user = { name: String(data.get("name") || "Demo"), email, role: "owner", verified: false };
-      next.onboarding = { step: 1, done: false };
-      save(next);
-      location.hash = "sahkan";
+      callApi("daftar", {
+        name: String(data.get("name") || ""),
+        business: String(data.get("business") || ""),
+        email,
+        password
+      }).then((result) => {
+        if (!result.ok) {
+          showError(result.error || "Pendaftaran gagal.");
+          return;
+        }
+        applyLive(result);
+        location.hash = "papan";
+        route();
+      });
       return;
     }
-    const state = load();
-    if (!state || state.user.email !== email) {
-      showError("Akaun demo ini belum didaftar dalam pelayar. Daftar dahulu.");
-      return;
-    }
-    if (!state.user.verified) {
-      showError("E-mel demo belum disahkan.");
-      location.hash = "sahkan";
-      return;
-    }
-    location.hash = "papan";
+    callApi("masuk", { email, password }).then((result) => {
+      if (!result.ok) {
+        showError(result.error || "Masuk gagal.");
+        return;
+      }
+      applyLive(result);
+      location.hash = "papan";
+      route();
+    });
     return;
   }
   const state = load();
   if (!state) return;
-  if (formId === "reply") {
-    const current = currentConversation(state);
-    const text = String(data.get("text") || "").trim();
-    if (!text || !current || current.mode !== "human_takeover" || current.window !== "open") return;
-    current.messages.push({ from: "staff", text, wamid: "wamid.demo." + Date.now(), status: "sent" });
-    log(state, "Balasan staf demo pada " + current.name + ".");
-    save(state);
-    route();
+  if (formId === "reply" || formId === "know") {
+    showError("Belum disambung ke pelayan.");
     return;
   }
   if (formId === "play") {
-    const result = answerFor(state, String(data.get("text") || ""));
-    document.getElementById("answer").textContent = result.text;
-    document.getElementById("source").textContent = "Sumber: " + result.source + (result.handover ? " Serahan manusia dicadangkan." : "");
-    return;
-  }
-  if (formId === "know") {
-    state.knowledge.push({
-      id: "n" + Date.now(),
-      section: String(data.get("section") || "FAQ"),
-      title: String(data.get("title") || "").trim(),
-      body: String(data.get("body") || "").trim(),
-      enabled: true
-    });
-    log(state, "Draf pengetahuan demo disimpan dalam pelayar.");
-    save(state);
-    route();
+    const answer = document.getElementById("answer");
+    const source = document.getElementById("source");
+    if (answer) answer.textContent = "Belum disambung. Jawapan tidak dijana.";
+    if (source) source.textContent = "";
     return;
   }
   if (formId === "rule") {
-    const item = state.rules.find((entry) => entry.id === String(data.get("ruleId")));
-    const action = String(data.get("action") || "");
-    if (action === "hantar_luar_tetingkap" || action === "picu_diri") {
-      state.notice = action === "picu_diri"
-        ? "Gelung ditolak. Peraturan tidak boleh mencetus dirinya."
-        : "Mesej biasa di luar tetingkap perkhidmatan tidak dibenarkan. Gunakan templat yang diluluskan.";
-      save(state);
-      route();
-      return;
-    }
-    if (item) {
-      item.name = String(data.get("name") || "").trim();
-      item.keyword = String(data.get("keyword") || "").trim().toLowerCase();
-      item.action = action;
-    }
-    state.notice = "";
-    log(state, "Peraturan demo disimpan.");
+    state.notice = "Automasi belum disambung ke pelayan.";
     save(state);
     route();
     return;
   }
   if (formId === "invite") {
     const email = String(data.get("email") || "").trim();
-    if (!email.includes("@")) return;
-    state.team.push({ name: String(data.get("name") || "").trim(), email, role: String(data.get("role") || "staff") });
-    log(state, "Jemputan demo tidak menghantar e-mel kepada " + email + ".");
-    save(state);
-    route();
+    const password = String(data.get("password") || "");
+    if (!email.includes("@") || password.length < 10) {
+      showError("Gunakan e-mel yang sah dan kata laluan 10 hingga 72 aksara.");
+      return;
+    }
+    callApi("ahli", {
+      name: String(data.get("name") || "").trim(),
+      email,
+      password,
+      role: String(data.get("role") || "staff")
+    }).then((result) => {
+      if (!result.ok) {
+        showError(result.error || "Ahli tidak dapat ditambah.");
+        return;
+      }
+      applyLive(result);
+      route();
+    });
     return;
   }
   if (formId === "template-draft") {
@@ -1074,13 +934,18 @@ function onSubmit(event) {
     return;
   }
   if (formId === "settings") {
-    state.business.name = String(data.get("name") || "").trim();
     state.business.industry = String(data.get("industry") || "").trim();
     state.business.language = String(data.get("language") || "ms");
     state.business.hours = String(data.get("hours") || "");
-    log(state, "Tetapan perniagaan demo disimpan dalam pelayar.");
     save(state);
-    route();
+    callApi("tetapan", { name: String(data.get("name") || "").trim() }).then((result) => {
+      if (!result.ok) {
+        showError(result.error || "Nama tidak dapat disimpan.");
+        return;
+      }
+      applyLive(result);
+      route();
+    });
   }
 }
 
@@ -1092,7 +957,7 @@ function onInput(event) {
     save(state);
     const list = visibleConversations(state).map((item) =>
       `<button class="thread-item ${item.id === state.active ? "is-on" : ""}" type="button" data-act="open" data-value="${esc(item.id)}"><span>${esc(item.name)}</span><small>${esc(label(item.mode))}${item.unread ? " · belum dibaca" : ""}</small></button>`
-    ).join("") || `<p class="muted">Tiada hasil.</p>`;
+    ).join("") || `<p class="muted">${state.conversations.length ? "Tiada hasil." : "Peti masuk belum disambung ke pelayan."}</p>`;
     const thread = document.getElementById("thread");
     if (thread) thread.innerHTML = list;
     return;
@@ -1242,11 +1107,22 @@ window.addEventListener("message", (event) => {
   keepUnconnected(state, note, "Peristiwa Embedded Signup: " + (eventName || "tanpa nama") + ".");
 });
 
-ensureDemo();
+async function boot() {
+  const root = document.getElementById("app");
+  if (root) root.innerHTML = `<main class="page"><p class="muted">Memuatkan sesi…</p></main>`;
+  try {
+    applyLive(await callApi("sesi"));
+  } catch {
+    live = null;
+  }
+  ready = true;
+  route();
+}
+
+boot();
 const app = document.getElementById("app");
 app.addEventListener("click", onClick);
 app.addEventListener("change", onChange);
 app.addEventListener("submit", onSubmit);
 app.addEventListener("input", onInput);
 window.addEventListener("hashchange", route);
-route();
