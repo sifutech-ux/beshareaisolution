@@ -81,7 +81,7 @@ final class SchemaDefinition
             $generated = trim((string) ($row['generation_expression'] ?? ''));
             $built[$table]['columns'][] = [
                 'name' => strtolower((string) $row['column_name']),
-                'type' => self::normalize((string) $row['column_type']),
+                'type' => self::normalizeType((string) $row['column_type']),
                 'nullable' => strtoupper((string) $row['is_nullable']) === 'YES',
                 'charset' => $explicit ? $charset : null,
                 'collation' => $explicit ? $collation : null,
@@ -143,15 +143,15 @@ final class SchemaDefinition
             }
             $built[$table]['checks'][] = [
                 'name' => (string) $row['constraint_name'],
-                'clause' => self::normalize((string) $row['check_clause']),
+                'clause' => self::normalizeCheck((string) $row['check_clause']),
             ];
         }
-        foreach ($built as &$table) {
-            $table['indexes'] = self::sortedByName($table['indexes']);
-            $table['foreign_keys'] = self::sortedByName($table['foreign_keys']);
-            $table['checks'] = self::sortedByName($table['checks']);
+        foreach (array_keys($built) as $name) {
+            $built[$name] = self::absorbJsonColumns($built[$name]);
+            $built[$name]['indexes'] = self::sortedByName($built[$name]['indexes']);
+            $built[$name]['foreign_keys'] = self::sortedByName($built[$name]['foreign_keys']);
+            $built[$name]['checks'] = self::sortedByName($built[$name]['checks']);
         }
-        unset($table);
         $triggerMap = [];
         foreach ($triggers as $row) {
             $triggerMap[(string) $row['trigger_name']] = [
@@ -202,11 +202,12 @@ final class SchemaDefinition
                 if ($paren === false) {
                     throw new \InvalidArgumentException('sql_definition_unreadable');
                 }
-                $table['checks'][] = ['name' => $matches[1], 'clause' => self::normalize(self::insideParens($part, $paren))];
+                $table['checks'][] = ['name' => $matches[1], 'clause' => self::normalizeCheck(self::insideParens($part, $paren))];
             } else {
                 $table['columns'][] = self::column($part);
             }
         }
+        self::addImplicitForeignKeyIndexes($table);
         $table['indexes'] = self::sortedByName($table['indexes']);
         $table['foreign_keys'] = self::sortedByName($table['foreign_keys']);
         $table['checks'] = self::sortedByName($table['checks']);
@@ -276,7 +277,7 @@ final class SchemaDefinition
         }
         return [
             'name' => strtolower($matches[1]),
-            'type' => self::normalize(self::cutType($rest)),
+            'type' => self::normalizeType(self::cutType($rest)),
             'nullable' => preg_match('/\bNOT\s+NULL\b/i', $part) !== 1,
             'charset' => $charset,
             'collation' => $collation,
@@ -468,6 +469,394 @@ final class SchemaDefinition
             }
         }
         return $depth === 0;
+    }
+
+    /**
+     * MariaDB 11.8 writes the historical default display width into COLUMN_TYPE
+     * when the migration omits one. An explicit non-default width is kept.
+     */
+    private static function normalizeType(string $sql): string
+    {
+        return self::stripDefaultIntegerDisplayWidth(self::normalize($sql));
+    }
+
+    private static function stripDefaultIntegerDisplayWidth(string $sql): string
+    {
+        $unsigned = [
+            'tinyint(3)unsigned' => 'tinyint unsigned',
+            'smallint(5)unsigned' => 'smallint unsigned',
+            'mediumint(8)unsigned' => 'mediumint unsigned',
+            'integer(10)unsigned' => 'integer unsigned',
+            'int(10)unsigned' => 'int unsigned',
+            'bigint(20)unsigned' => 'bigint unsigned',
+        ];
+        $sql = strtr($sql, $unsigned);
+        $signed = [
+            'tinyint(4)' => 'tinyint',
+            'smallint(6)' => 'smallint',
+            'mediumint(9)' => 'mediumint',
+            'integer(11)' => 'integer',
+            'int(11)' => 'int',
+            'bigint(20)' => 'bigint',
+        ];
+        return preg_replace_callback(
+            '/\b(?:tinyint\(4\)|smallint\(6\)|mediumint\(9\)|integer\(11\)|int\(11\)|bigint\(20\))(?!unsigned)/',
+            static fn (array $match): string => $signed[$match[0]] ?? $match[0],
+            $sql
+        ) ?? $sql;
+    }
+
+    /**
+     * CHECK text is compared after redundant grouping parentheses are removed.
+     * Parentheses that change AND/OR precedence stay in place.
+     */
+    private static function normalizeCheck(string $sql): string
+    {
+        $sql = self::normalize($sql);
+        return self::canonicalBoolean($sql) ?? $sql;
+    }
+
+    private static function canonicalBoolean(string $sql): ?string
+    {
+        $tokens = self::booleanTokens($sql);
+        if ($tokens === null) {
+            return null;
+        }
+        $index = 0;
+        $expr = self::parseOr($tokens, $index);
+        if ($expr === null || $index !== count($tokens)) {
+            return null;
+        }
+        return self::printBoolean($expr, 0);
+    }
+
+    /** @return list<array{k:string,v?:string}>|null */
+    private static function booleanTokens(string $sql): ?array
+    {
+        $tokens = [];
+        $length = strlen($sql);
+        $i = 0;
+        while ($i < $length) {
+            $char = $sql[$i];
+            if ($char === ' ') {
+                $i++;
+                continue;
+            }
+            if ($char === '(') {
+                $tokens[] = ['k' => 'lp'];
+                $i++;
+                continue;
+            }
+            if ($char === ')') {
+                $tokens[] = ['k' => 'rp'];
+                $i++;
+                continue;
+            }
+            if ($char === ',') {
+                $tokens[] = ['k' => 'comma'];
+                $i++;
+                continue;
+            }
+            if ($char === "'") {
+                $value = '';
+                $i++;
+                while ($i < $length) {
+                    if ($sql[$i] === "'") {
+                        if ($i + 1 < $length && $sql[$i + 1] === "'") {
+                            $value .= "'";
+                            $i += 2;
+                            continue;
+                        }
+                        break;
+                    }
+                    $value .= $sql[$i];
+                    $i++;
+                }
+                if ($i >= $length || $sql[$i] !== "'") {
+                    return null;
+                }
+                $tokens[] = ['k' => 'str', 'v' => $value];
+                $i++;
+                continue;
+            }
+            if (preg_match('/\G(?:<>|!=|>=|<=|=|>|<)/', $sql, $match, 0, $i) === 1) {
+                $tokens[] = ['k' => 'op', 'v' => $match[0]];
+                $i += strlen($match[0]);
+                continue;
+            }
+            if (preg_match('/\G[0-9]+/', $sql, $match, 0, $i) === 1) {
+                $tokens[] = ['k' => 'num', 'v' => $match[0]];
+                $i += strlen($match[0]);
+                continue;
+            }
+            if (preg_match('/\G[a-z_][a-z0-9_]*/', $sql, $match, 0, $i) === 1) {
+                $word = $match[0];
+                $tokens[] = in_array($word, ['and', 'or', 'not', 'in', 'is', 'null'], true)
+                    ? ['k' => 'kw', 'v' => $word]
+                    : ['k' => 'id', 'v' => $word];
+                $i += strlen($word);
+                continue;
+            }
+            return null;
+        }
+        return $tokens;
+    }
+
+    /** @param list<array{k:string,v?:string}> $tokens */
+    private static function parseOr(array $tokens, int &$index): ?array
+    {
+        $left = self::parseAnd($tokens, $index);
+        if ($left === null) {
+            return null;
+        }
+        $items = [$left];
+        while (self::keywordAt($tokens, $index, 'or')) {
+            $index++;
+            $right = self::parseAnd($tokens, $index);
+            if ($right === null) {
+                return null;
+            }
+            $items[] = $right;
+        }
+        return count($items) === 1 ? $left : ['t' => 'or', 'prec' => 1, 'items' => $items];
+    }
+
+    /** @param list<array{k:string,v?:string}> $tokens */
+    private static function parseAnd(array $tokens, int &$index): ?array
+    {
+        $left = self::parseNot($tokens, $index);
+        if ($left === null) {
+            return null;
+        }
+        $items = [$left];
+        while (self::keywordAt($tokens, $index, 'and')) {
+            $index++;
+            $right = self::parseNot($tokens, $index);
+            if ($right === null) {
+                return null;
+            }
+            $items[] = $right;
+        }
+        return count($items) === 1 ? $left : ['t' => 'and', 'prec' => 2, 'items' => $items];
+    }
+
+    /** @param list<array{k:string,v?:string}> $tokens */
+    private static function parseNot(array $tokens, int &$index): ?array
+    {
+        if (self::keywordAt($tokens, $index, 'not') && !self::keywordAt($tokens, $index + 1, 'in')) {
+            $index++;
+            $item = self::parseNot($tokens, $index);
+            if ($item === null) {
+                return null;
+            }
+            return ['t' => 'not', 'prec' => 3, 'item' => $item];
+        }
+        return self::parseComparison($tokens, $index);
+    }
+
+    /** @param list<array{k:string,v?:string}> $tokens */
+    private static function parseComparison(array $tokens, int &$index): ?array
+    {
+        $left = self::parsePrimary($tokens, $index);
+        if ($left === null) {
+            return null;
+        }
+        if (self::keywordAt($tokens, $index, 'is')) {
+            $index++;
+            $negated = false;
+            if (self::keywordAt($tokens, $index, 'not')) {
+                $negated = true;
+                $index++;
+            }
+            if (!self::keywordAt($tokens, $index, 'null')) {
+                return null;
+            }
+            $index++;
+            return ['t' => 'isnull', 'prec' => 4, 'not' => $negated, 'item' => $left];
+        }
+        $negated = false;
+        if (self::keywordAt($tokens, $index, 'not')) {
+            if (!self::keywordAt($tokens, $index + 1, 'in')) {
+                return null;
+            }
+            $negated = true;
+            $index++;
+        }
+        if (self::keywordAt($tokens, $index, 'in')) {
+            $index++;
+            if (($tokens[$index]['k'] ?? '') !== 'lp') {
+                return null;
+            }
+            $index++;
+            $list = [];
+            while (true) {
+                $item = self::parsePrimary($tokens, $index);
+                if ($item === null) {
+                    return null;
+                }
+                $list[] = $item;
+                if (($tokens[$index]['k'] ?? '') === 'comma') {
+                    $index++;
+                    continue;
+                }
+                break;
+            }
+            if (($tokens[$index]['k'] ?? '') !== 'rp') {
+                return null;
+            }
+            $index++;
+            return ['t' => 'in', 'prec' => 4, 'not' => $negated, 'item' => $left, 'list' => $list];
+        }
+        if (($tokens[$index]['k'] ?? '') === 'op') {
+            $operator = (string) $tokens[$index]['v'];
+            $index++;
+            $right = self::parsePrimary($tokens, $index);
+            if ($right === null) {
+                return null;
+            }
+            return ['t' => 'cmp', 'prec' => 4, 'op' => $operator, 'left' => $left, 'right' => $right];
+        }
+        return $left;
+    }
+
+    /** @param list<array{k:string,v?:string}> $tokens */
+    private static function parsePrimary(array $tokens, int &$index): ?array
+    {
+        $kind = $tokens[$index]['k'] ?? '';
+        if ($kind === 'lp') {
+            $index++;
+            $expr = self::parseOr($tokens, $index);
+            if ($expr === null || ($tokens[$index]['k'] ?? '') !== 'rp') {
+                return null;
+            }
+            $index++;
+            return $expr;
+        }
+        if ($kind === 'str') {
+            $value = (string) $tokens[$index]['v'];
+            $index++;
+            return ['t' => 'atom', 'prec' => 5, 'text' => "'" . str_replace("'", "''", $value) . "'"];
+        }
+        if ($kind === 'num' || $kind === 'id') {
+            $text = (string) $tokens[$index]['v'];
+            $index++;
+            return ['t' => 'atom', 'prec' => 5, 'text' => $text];
+        }
+        return null;
+    }
+
+    /** @param list<array{k:string,v?:string}> $tokens */
+    private static function keywordAt(array $tokens, int $index, string $word): bool
+    {
+        return ($tokens[$index]['k'] ?? '') === 'kw' && ($tokens[$index]['v'] ?? '') === $word;
+    }
+
+    private static function printBoolean(array $node, int $parentPrec): string
+    {
+        $prec = (int) $node['prec'];
+        $text = match ($node['t']) {
+            'or', 'and' => implode(
+                $node['t'] === 'or' ? ' or ' : ' and ',
+                array_map(static fn (array $child): string => self::printBoolean($child, $prec), $node['items'])
+            ),
+            'not' => 'not ' . self::printBoolean($node['item'], $prec),
+            'isnull' => self::printBoolean($node['item'], $prec) . ($node['not'] ? ' is not null' : ' is null'),
+            'in' => self::printBoolean($node['item'], $prec)
+                . ($node['not'] ? ' not in(' : ' in(')
+                . implode(',', array_map(static fn (array $child): string => self::printBoolean($child, 0), $node['list']))
+                . ')',
+            'cmp' => self::printBoolean($node['left'], $prec) . ' ' . $node['op'] . ' ' . self::printBoolean($node['right'], $prec),
+            'atom' => $node['text'],
+            default => '',
+        };
+        if ($text === '') {
+            return '';
+        }
+        if ($prec < $parentPrec) {
+            return '(' . $text . ')';
+        }
+        return $text;
+    }
+
+    /** @param array<string,mixed> $table
+     *  @return array<string,mixed>
+     */
+    private static function absorbJsonColumns(array $table): array
+    {
+        $checks = $table['checks'];
+        $columns = $table['columns'];
+        $drop = [];
+        $convert = [];
+        foreach ($checks as $index => $check) {
+            if (preg_match('/\Ajson_valid\(([a-z0-9_]+)\)\z/', (string) $check['clause'], $match) !== 1) {
+                continue;
+            }
+            $column = $match[1];
+            if (strtolower((string) $check['name']) !== $column) {
+                continue;
+            }
+            foreach ($table['columns'] as $columnIndex => $stored) {
+                if ($stored['name'] !== $column) {
+                    continue;
+                }
+                if ($stored['type'] !== 'longtext' || $stored['charset'] !== 'utf8mb4' || $stored['collation'] !== 'utf8mb4_bin') {
+                    continue;
+                }
+                $convert[$columnIndex] = true;
+                $drop[$index] = true;
+            }
+        }
+        foreach (array_keys($convert) as $columnIndex) {
+            $columns[$columnIndex]['type'] = 'json';
+            $columns[$columnIndex]['charset'] = null;
+            $columns[$columnIndex]['collation'] = null;
+        }
+        if ($drop === []) {
+            return $table;
+        }
+        $kept = [];
+        foreach ($checks as $index => $check) {
+            if (!isset($drop[$index])) {
+                $kept[] = $check;
+            }
+        }
+        $table['columns'] = $columns;
+        $table['checks'] = $kept;
+        return $table;
+    }
+
+    /**
+     * MariaDB creates a non-unique index named after a foreign key when no
+     * existing index already starts with the referenced columns.
+     *
+     * @param array<string,mixed> $table
+     */
+    private static function addImplicitForeignKeyIndexes(array &$table): void
+    {
+        foreach ($table['foreign_keys'] as $foreignKey) {
+            if (self::indexCovers($table['indexes'], $foreignKey['columns'])) {
+                continue;
+            }
+            $table['indexes'][] = [
+                'name' => $foreignKey['name'],
+                'unique' => false,
+                'columns' => $foreignKey['columns'],
+            ];
+        }
+    }
+
+    /**
+     * @param list<array{columns:list<string>}> $indexes
+     * @param list<string> $columns
+     */
+    private static function indexCovers(array $indexes, array $columns): bool
+    {
+        foreach ($indexes as $index) {
+            if (array_slice($index['columns'], 0, count($columns)) === $columns) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static function defaultValue(mixed $value): ?string
