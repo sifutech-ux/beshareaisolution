@@ -20,6 +20,7 @@ final class Db
             PDO::MYSQL_ATTR_FOUND_ROWS => true,
             PDO::MYSQL_ATTR_MULTI_STATEMENTS => false,
         ]);
+        $pdo->exec("SET time_zone = '+00:00'");
         $current = $pdo->query('SELECT DATABASE() AS name');
         $row = $current === false ? false : $current->fetch();
         if (!is_array($row) || (string) $row['name'] !== Contract::DATABASE) {
@@ -39,8 +40,14 @@ final class Db
         }
         $path = getenv('BESHARE_OS_DB_CONFIG');
         if (!is_string($path) || $path === '') {
-            throw new AuthException('Pangkalan data belum dikonfigurasi.', 503);
+            $path = dirname(__DIR__, 3) . '/private/beshare-os-db.php';
         }
+        return self::loadFile($path);
+    }
+
+    /** @return array{dsn:string,user:string,password:string} */
+    private static function loadFile(string $path): array
+    {
         $real = realpath($path);
         $repo = realpath(dirname(__DIR__, 2));
         if ($real === false || !is_file($real) || $repo === false) {
@@ -50,8 +57,10 @@ final class Db
         if ($real === $repo || str_starts_with($real, $prefix) || preg_match('#(?:^|/)public_html(?:/|$)#', $real) === 1) {
             throw new AuthException('Konfigurasi pangkalan ditolak.', 500);
         }
+        ob_start();
         $loaded = require $real;
-        if (!is_array($loaded)) {
+        $leak = ob_get_clean();
+        if ($leak !== '' || !is_array($loaded)) {
             throw new AuthException('Konfigurasi pangkalan ditolak.', 500);
         }
         $fileDsn = $loaded['dsn'] ?? '';

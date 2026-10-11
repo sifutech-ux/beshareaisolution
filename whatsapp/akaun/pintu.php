@@ -4,8 +4,12 @@ declare(strict_types=1);
 use BesharOs\AuthException;
 use BesharOs\AuthHttp;
 use BesharOs\Db;
+use BesharOs\MetaGraph;
+use BesharOs\PrivateConfig;
 use BesharOs\RateLimit;
 use BesharOs\SessionCookie;
+use BesharOs\TokenSeal;
+use BesharOs\WhatsAppGateway;
 
 if (PHP_SAPI === 'cli') {
     http_response_code(404);
@@ -13,6 +17,7 @@ if (PHP_SAPI === 'cli') {
 }
 
 require dirname(__DIR__, 2) . '/os/src/bootstrap.php';
+require dirname(__DIR__) . '/sambungan/ids.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -62,12 +67,20 @@ try {
     }
     $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
     $remote = (string) ($_SERVER['REMOTE_ADDR'] ?? '0');
-    $rateDir = getenv('BESHARE_OS_RATE_DIR');
-    if (!is_string($rateDir) || $rateDir === '') {
-        $rateDir = dirname(__DIR__, 2) . '/os/var/rate';
+    $pdo = Db::connect();
+    $private = PrivateConfig::load();
+    $secret = is_array($private) ? (string) ($private['app_secret'] ?? '') : '';
+    $seal = TokenSeal::tryFrom(is_array($private) ? $private : null);
+    $gateway = null;
+    if ($secret !== '' && $seal instanceof TokenSeal && BESHARE_META_APP_ID !== '' && BESHARE_META_CONFIG_ID !== '') {
+        try {
+            $gateway = new WhatsAppGateway($pdo, new MetaGraph(BESHARE_META_APP_ID, $secret, BESHARE_META_GRAPH), $seal, BESHARE_META_APP_ID);
+        } catch (AuthException) {
+            $gateway = null;
+        }
     }
-    $http = new AuthHttp(Db::connect(), new RateLimit($rateDir));
-    $result = $http->handle($method, $action, $_SESSION, $body, $headers, $remote, $host);
+    $http = new AuthHttp($pdo, new RateLimit(RateLimit::resolveDirectory()), $gateway);
+    $result = $http->handle($method, $action, $_SESSION, $body, $headers, $remote, $host, session_id());
     if ($result['regenerate']) {
         session_regenerate_id(true);
     }

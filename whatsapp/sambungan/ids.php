@@ -6,8 +6,8 @@ declare(strict_types=1);
  * App ID dan Configuration ID memang dipaparkan pada pelayar.
  * Rahsia aplikasi tidak diletakkan di sini.
  */
-const BESHARE_META_APP_ID = '';
-const BESHARE_META_CONFIG_ID = '';
+const BESHARE_META_APP_ID = '27767197276313052';
+const BESHARE_META_CONFIG_ID = '1028295100269838';
 const BESHARE_META_GRAPH = 'v26.0';
 
 function beshare_os_public_meta(string $appId, string $configId, string $version = BESHARE_META_GRAPH): array
