@@ -104,7 +104,46 @@ foreach ($data['entry'] ?? [] as $entri) {
     }
 }
 
+$keputusan = 'ignored';
+if (ada_peristiwa_hayat(is_string($mentah) ? $mentah : '')) {
+    try {
+        require_once dirname(__DIR__) . '/os/src/bootstrap.php';
+        $tandatangan = $_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? '';
+        $keputusan = \BesharOs\LifecycleBridge::deliver(is_string($mentah) ? $mentah : '', is_string($tandatangan) ? $tandatangan : '');
+    } catch (Throwable) {
+        $keputusan = 'failed';
+    }
+}
+if ($keputusan === 'failed') {
+    http_response_code(500);
+    echo '{"ok":false}';
+    exit;
+}
+
 echo '{"ok":true}';
+
+function ada_peristiwa_hayat(string $mentah): bool
+{
+    $data = json_decode($mentah, true, 512, JSON_BIGINT_AS_STRING);
+    if (!is_array($data)) {
+        return false;
+    }
+    foreach ($data['entry'] ?? [] as $entri) {
+        if (!is_array($entri)) {
+            continue;
+        }
+        foreach ($entri['changes'] ?? [] as $perubahan) {
+            if (!is_array($perubahan) || ($perubahan['field'] ?? '') !== 'account_update' || !is_array($perubahan['value'] ?? null)) {
+                continue;
+            }
+            $acara = (string) ($perubahan['value']['event'] ?? '');
+            if ($acara === 'PARTNER_REMOVED' || $acara === 'ACCOUNT_OFFBOARDED') {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 function pertanyaan(string $nama): string
 {
@@ -144,6 +183,10 @@ function token_nombor(string $phoneId): string
 
 function laluan_dilihat(): string
 {
+    $khas = getenv('BESHARE_STOR');
+    if (is_string($khas) && $khas !== '') {
+        return rtrim($khas, '/') . '/webhook-dilihat.txt';
+    }
     return dirname(__DIR__) . '/admin/stor/webhook-dilihat.txt';
 }
 

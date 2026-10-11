@@ -28,10 +28,10 @@ final class WhatsAppWebhook
     }
 
     /**
-     * Entry for a later approved legacy-callback bridge.
-     * The legacy webhook is not changed by this method. The caller must pass the
-     * raw body and the X-Hub-Signature-256 header. Unverified bodies are rejected
-     * before any write. Only PARTNER_REMOVED and ACCOUNT_OFFBOARDED are accepted.
+     * Entry used by the app-callback bridge after the original body is verified.
+     * The caller passes the lifecycle slice and a signature over that slice.
+     * Unverified bodies are rejected before any write. Only PARTNER_REMOVED
+     * and ACCOUNT_OFFBOARDED are accepted.
      *
      * @return array{stored:int,replayed:int}
      */

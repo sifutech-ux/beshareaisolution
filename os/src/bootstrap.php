@@ -19,6 +19,7 @@ require __DIR__ . '/PrivateConfig.php';
 require __DIR__ . '/MetaGraph.php';
 require __DIR__ . '/WebhookReadiness.php';
 require __DIR__ . '/WhatsAppWebhook.php';
+require __DIR__ . '/LifecycleBridge.php';
 require_once __DIR__ . '/ActivationGate.php';
 require_once __DIR__ . '/PhoneOverrideGate.php';
 require __DIR__ . '/CoexistenceSync.php';
