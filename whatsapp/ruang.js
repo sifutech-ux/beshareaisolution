@@ -1095,8 +1095,17 @@ function signupLoginOptions(configId, redirectUri) {
 
 function coexistenceLoginOptions(configId, redirectUri) {
   const options = signupLoginOptions(configId, redirectUri);
-  options.extras.featureType = "whatsapp_business_app_onboarding";
-  return options;
+  return {
+    config_id: options.config_id,
+    response_type: options.response_type,
+    override_default_response_type: options.override_default_response_type,
+    fallback_redirect_uri: options.fallback_redirect_uri,
+    extras: {
+      setup: {},
+      featureType: "whatsapp_business_app_onboarding",
+      sessionInfoVersion: "3"
+    }
+  };
 }
 
 function metaStatus(response) {

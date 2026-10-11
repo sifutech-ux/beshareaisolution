@@ -898,7 +898,7 @@ $edgeCreated = $http->handle('POST', 'daftar', $edge, [
 ], ['x-csrf-token' => $edgeIssued['body']['csrf']], $remote, $host, 'edge-owner');
 $script->calls = [];
 $script->script = [oauthResponse('EAA-edge-should-not-exchange')];
-$edgeCross = catchStatus(function () use ($http, &$edge, $edgeCreated, $appState, $remote, $host): void {
+$edgeCross = catchStatus(function () use ($http, &$edge, $edgeCreated, $appState, $appWaba, $remote, $host): void {
     $http->handle('POST', 'peristiwa', $edge, [
         'state' => $appState,
         'event' => 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
