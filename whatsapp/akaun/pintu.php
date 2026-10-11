@@ -67,10 +67,6 @@ try {
     }
     $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
     $remote = (string) ($_SERVER['REMOTE_ADDR'] ?? '0');
-    $rateDir = getenv('BESHARE_OS_RATE_DIR');
-    if (!is_string($rateDir) || $rateDir === '') {
-        $rateDir = dirname(__DIR__, 2) . '/os/var/rate';
-    }
     $pdo = Db::connect();
     $private = PrivateConfig::load();
     $secret = is_array($private) ? (string) ($private['app_secret'] ?? '') : '';
@@ -83,7 +79,7 @@ try {
             $gateway = null;
         }
     }
-    $http = new AuthHttp($pdo, new RateLimit($rateDir), $gateway);
+    $http = new AuthHttp($pdo, new RateLimit(RateLimit::resolveDirectory()), $gateway);
     $result = $http->handle($method, $action, $_SESSION, $body, $headers, $remote, $host, session_id());
     if ($result['regenerate']) {
         session_regenerate_id(true);

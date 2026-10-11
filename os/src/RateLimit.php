@@ -5,6 +5,23 @@ namespace BesharOs;
 
 final class RateLimit
 {
+    public static function resolveDirectory(): string
+    {
+        $override = getenv('BESHARE_OS_RATE_DIR');
+        if (is_string($override) && $override !== '') {
+            if (self::isExposedPath($override) || !self::canUse($override)) {
+                throw new AuthException('Had percubaan tidak dapat disediakan.', 500);
+            }
+            return $override;
+        }
+        $path = dirname(__DIR__, 3) . '/private/rate';
+        $real = realpath($path);
+        if ($real === false || !is_dir($real) || !is_writable($real) || self::isExposedPath($real)) {
+            throw new AuthException('Had percubaan tidak dapat disediakan.', 500);
+        }
+        return $real;
+    }
+
     public function __construct(
         private string $directory,
         private int $maxAttempts = 5,
@@ -70,5 +87,28 @@ final class RateLimit
     private function path(string $key): string
     {
         return $this->directory . '/' . hash('sha256', $key) . '.json';
+    }
+
+    private static function canUse(string $path): bool
+    {
+        if (is_dir($path)) {
+            return is_writable($path);
+        }
+        $parent = realpath(dirname($path));
+        return $parent !== false && is_dir($parent) && is_writable($parent) && !self::isExposedPath($parent);
+    }
+
+    private static function isExposedPath(string $path): bool
+    {
+        $real = realpath($path);
+        $check = $real === false ? $path : $real;
+        $repo = realpath(dirname(__DIR__, 2));
+        if ($repo !== false) {
+            $prefix = rtrim($repo, '/') . '/';
+            if ($check === $repo || str_starts_with($check, $prefix)) {
+                return true;
+            }
+        }
+        return preg_match('#(?:^|/)public_html(?:/|$)#', $check) === 1;
     }
 }

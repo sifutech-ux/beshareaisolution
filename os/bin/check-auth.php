@@ -5,6 +5,7 @@ use BesharOs\Accounts;
 use BesharOs\AuthException;
 use BesharOs\AuthHttp;
 use BesharOs\Csrf;
+use BesharOs\Db;
 use BesharOs\Identifiers;
 use BesharOs\Membership;
 use BesharOs\Password;
@@ -107,6 +108,8 @@ $check('dashboard auth actions call the api', str_contains($dashboard, 'callApi(
 $check('client address is not taken from a forwarded header', str_contains($pintu, 'REMOTE_ADDR') && !str_contains($pintu, 'FORWARDED_FOR') && !str_contains($pintu, 'X-Real-IP') && !str_contains($pintu, 'X_REAL_IP'));
 $check('login rotates the php session id', str_contains($pintu, 'session_regenerate_id(true)') && str_contains($pintu, "session.use_strict_mode"));
 $check('library tree is denied over http', str_contains($guard, 'Require all denied'));
+$check('rate storage resolves outside the web root', str_contains($pintu, 'RateLimit::resolveDirectory()') && !str_contains($pintu, 'os/var/rate'));
+privateConfigChecks($check);
 
 $pdo = lab();
 if (!$pdo instanceof PDO) {
@@ -656,6 +659,198 @@ try {
     $separate = $error->status() === 401;
 }
 $check('a different account keeps its own login bucket', $separate);
+
+function privateConfigChecks(callable $check): void
+{
+    $saved = [];
+    foreach (['BESHARE_OS_DSN', 'BESHARE_OS_DB_USER', 'BESHARE_OS_DB_PASSWORD', 'BESHARE_OS_DB_CONFIG', 'BESHARE_OS_RATE_DIR'] as $name) {
+        $current = getenv($name);
+        $saved[$name] = $current === false ? null : $current;
+        putenv($name);
+    }
+    $scratch = sys_get_temp_dir() . '/beshare-os-config-' . bin2hex(random_bytes(4));
+    $privateRoot = dirname(__DIR__, 3) . '/private';
+    $defaultDb = $privateRoot . '/beshare-os-db.php';
+    $defaultRate = $privateRoot . '/rate';
+    $madePrivate = !is_dir($privateRoot);
+    $madeDb = !is_file($defaultDb);
+    $madeRate = !is_dir($defaultRate);
+    $publicRate = dirname(__DIR__, 2) . '/os/var/rate';
+    $publicRateExisted = is_dir($publicRate);
+    $secret = 'ujian-db-bukan-rahsia';
+    try {
+        $dbSource = (string) file_get_contents(dirname(__DIR__) . '/src/Db.php');
+        $rateSource = (string) file_get_contents(dirname(__DIR__) . '/src/RateLimit.php');
+        $repo = dirname(__DIR__, 2);
+        $check(
+            'private paths sit beside the repository',
+            str_contains($dbSource, "dirname(__DIR__, 3) . '/private/beshare-os-db.php'")
+                && str_contains($rateSource, "dirname(__DIR__, 3) . '/private/rate'")
+                && $defaultDb === dirname($repo) . '/private/beshare-os-db.php'
+                && $defaultRate === dirname($repo) . '/private/rate'
+                && !str_starts_with($defaultDb, rtrim($repo, '/') . '/')
+                && !str_contains($defaultDb, '/public_html/')
+        );
+        $missing = caughtConfig(static function (): void {
+            Db::config();
+        });
+        $check('missing private database file fails closed', !is_file($defaultDb) && $missing === [503, 'Pangkalan data belum dikonfigurasi.']);
+        $rateMissing = caughtConfig(static function (): void {
+            RateLimit::resolveDirectory();
+        });
+        $check('missing private rate directory fails closed', !is_dir($defaultRate) && $rateMissing === [500, 'Had percubaan tidak dapat disediakan.'] && ($publicRateExisted || !is_dir($publicRate)));
+
+        $parentWritable = is_dir($privateRoot) || (is_dir(dirname($privateRoot)) && is_writable(dirname($privateRoot)));
+        if ($parentWritable) {
+            if (!is_dir($privateRoot) && !mkdir($privateRoot, 0700, true) && !is_dir($privateRoot)) {
+                $parentWritable = false;
+            }
+        }
+        if ($parentWritable) {
+            file_put_contents($defaultDb, "<?php\nreturn ['dsn' => 'mysql:host=127.0.0.1;dbname=u879723783_beshare_os;charset=utf8mb4', 'user' => 'pemilik-fail', 'password' => " . var_export($secret, true) . "];\n");
+            chmod($defaultDb, 0600);
+            $fromDefault = Db::config();
+            $check('private database file supplies dsn user and password', $fromDefault === [
+                'dsn' => 'mysql:host=127.0.0.1;dbname=u879723783_beshare_os;charset=utf8mb4',
+                'user' => 'pemilik-fail',
+                'password' => $secret,
+            ]);
+            if (!is_dir($defaultRate)) {
+                mkdir($defaultRate, 0700);
+            }
+            $check('private rate directory is the default store', RateLimit::resolveDirectory() === realpath($defaultRate));
+        }
+
+        $overrideDir = $scratch . '-rate';
+        mkdir($overrideDir, 0700);
+        putenv('BESHARE_OS_RATE_DIR=' . $overrideDir);
+        $check('rate directory environment variable wins', RateLimit::resolveDirectory() === $overrideDir);
+        putenv('BESHARE_OS_RATE_DIR');
+
+        $fileConfig = $scratch . '-db.php';
+        file_put_contents($fileConfig, "<?php\nreturn ['dsn' => 'mysql:host=127.0.0.1;dbname=u879723783_beshare_os;charset=utf8mb4', 'user' => 'pemilik-env', 'password' => 'lain'];\n");
+        chmod($fileConfig, 0600);
+        putenv('BESHARE_OS_DB_CONFIG=' . $fileConfig);
+        $fromEnvPath = Db::config();
+        $check('database config path wins over the private file', ($fromEnvPath['user'] ?? '') === 'pemilik-env' && ($fromEnvPath['dsn'] ?? '') !== '' && ($fromEnvPath['password'] ?? '') !== '' && !str_contains((string) $fromEnvPath['dsn'], 'password='));
+        putenv('BESHARE_OS_DSN=mysql:host=127.0.0.1;dbname=u879723783_beshare_os;charset=utf8mb4');
+        putenv('BESHARE_OS_DB_USER=pemilik-pembolehubah');
+        putenv('BESHARE_OS_DB_PASSWORD=pembolehubah');
+        $fromEnv = Db::config();
+        $check('database environment variables win over files', ($fromEnv['user'] ?? '') === 'pemilik-pembolehubah' && ($fromEnv['password'] ?? '') === 'pembolehubah');
+        putenv('BESHARE_OS_DSN');
+        putenv('BESHARE_OS_DB_USER');
+        putenv('BESHARE_OS_DB_PASSWORD');
+        putenv('BESHARE_OS_DB_CONFIG');
+
+        $inside = dirname(__DIR__, 2) . '/os/var/db-config-test.php';
+        file_put_contents($inside, "<?php\nreturn ['dsn' => 'mysql:host=127.0.0.1;dbname=u879723783_beshare_os;charset=utf8mb4', 'user' => 'dalam', 'password' => 'dalam'];\n");
+        putenv('BESHARE_OS_DB_CONFIG=' . $inside);
+        $insideRepo = caughtConfig(static function (): void {
+            Db::config();
+        });
+        $check('database file inside the repository is rejected', $insideRepo === [500, 'Konfigurasi pangkalan ditolak.']);
+        putenv('BESHARE_OS_DB_CONFIG');
+        unlink($inside);
+
+        $public = $scratch . '/public_html';
+        mkdir($public, 0700, true);
+        $publicFile = $public . '/beshare-os-db.php';
+        file_put_contents($publicFile, "<?php\nreturn ['dsn' => 'mysql:host=127.0.0.1;dbname=u879723783_beshare_os;charset=utf8mb4', 'user' => 'awam', 'password' => 'awam'];\n");
+        putenv('BESHARE_OS_DB_CONFIG=' . $publicFile);
+        $publicDb = caughtConfig(static function (): void {
+            Db::config();
+        });
+        putenv('BESHARE_OS_RATE_DIR=' . $public . '/rate');
+        $publicRateResult = caughtConfig(static function (): void {
+            RateLimit::resolveDirectory();
+        });
+        $check('public web root configuration is rejected', $publicDb === [500, 'Konfigurasi pangkalan ditolak.'] && $publicRateResult === [500, 'Had percubaan tidak dapat disediakan.'] && !is_dir($public . '/rate'));
+        putenv('BESHARE_OS_DB_CONFIG');
+        putenv('BESHARE_OS_RATE_DIR');
+
+        file_put_contents($fileConfig, "<?php\necho " . var_export($secret, true) . ";\nreturn ['dsn' => 'mysql:host=127.0.0.1;dbname=u879723783_beshare_os;charset=utf8mb4', 'user' => 'bocor', 'password' => " . var_export($secret, true) . "];\n");
+        putenv('BESHARE_OS_DB_CONFIG=' . $fileConfig);
+        $leaked = caughtConfig(static function (): void {
+            Db::config();
+        });
+        $check('database file output is rejected without the secret', $leaked === [500, 'Konfigurasi pangkalan ditolak.'] && !str_contains($leaked[1], $secret));
+        file_put_contents($fileConfig, "<?php\nreturn ['dsn' => '', 'user' => '', 'password' => ''];\n");
+        $invalid = caughtConfig(static function (): void {
+            Db::config();
+        });
+        $check('invalid database file fails closed', $invalid === [500, 'Konfigurasi pangkalan ditolak.']);
+        putenv('BESHARE_OS_DSN=mysql:host=127.0.0.1;dbname=u879723783_beshare_os;charset=utf8mb4;password=terbocor');
+        putenv('BESHARE_OS_DB_USER=pemilik');
+        putenv('BESHARE_OS_DB_PASSWORD=pembolehubah');
+        $embedded = caughtConfig(static function (): void {
+            Db::connect();
+        });
+        $check('dsn password assignment is rejected', $embedded === [500, 'Konfigurasi pangkalan tidak sah.'] && !str_contains($embedded[1], 'terbocor'));
+
+        $labPassword = is_file('/tmp/maria-lab.pw') ? trim((string) file_get_contents('/tmp/maria-lab.pw')) : '';
+        putenv('BESHARE_OS_DSN=mysql:host=127.0.0.1;port=3307;dbname=mysql;charset=utf8mb4');
+        putenv('BESHARE_OS_DB_USER=root');
+        putenv('BESHARE_OS_DB_PASSWORD=' . $labPassword);
+        $wrongDatabase = caughtConfig(static function (): void {
+            Db::connect();
+        });
+        $check('database name validation still rejects another database', $wrongDatabase === [500, 'Pangkalan data ditolak.']);
+    } finally {
+        foreach ($saved as $name => $value) {
+            if ($value === null) {
+                putenv($name);
+            } else {
+                putenv($name . '=' . $value);
+            }
+        }
+        $inside = dirname(__DIR__, 2) . '/os/var/db-config-test.php';
+        if (is_file($inside)) {
+            unlink($inside);
+        }
+        if ($madeDb && is_file($defaultDb)) {
+            unlink($defaultDb);
+        }
+        if ($madeRate && is_dir($defaultRate)) {
+            rmdir($defaultRate);
+        }
+        if ($madePrivate && is_dir($privateRoot)) {
+            rmdir($privateRoot);
+        }
+        if (is_dir($scratch)) {
+            $files = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($scratch, FilesystemIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::CHILD_FIRST
+            );
+            foreach ($files as $file) {
+                $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
+            }
+            rmdir($scratch);
+        }
+        foreach ([$scratch . '-db.php'] as $file) {
+            if (is_file($file)) {
+                unlink($file);
+            }
+        }
+        $overrideDir = $scratch . '-rate';
+        if (is_dir($overrideDir)) {
+            rmdir($overrideDir);
+        }
+    }
+}
+
+/** @return array{0:int,1:string} */
+function caughtConfig(callable $action): array
+{
+    try {
+        $action();
+    } catch (AuthException $error) {
+        return [$error->status(), $error->getMessage()];
+    } catch (Throwable) {
+        return [0, ''];
+    }
+    return [0, ''];
+}
 
 function lab(): ?PDO
 {
