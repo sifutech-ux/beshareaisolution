@@ -12,6 +12,12 @@ final class WhatsAppWebhook
     {
     }
 
+    /** @return list<string> */
+    public static function fields(): array
+    {
+        return ['messages', 'account_update', 'history', 'smb_app_state_sync', 'smb_message_echoes'];
+    }
+
     public static function signatureMatches(string $raw, string $header, string $secret): bool
     {
         if ($secret === '' || preg_match('/\Asha256=([0-9a-f]{64})\z/i', $header, $match) !== 1) {
@@ -124,14 +130,17 @@ final class WhatsAppWebhook
                     }
                     continue;
                 }
-                $kind = $field === 'account_update' ? 'account_update' : 'other';
-                $body = ['field' => $this->label($field, 64), 'waba_id' => $this->id((string) ($entry['id'] ?? ''))];
-                $events[] = [
-                    'kind' => $kind,
-                    'key' => $this->key($kind . ':' . hash('sha256', json_encode($body, JSON_UNESCAPED_SLASHES) . $this->canonical($value))),
-                    'phone' => '',
-                    'body' => $body,
-                ];
+                if (!in_array($field, self::fields(), true) || $field === 'messages') {
+                    $body = ['field' => $this->label($field, 64), 'waba_id' => $this->id((string) ($entry['id'] ?? ''))];
+                    $events[] = [
+                        'kind' => 'other',
+                        'key' => $this->key('other:' . hash('sha256', json_encode($body, JSON_UNESCAPED_SLASHES) . $this->canonical($value))),
+                        'phone' => '',
+                        'body' => $body,
+                    ];
+                    continue;
+                }
+                $events[] = $this->coexistenceEvent($field, $entry, $value);
             }
         }
         return $events;
@@ -144,10 +153,13 @@ final class WhatsAppWebhook
         if (!is_string($json)) {
             return 'skipped';
         }
-        $sealed = $this->seal->seal($json, 200000);
+        $wide = in_array($event['kind'], ['history', 'smb_app_state_sync', 'smb_message_echoes', 'account_update'], true);
+        $sealed = $this->sealBody($event['body'], $wide);
+        $json = $sealed['json'];
         $connection = $this->route($event);
         $businessId = $connection['business_id'] ?? null;
         $connectionId = $connection['id'] ?? null;
+        $this->pdo->beginTransaction();
         try {
             $insert = $this->pdo->prepare(
                 'INSERT INTO webhook_events (
@@ -161,25 +173,35 @@ final class WhatsAppWebhook
                 $event['key'],
                 $event['kind'],
                 hash('sha256', $json),
-                bin2hex($sealed['ciphertext']),
-                bin2hex($sealed['nonce']),
-                bin2hex($sealed['tag']),
-                $sealed['version'],
+                bin2hex($sealed['sealed']['ciphertext']),
+                bin2hex($sealed['sealed']['nonce']),
+                bin2hex($sealed['sealed']['tag']),
+                $sealed['sealed']['version'],
             ]);
+            if ($event['kind'] === 'message' && is_int($businessId) && is_int($connectionId)) {
+                $mark = $this->pdo->prepare(
+                    'UPDATE whatsapp_connections
+                     SET messaging_state = \'receive_verified\', updated_at = UTC_TIMESTAMP()
+                     WHERE id = ? AND business_id = ? AND token_state = \'verified\'
+                       AND webhook_state = \'subscribed\' AND messaging_state = \'unverified\''
+                );
+                $mark->execute([$connectionId, $businessId]);
+            }
+            $this->observe($event, $connection);
+            $this->pdo->commit();
         } catch (PDOException $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
             if (str_contains($error->getMessage(), 'uq_webhook_dedupe') || str_contains($error->getMessage(), 'Duplicate')) {
                 return 'replayed';
             }
             throw $error;
-        }
-        if ($event['kind'] === 'message' && is_int($businessId) && is_int($connectionId)) {
-            $mark = $this->pdo->prepare(
-                'UPDATE whatsapp_connections
-                 SET messaging_state = \'receive_verified\', updated_at = UTC_TIMESTAMP()
-                 WHERE id = ? AND business_id = ? AND token_state = \'verified\'
-                   AND webhook_state = \'subscribed\' AND messaging_state = \'unverified\''
-            );
-            $mark->execute([$connectionId, $businessId]);
+        } catch (\Throwable $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $error;
         }
         return 'stored';
     }
@@ -198,14 +220,30 @@ final class WhatsAppWebhook
             return null;
         }
         $statement = $this->pdo->prepare(
-            'SELECT id, business_id FROM whatsapp_connections WHERE waba_id = ? AND disconnected_at IS NULL'
+            'SELECT id, business_id, display_phone FROM whatsapp_connections WHERE waba_id = ? AND disconnected_at IS NULL'
         );
         $statement->execute([$waba]);
         $rows = $statement->fetchAll();
-        if (count($rows) !== 1 || !is_array($rows[0])) {
-            return null;
+        $wanted = $this->digitsOnly((string) ($event['body']['phone_number'] ?? ''));
+        if ($wanted !== '') {
+            $matches = [];
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                if ($this->digitsOnly((string) ($row['display_phone'] ?? '')) === $wanted) {
+                    $matches[] = $row;
+                }
+            }
+            if (count($matches) !== 1) {
+                return null;
+            }
+            return ['id' => (int) $matches[0]['id'], 'business_id' => (int) $matches[0]['business_id']];
         }
-        return ['id' => (int) $rows[0]['id'], 'business_id' => (int) $rows[0]['business_id']];
+        if (count($rows) === 1 && is_array($rows[0])) {
+            return ['id' => (int) $rows[0]['id'], 'business_id' => (int) $rows[0]['business_id']];
+        }
+        return null;
     }
 
     /** @return array{id:int,business_id:int}|null */
@@ -241,6 +279,255 @@ final class WhatsAppWebhook
             'reaction' => 'Reaksi diterima.',
             default => 'Mesej diterima.',
         };
+    }
+
+    /**
+     * @param array<string,mixed> $entry
+     * @param array<string,mixed> $value
+     * @return array{kind:string,key:string,phone:string,body:array<string,mixed>}
+     */
+    private function coexistenceEvent(string $field, array $entry, array $value): array
+    {
+        $phone = $this->id(is_array($value['metadata'] ?? null) ? ($value['metadata']['phone_number_id'] ?? '') : '');
+        $signal = $this->historySignal($value);
+        $info = is_array($value['disconnection_info'] ?? null) ? $value['disconnection_info'] : [];
+        $reason = $this->token((string) ($info['reason'] ?? ''));
+        $initiated = $this->token((string) ($info['initiated_by'] ?? ''));
+        $body = [
+            'field' => $field,
+            'waba_id' => $this->id((string) ($entry['id'] ?? '')),
+            'phone_number_id' => $phone,
+            'phone_number' => $this->digitsOnly((string) ($value['phone_number'] ?? '')),
+            'event' => $this->token((string) ($value['event'] ?? '')),
+            'reason' => in_array($reason, ['ACCOUNT_DISCONNECTED', 'BUSINESS_DOWNGRADE', 'CHANGE_NUMBER', 'COMPANION_INACTIVITY', 'PRIMARY_INACTIVITY', 'USER_RE_REGISTERED'], true) ? $reason : '',
+            'initiated_by' => in_array($initiated, ['USER', 'SYSTEM'], true) ? $initiated : '',
+            'phase' => $signal['phase'],
+            'chunk_order' => $signal['chunk'],
+            'progress' => $signal['progress'],
+            'error_code' => $signal['error'],
+            'value' => $this->scrub($value),
+        ];
+        $encoded = json_encode($body, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        return [
+            'kind' => $field,
+            'key' => $this->key($field . ':' . hash('sha256', is_string($encoded) ? $encoded : $field)),
+            'phone' => $phone,
+            'body' => $body,
+        ];
+    }
+
+    /** @param array<string,mixed> $value @return array{phase:?int,chunk:?int,progress:?int,error:string} */
+    private function historySignal(array $value): array
+    {
+        $phase = null;
+        $chunk = null;
+        $progress = null;
+        $error = '';
+        foreach (is_array($value['history'] ?? null) ? $value['history'] : [] as $block) {
+            if (!is_array($block)) {
+                continue;
+            }
+            $meta = is_array($block['metadata'] ?? null) ? $block['metadata'] : [];
+            if (is_numeric($meta['phase'] ?? null)) {
+                $phase = (int) $meta['phase'];
+            }
+            if (is_numeric($meta['chunk_order'] ?? null)) {
+                $chunk = (int) $meta['chunk_order'];
+            }
+            if (is_numeric($meta['progress'] ?? null)) {
+                $progress = (int) $meta['progress'];
+            }
+            foreach (is_array($block['errors'] ?? null) ? $block['errors'] : [] as $item) {
+                if (is_array($item) && (string) ($item['code'] ?? '') === '2593109') {
+                    $error = '2593109';
+                }
+            }
+        }
+        return ['phase' => $phase, 'chunk' => $chunk, 'progress' => $progress, 'error' => $error];
+    }
+
+    /** @param array<string,mixed> $body @return array{json:string,sealed:array{ciphertext:string,nonce:string,tag:string,version:int}} */
+    private function sealBody(array $body, bool $wide): array
+    {
+        $json = json_encode($body, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if (!is_string($json)) {
+            throw new AuthException('Rekod tidak dapat disimpan.', 500);
+        }
+        try {
+            return ['json' => $json, 'sealed' => $this->seal->seal($json, $wide ? 1048576 : 200000)];
+        } catch (AuthException $error) {
+            if (!$wide) {
+                throw $error;
+            }
+            $short = [
+                'field' => $body['field'] ?? '',
+                'waba_id' => $body['waba_id'] ?? '',
+                'phone_number_id' => $body['phone_number_id'] ?? '',
+                'event' => $body['event'] ?? '',
+                'error_code' => $body['error_code'] ?? '',
+                'progress' => $body['progress'] ?? null,
+                'truncated' => true,
+            ];
+            $json = json_encode($short, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if (!is_string($json)) {
+                throw $error;
+            }
+            return ['json' => $json, 'sealed' => $this->seal->seal($json, 200000)];
+        }
+    }
+
+    /** @param array{kind:string,key:string,phone:string,body:array<string,mixed>} $event @param array{id:int,business_id:int}|null $connection */
+    private function observe(array $event, ?array $connection): void
+    {
+        if ($connection === null) {
+            return;
+        }
+        $name = (string) ($event['body']['event'] ?? '');
+        if ($event['kind'] === 'account_update' && in_array($name, ['PARTNER_REMOVED', 'ACCOUNT_OFFBOARDED'], true)) {
+            $this->disconnect($connection, $event['body']);
+            return;
+        }
+        if ($event['kind'] === 'history') {
+            $this->observeHistory($connection, $event['body']);
+            return;
+        }
+        if ($event['kind'] === 'smb_app_state_sync') {
+            $this->advance($connection, 'sync_contacts');
+        }
+    }
+
+    /** @param array{id:int,business_id:int} $connection @param array<string,mixed> $body */
+    private function observeHistory(array $connection, array $body): void
+    {
+        if ((string) ($body['error_code'] ?? '') === '2593109') {
+            $this->setSync($connection, 'sync_history', 'declined', '2593109');
+            $this->finishJob($connection, 'history', 'declined', '2593109');
+            return;
+        }
+        if (($body['progress'] ?? null) === 100) {
+            $this->setSync($connection, 'sync_history', 'completed', null);
+            $this->finishJob($connection, 'history', 'completed', null);
+            return;
+        }
+        $this->setSync($connection, 'sync_history', 'in_progress', null);
+    }
+
+    /** @param array{id:int,business_id:int} $connection */
+    private function advance(array $connection, string $column): void
+    {
+        if ($column !== 'sync_contacts' && $column !== 'sync_history') {
+            return;
+        }
+        $statement = $this->pdo->prepare(
+            'UPDATE whatsapp_connections
+             SET ' . $column . ' = \'in_progress\', updated_at = UTC_TIMESTAMP()
+             WHERE id = ? AND business_id = ? AND disconnected_at IS NULL AND ' . $column . ' = \'pending\''
+        );
+        $statement->execute([$connection['id'], $connection['business_id']]);
+    }
+
+    /** @param array{id:int,business_id:int} $connection */
+    private function setSync(array $connection, string $column, string $status, ?string $code): void
+    {
+        if ($column !== 'sync_history') {
+            return;
+        }
+        $statement = $this->pdo->prepare(
+            'UPDATE whatsapp_connections
+             SET sync_history = ?, last_error_code = COALESCE(?, last_error_code), updated_at = UTC_TIMESTAMP()
+             WHERE id = ? AND business_id = ? AND disconnected_at IS NULL
+               AND sync_history IN (\'pending\', \'in_progress\', \'failed\')'
+        );
+        $statement->execute([$status, $code, $connection['id'], $connection['business_id']]);
+    }
+
+    /** @param array{id:int,business_id:int} $connection */
+    private function finishJob(array $connection, string $syncType, string $status, ?string $code): void
+    {
+        $statement = $this->pdo->prepare(
+            'UPDATE coexistence_sync_jobs
+             SET status = ?, last_error_code = ?, finished_at = UTC_TIMESTAMP(), updated_at = UTC_TIMESTAMP()
+             WHERE connection_id = ? AND business_id = ? AND sync_type = ? AND status IN (\'authorized\', \'in_progress\')'
+        );
+        $statement->execute([$status, $code, $connection['id'], $connection['business_id'], $syncType]);
+    }
+
+    /** @param array{id:int,business_id:int} $connection @param array<string,mixed> $body */
+    private function disconnect(array $connection, array $body): void
+    {
+        $reason = (string) ($body['reason'] ?? '');
+        $code = $reason !== '' ? $reason : ((string) ($body['event'] ?? '') === 'ACCOUNT_OFFBOARDED' ? 'ACCOUNT_OFFBOARDED' : 'PARTNER_REMOVED');
+        $statement = $this->pdo->prepare(
+            'UPDATE whatsapp_connections
+             SET token_state = \'revoked\', messaging_state = \'unverified\',
+                 token_ciphertext = NULL, token_nonce = NULL, token_tag = NULL, token_key_version = NULL,
+                 disconnected_at = UTC_TIMESTAMP(), last_error_code = ?,
+                 sync_contacts = IF(sync_contacts IN (\'pending\', \'in_progress\'), \'unavailable\', sync_contacts),
+                 sync_history = IF(sync_history IN (\'pending\', \'in_progress\'), \'unavailable\', sync_history),
+                 updated_at = UTC_TIMESTAMP()
+             WHERE id = ? AND business_id = ? AND token_state = \'verified\' AND disconnected_at IS NULL'
+        );
+        $statement->execute([$code, $connection['id'], $connection['business_id']]);
+        if ($statement->rowCount() !== 1) {
+            return;
+        }
+        $jobs = $this->pdo->prepare(
+            'UPDATE coexistence_sync_jobs
+             SET status = \'cancelled\', last_error_code = \'PARTNER_REMOVED\', finished_at = UTC_TIMESTAMP(), updated_at = UTC_TIMESTAMP()
+             WHERE connection_id = ? AND business_id = ? AND status IN (\'authorized\', \'in_progress\')'
+        );
+        $jobs->execute([$connection['id'], $connection['business_id']]);
+        $audit = $this->pdo->prepare(
+            'INSERT INTO audit_logs
+                (business_id, actor_user_id, actor_kind, action, entity_type, entity_id, meta_json, created_at)
+             VALUES (?, NULL, \'system\', \'rakan_diputuskan\', \'whatsapp_connection\', ?, ?, UTC_TIMESTAMP())'
+        );
+        $audit->execute([
+            $connection['business_id'],
+            $connection['id'],
+            json_encode([
+                'event' => (string) ($body['event'] ?? ''),
+                'reason' => $reason,
+                'initiated_by' => (string) ($body['initiated_by'] ?? ''),
+            ], JSON_UNESCAPED_SLASHES),
+        ]);
+    }
+
+    private function scrub(mixed $value, int $depth = 0): mixed
+    {
+        if ($depth > 8) {
+            return null;
+        }
+        if (is_string($value)) {
+            return $this->label($value, 4000);
+        }
+        if (is_int($value) || is_float($value) || is_bool($value) || $value === null) {
+            return $value;
+        }
+        if (!is_array($value)) {
+            return null;
+        }
+        $clean = [];
+        foreach ($value as $key => $item) {
+            $name = is_int($key) ? $key : (is_string($key) ? $key : '');
+            if (!is_int($name) && in_array(strtolower($name), ['access_token', 'token', 'authorization', 'client_secret', 'app_secret', 'password', 'secret', 'url', 'href', 'input_token'], true)) {
+                continue;
+            }
+            $clean[$name] = $this->scrub($item, $depth + 1);
+        }
+        return $clean;
+    }
+
+    private function digitsOnly(string $value): string
+    {
+        $digits = preg_replace('/\D/', '', $value);
+        $digits = is_string($digits) ? $digits : '';
+        return preg_match('/\A\d{6,20}\z/', $digits) === 1 ? $digits : '';
+    }
+
+    private function token(string $value): string
+    {
+        return preg_match('/\A[A-Za-z0-9_]{1,64}\z/', $value) === 1 ? $value : '';
     }
 
     /** @param array<string,mixed> $value */

@@ -89,8 +89,10 @@ $check(
         && !str_contains($coexistBind, '/register')
         && !str_contains($coexistBind, 'smb_app')
         && str_contains($graphSrc, 'is_on_biz_app,platform_type')
-        && !str_contains($graphSrc, 'smb_app_data')
+        && str_contains($graphSrc, 'function smbAppData')
         && !str_contains($graphSrc, '/register')
+        && !str_contains((string) file_get_contents($root . '/os/src/WhatsAppWebhook.php'), 'smbAppData')
+        && !str_contains($webhookFile, 'smb_app_data')
 );
 
 $seal = new TokenSeal(random_bytes(32), 1);
@@ -561,7 +563,8 @@ $ambiguousRaw = json_encode([
 ], JSON_UNESCAPED_SLASHES);
 $webhook->ingest((string) $ambiguousRaw);
 $ambiguous = $pdo->query('SELECT business_id FROM webhook_events WHERE event_kind = \'account_update\' ORDER BY id DESC LIMIT 1')->fetch();
-$check('ambiguous waba update stays unscoped', is_array($ambiguous) && $ambiguous['business_id'] === null);
+$stillVerified = (string) $pdo->query('SELECT COUNT(*) FROM whatsapp_connections WHERE token_state = \'verified\' AND disconnected_at IS NULL AND waba_id = \'' . $waba . '\'')->fetchColumn();
+$check('ambiguous waba update stays unscoped', is_array($ambiguous) && $ambiguous['business_id'] === null && $stillVerified === '2');
 
 $expiredSeal = $seal->seal('token-tamat', 100);
 $pdo->prepare(
@@ -1138,9 +1141,11 @@ function lab(): ?PDO
     $server->exec('DROP DATABASE IF EXISTS meta_lab');
     $server->exec('CREATE DATABASE meta_lab CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
     $server->exec('USE meta_lab');
-    $sql = (string) file_get_contents(dirname(__DIR__) . '/migrations/0001_foundation.up.sql');
-    foreach (SqlScript::statements($sql) as $statement) {
-        $server->exec($statement);
+    foreach (['0001_foundation.up.sql', '0002_coexistence_sync.up.sql'] as $name) {
+        $sql = (string) file_get_contents(dirname(__DIR__) . '/migrations/' . $name);
+        foreach (SqlScript::statements($sql) as $statement) {
+            $server->exec($statement);
+        }
     }
     $pdo = new PDO('mysql:host=127.0.0.1;port=3307;dbname=meta_lab;charset=utf8mb4', 'root', $password, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
