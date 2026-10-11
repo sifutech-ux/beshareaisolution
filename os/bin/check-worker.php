@@ -136,6 +136,27 @@ function insertLink(PDO $pdo, TokenSeal $seal, int $businessId, string $waba, st
 
 function markReady(PDO $pdo, int $connectionId, string $part): void
 {
+    global $seal, $secret;
+    $statement = $pdo->prepare('SELECT business_id, waba_id, phone_number_id FROM whatsapp_connections WHERE id = ?');
+    $statement->execute([$connectionId]);
+    $row = $statement->fetch();
+    if (!is_array($row)) {
+        throw new RuntimeException('sambungan ujian tiada');
+    }
+    if (!CoexistenceSync::hasDeliveryEvidence($pdo, $connectionId, (int) $row['business_id'])) {
+        $raw = envelope((string) $row['waba_id'], 'smb_message_echoes', [
+            'metadata' => ['phone_number_id' => (string) $row['phone_number_id']],
+            'message_echoes' => [[
+                'from' => '60120000000',
+                'to' => '60120000001',
+                'id' => 'wamid.BUKTI.' . $connectionId,
+                'timestamp' => '1710000000',
+                'type' => 'text',
+                'text' => ['body' => 'bukti-gema-' . $connectionId],
+            ]],
+        ]);
+        signedIngest(new WhatsAppWebhook($pdo, $seal), $raw, $secret);
+    }
     CoexistenceSync::record($pdo, $connectionId, $part);
 }
 

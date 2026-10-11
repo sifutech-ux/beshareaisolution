@@ -531,6 +531,21 @@ final class CoexistenceSync
         return $count;
     }
 
+    public static function hasDeliveryEvidence(PDO $pdo, int $connectionId, int $businessId): bool
+    {
+        if ($connectionId < 1 || $businessId < 1) {
+            return false;
+        }
+        $statement = $pdo->prepare(
+            'SELECT 1 FROM webhook_events
+             WHERE connection_id = ? AND business_id = ? AND status = \'accepted\'
+               AND event_kind IN (\'message\', \'history\', \'smb_app_state_sync\', \'smb_message_echoes\')
+             LIMIT 1'
+        );
+        $statement->execute([$connectionId, $businessId]);
+        return $statement->fetchColumn() !== false;
+    }
+
     public static function record(PDO $pdo, int $connectionId, string $part): void
     {
         $column = $part === 'callback' ? 'callback_ready_at' : ($part === 'fields' ? 'fields_ready_at' : '');
@@ -542,6 +557,9 @@ final class CoexistenceSync
         $businessId = $found->fetchColumn();
         if ($businessId === false) {
             throw new AuthException('Sambungan tidak dijumpai.', 404);
+        }
+        if (!self::hasDeliveryEvidence($pdo, $connectionId, (int) $businessId)) {
+            throw new AuthException('Bukti webhook belum disahkan.', 409);
         }
         $update = $pdo->prepare(
             'UPDATE whatsapp_connections

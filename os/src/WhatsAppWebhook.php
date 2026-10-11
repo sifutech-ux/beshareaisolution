@@ -27,6 +27,45 @@ final class WhatsAppWebhook
         return hash_equals($expected, strtolower($match[1]));
     }
 
+    /**
+     * Entry for a later approved legacy-callback bridge.
+     * The legacy webhook is not changed by this method. The caller must pass the
+     * raw body and the X-Hub-Signature-256 header. Unverified bodies are rejected
+     * before any write. Only PARTNER_REMOVED and ACCOUNT_OFFBOARDED are accepted.
+     *
+     * @return array{stored:int,replayed:int}
+     */
+    public function ingestVerifiedLifecycle(string $raw, string $secret, string $header): array
+    {
+        if (!self::signatureMatches($raw, $header, $secret)) {
+            throw new AuthException('Tandatangan tidak sah.', 403);
+        }
+        $payload = json_decode($raw, true, 512, JSON_BIGINT_AS_STRING);
+        if (!is_array($payload) || ($payload['object'] ?? '') !== 'whatsapp_business_account' || !is_array($payload['entry'] ?? null)) {
+            throw new AuthException('Payload webhook tidak sah.', 400);
+        }
+        $seen = 0;
+        foreach ($payload['entry'] as $entry) {
+            if (!is_array($entry) || !is_array($entry['changes'] ?? null)) {
+                throw new AuthException('Payload webhook tidak sah.', 400);
+            }
+            foreach ($entry['changes'] as $change) {
+                if (!is_array($change) || (string) ($change['field'] ?? '') !== 'account_update' || !is_array($change['value'] ?? null)) {
+                    throw new AuthException('Peristiwa ini tidak diteruskan.', 400);
+                }
+                $event = (string) ($change['value']['event'] ?? '');
+                if (!in_array($event, ['PARTNER_REMOVED', 'ACCOUNT_OFFBOARDED'], true)) {
+                    throw new AuthException('Peristiwa ini tidak diteruskan.', 400);
+                }
+                $seen++;
+            }
+        }
+        if ($seen < 1) {
+            throw new AuthException('Payload webhook tidak sah.', 400);
+        }
+        return $this->ingest($raw);
+    }
+
     /** @return array{stored:int,replayed:int} */
     public function ingest(string $raw): array
     {

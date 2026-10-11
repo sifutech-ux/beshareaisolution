@@ -140,6 +140,79 @@ final class MetaGraph
         ]);
     }
 
+    /**
+     * Read apps subscribed to a WABA. This does not subscribe or remove anything.
+     *
+     * @return array<string,mixed>
+     */
+    public function subscribedApps(string $token, string $wabaId): array
+    {
+        $this->requireTransport();
+        $this->assertId($wabaId);
+        return $this->request('GET', $wabaId . '/subscribed_apps', $this->bearer($token), '');
+    }
+
+    /**
+     * Read the phone, WABA, and application callback URLs.
+     *
+     * @return array<string,mixed>
+     */
+    public function webhookConfiguration(string $token, string $phoneId): array
+    {
+        $this->requireTransport();
+        $this->assertId($phoneId);
+        return $this->request('GET', $phoneId, $this->bearer($token), '', ['fields' => 'webhook_configuration']);
+    }
+
+    /**
+     * Set only this phone's alternate callback. The URL is chosen by the caller
+     * from the fixed OS endpoint; this method does not subscribe a WABA.
+     *
+     * @return array<string,mixed>
+     */
+    public function setPhoneOverride(string $token, string $phoneId, string $callbackUrl, string $verifyToken): array
+    {
+        $this->requireTransport();
+        $this->assertId($phoneId);
+        if (preg_match('#\Ahttps://beshareaisolution\.com/whatsapp/sambungan/webhook\.php\z#', $callbackUrl) !== 1) {
+            throw new MetaCallException('callback', 400);
+        }
+        if ($verifyToken === '' || strlen($verifyToken) > 200 || preg_match('/[\r\n]/', $verifyToken) === 1) {
+            throw new MetaCallException('verify', 400);
+        }
+        $body = json_encode([
+            'webhook_configuration' => [
+                'override_callback_uri' => $callbackUrl,
+                'verify_token' => $verifyToken,
+            ],
+        ], JSON_UNESCAPED_SLASHES);
+        if (!is_string($body)) {
+            throw new MetaCallException('callback', 400);
+        }
+        return $this->request('POST', $phoneId, $this->bearer($token) + ['content-type' => 'application/json'], $body);
+    }
+
+    /**
+     * Remove only this phone's alternate callback. An empty URI is the documented
+     * phone rollback. It is not an empty WABA subscribed_apps request.
+     *
+     * @return array<string,mixed>
+     */
+    public function clearPhoneOverride(string $token, string $phoneId): array
+    {
+        $this->requireTransport();
+        $this->assertId($phoneId);
+        $body = json_encode([
+            'webhook_configuration' => [
+                'override_callback_uri' => '',
+            ],
+        ], JSON_UNESCAPED_SLASHES);
+        if (!is_string($body)) {
+            throw new MetaCallException('callback', 400);
+        }
+        return $this->request('POST', $phoneId, $this->bearer($token) + ['content-type' => 'application/json'], $body);
+    }
+
     public function subscribe(string $token, string $wabaId): bool
     {
         $ready = $this->ready;
@@ -219,6 +292,13 @@ final class MetaGraph
     {
         if (preg_match('/\A\d{5,32}\z/', $id) !== 1) {
             throw new MetaCallException('id', 400);
+        }
+    }
+
+    private function requireTransport(): void
+    {
+        if (!$this->transport instanceof MetaTransport) {
+            throw new MetaCallException('disabled', 409);
         }
     }
 }
