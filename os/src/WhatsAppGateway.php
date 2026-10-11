@@ -52,6 +52,10 @@ final class WhatsAppGateway
         $phone = $this->metaId($body, 'phone_number_id');
         $step = $this->step($body);
         $errorCode = $this->safeCode($body['error_code'] ?? '');
+        if ($errorCode === null) {
+            $errorCode = $this->safeCode($body['error_id'] ?? '');
+        }
+        $sessionId = $this->safeCode($body['session_id'] ?? '');
         $this->pdo->beginTransaction();
         try {
             $row = $this->lock($actor, $this->text($body, 'state'), $sessionKey);
@@ -60,7 +64,8 @@ final class WhatsAppGateway
                 return;
             }
             if ($event === 'CANCEL') {
-                $this->finishRow((int) $row['id'], $actor['business_id'], 'abandoned', $event, $step, null, $waba, $phone);
+                $this->finishRow((int) $row['id'], $actor['business_id'], 'abandoned', $event, $step, $errorCode, $waba, $phone);
+                $this->audit($actor, 'sambungan_dibatalkan', (int) $row['id'], $this->cancelMeta($step, $errorCode, $sessionId));
             } elseif ($event === 'ERROR') {
                 $this->finishRow((int) $row['id'], $actor['business_id'], 'rejected', $event, $step, $errorCode ?: 'error', $waba, $phone);
                 $this->audit($actor, 'sambungan_ditolak', (int) $row['id'], null);
@@ -566,7 +571,7 @@ final class WhatsAppGateway
             'expired', '190' => 'Kelayakan Meta telah tamat atau tidak sah.',
             'waba', 'phone' => 'Aset WhatsApp tidak disahkan untuk tenant ini.',
             default => match ($status) {
-                'abandoned' => 'Aliran Meta dibatalkan.',
+                'abandoned' => $code === '' ? 'Aliran Meta dibatalkan.' : 'Aliran Meta dibatalkan. Kod ralat ' . $code . '.',
                 'incomplete' => 'Meta tidak memulangkan nombor telefon.',
                 'expired' => 'Sesi sambungan telah tamat.',
                 'rejected' => 'Sambungan Meta ditolak.',
@@ -703,6 +708,22 @@ final class WhatsAppGateway
             return null;
         }
         return $step;
+    }
+
+    /** @return array<string,string> */
+    private function cancelMeta(?string $step, ?string $errorCode, ?string $sessionId): array
+    {
+        $meta = ['event' => 'CANCEL'];
+        if ($step !== null) {
+            $meta['current_step'] = $step;
+        }
+        if ($errorCode !== null) {
+            $meta['error_code'] = $errorCode;
+        }
+        if ($sessionId !== null) {
+            $meta['session_id'] = $sessionId;
+        }
+        return $meta;
     }
 
     private function safeCode(mixed $value): ?string

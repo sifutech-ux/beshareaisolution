@@ -997,6 +997,7 @@ function onInput(event) {
 
 let signupReady = { appId: "", configId: "", version: "v26.0" };
 let signupState = "";
+let signupQueue = null;
 let inboxLoad = "";
 
 function facebookHost(origin) {
@@ -1060,6 +1061,34 @@ function loadFacebookSdk(cfg) {
   }
 }
 
+function metaText(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return String(Math.trunc(value));
+  return typeof value === "string" ? value : "";
+}
+
+function signupDiagnostic(info) {
+  const source = info && typeof info === "object" ? info : {};
+  const rawCode = metaText(source.error_code) || metaText(source.error_id);
+  const session = metaText(source.session_id);
+  return {
+    error_code: /^[A-Za-z0-9_-]{1,64}$/.test(rawCode) ? rawCode : "",
+    session_id: /^[A-Za-z0-9_-]{1,64}$/.test(session) ? session : ""
+  };
+}
+
+function signupEventFields(data) {
+  const info = data && data.data && typeof data.data === "object" ? data.data : {};
+  const diagnostic = signupDiagnostic(info);
+  return {
+    event: data && typeof data.event === "string" ? data.event : "",
+    waba_id: metaText(info.waba_id),
+    phone_number_id: metaText(info.phone_number_id),
+    current_step: typeof info.current_step === "string" ? info.current_step : "",
+    error_code: diagnostic.error_code,
+    session_id: diagnostic.session_id
+  };
+}
+
 function openEmbeddedSignup() {
   const state = load();
   if (!state) return;
@@ -1073,30 +1102,48 @@ function openEmbeddedSignup() {
       : "Tetingkap Meta tidak dibuka. App ID dan Configuration ID belum dipasang pada pelayan.");
     return;
   }
-  callApi("sambung", {}).then((started) => {
-    if (!started.ok || !/^[0-9a-f]{64}$/.test(started.state || "")) {
-      showSignupNote(started.error || "Sesi sambungan tidak dapat dibuka.");
+  const pending = { codeReady: false, codeSent: false, code: "", events: [], stateReady: false, failed: false };
+  signupQueue = pending;
+  const started = callApi("sambung", {});
+  window.FB.login((response) => {
+    if (signupQueue !== pending) return;
+    const code = response && response.authResponse ? response.authResponse.code : "";
+    pending.code = typeof code === "string" ? code : "";
+    pending.codeReady = true;
+    settleSignup(pending);
+  }, {
+    config_id: signupReady.configId,
+    response_type: "code",
+    override_default_response_type: true,
+    extras: {
+      setup: {},
+      featureType: "",
+      sessionInfoVersion: "3"
+    }
+  });
+  started.then((data) => {
+    if (signupQueue !== pending) return;
+    if (!data || data.ok !== true || !/^[0-9a-f]{64}$/.test(data.state || "")) {
+      pending.failed = true;
+      signupQueue = null;
+      signupState = "";
+      showSignupNote((data && data.error) || "Sesi sambungan tidak dapat dibuka.");
       return;
     }
-    signupState = started.state;
-    window.FB.login((response) => {
-      const code = response && response.authResponse ? response.authResponse.code : "";
-      if (!code) {
-        showSignupNote("Tetingkap Meta ditutup sebelum kebenaran diberi.");
-        return;
-      }
-      exchangeSignupCode(code);
-    }, {
-      config_id: signupReady.configId,
-      response_type: "code",
-      override_default_response_type: true,
-      extras: {
-        setup: {},
-        featureType: "",
-        sessionInfoVersion: "3"
-      }
-    });
+    pending.stateReady = true;
+    signupState = data.state;
+    settleSignup(pending);
   });
+}
+
+function settleSignup(pending) {
+  if (pending.failed || !pending.stateReady || !signupState) return;
+  if (pending.codeReady && !pending.codeSent) {
+    pending.codeSent = true;
+    if (pending.code) exchangeSignupCode(pending.code);
+    else showSignupNote("Tetingkap Meta ditutup sebelum kebenaran diberi.");
+  }
+  while (pending.events.length) sendSignupEvent(pending.events.shift());
 }
 
 function exchangeSignupCode(code) {
@@ -1124,17 +1171,17 @@ window.addEventListener("message", (event) => {
       return;
     }
   }
-  if (!data || data.type !== "WA_EMBEDDED_SIGNUP" || !signupState) return;
-  const info = data.data && typeof data.data === "object" ? data.data : {};
-  const eventName = typeof data.event === "string" ? data.event : "";
-  callApi("peristiwa", {
-    state: signupState,
-    event: eventName,
-    waba_id: typeof info.waba_id === "string" ? info.waba_id : "",
-    phone_number_id: typeof info.phone_number_id === "string" ? info.phone_number_id : "",
-    current_step: typeof info.current_step === "string" ? info.current_step : "",
-    error_code: typeof info.error_id === "string" ? info.error_id : ""
-  }).then((result) => {
+  if (!data || data.type !== "WA_EMBEDDED_SIGNUP") return;
+  const fields = signupEventFields(data);
+  if (signupState) {
+    sendSignupEvent(fields);
+    return;
+  }
+  if (signupQueue) signupQueue.events.push(fields);
+});
+
+function sendSignupEvent(fields) {
+  callApi("peristiwa", Object.assign({ state: signupState }, fields)).then((result) => {
     if (result && result.user) applyLive(result);
     inboxLoad = "";
     const current = load();
@@ -1145,7 +1192,7 @@ window.addEventListener("message", (event) => {
     save(current);
     if ((location.hash.replace("#", "") || "") === "sambungan") route();
   });
-});
+}
 
 async function boot() {
   const root = document.getElementById("app");

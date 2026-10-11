@@ -40,7 +40,7 @@ if ($method === 'GET') {
     if (!is_string($mode) || !is_string($token) || !is_string($challenge)) {
         beshare_os_webhook_finish(400, 'Bad request');
     }
-    if ($mode !== 'subscribe' || $challenge === '' || !hash_equals($tokenValue, $token)) {
+    if ($mode !== 'subscribe' || preg_match('/\A[0-9]{1,128}\z/', $challenge) !== 1 || !hash_equals($tokenValue, $token)) {
         beshare_os_webhook_finish(403, 'Forbidden');
     }
     beshare_os_webhook_finish(200, $challenge);
@@ -65,7 +65,8 @@ if (!$seal instanceof TokenSeal) {
 try {
     (new WhatsAppWebhook(Db::connect(), $seal))->ingest($raw);
 } catch (AuthException $error) {
-    beshare_os_webhook_finish($error->status(), 'Bad request');
+    $status = $error->status();
+    beshare_os_webhook_finish($status >= 500 ? $status : 400, $status >= 500 ? 'Unavailable' : 'Bad request');
 } catch (Throwable) {
     beshare_os_webhook_finish(500, 'Unavailable');
 }

@@ -145,7 +145,7 @@ final class WhatsAppWebhook
             return 'skipped';
         }
         $sealed = $this->seal->seal($json, 200000);
-        $connection = $event['phone'] === '' ? null : $this->connection($event['phone']);
+        $connection = $this->route($event);
         $businessId = $connection['business_id'] ?? null;
         $connectionId = $connection['id'] ?? null;
         try {
@@ -182,6 +182,30 @@ final class WhatsAppWebhook
             $mark->execute([$connectionId, $businessId]);
         }
         return 'stored';
+    }
+
+    /**
+     * @param array{kind:string,key:string,phone:string,body:array<string,mixed>} $event
+     * @return array{id:int,business_id:int}|null
+     */
+    private function route(array $event): ?array
+    {
+        if ($event['phone'] !== '') {
+            return $this->connection($event['phone']);
+        }
+        $waba = $this->id($event['body']['waba_id'] ?? '');
+        if ($waba === '') {
+            return null;
+        }
+        $statement = $this->pdo->prepare(
+            'SELECT id, business_id FROM whatsapp_connections WHERE waba_id = ? AND disconnected_at IS NULL'
+        );
+        $statement->execute([$waba]);
+        $rows = $statement->fetchAll();
+        if (count($rows) !== 1 || !is_array($rows[0])) {
+            return null;
+        }
+        return ['id' => (int) $rows[0]['id'], 'business_id' => (int) $rows[0]['business_id']];
     }
 
     /** @return array{id:int,business_id:int}|null */

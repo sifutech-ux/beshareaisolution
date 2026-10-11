@@ -53,6 +53,12 @@ $check(
         && str_contains($dashboard, '? "peti" : "sesi"')
         && str_contains($dashboard, 'sessionInfoVersion: "3"')
         && str_contains($dashboard, 'response_type: "code"')
+        && str_contains($dashboard, 'function signupDiagnostic')
+        && str_contains($dashboard, 'source.error_code')
+        && str_contains($dashboard, 'source.error_id')
+        && str_contains($dashboard, 'window.FB.login')
+        && !str_contains($dashboard, 'callApi("sambung", {}).then')
+        && !str_contains($dashboard, 'error_message')
         && !str_contains($dashboard, 'sambungan/tukar.php')
         && !str_contains($dashboard, '27767197276313052')
         && !str_contains($dashboard, 'console.')
@@ -432,6 +438,103 @@ $message = is_array($conversation) && isset($conversation['messages'][0]) ? $con
 $check('inbox reads the verified webhook for its tenant', ($message['text'] ?? '') === 'Harga harini?' && ($message['status'] ?? '') === 'delivered' && ($message['wamid'] ?? '') === 'wamid.TESTMESSAGE0001');
 $check('another tenant cannot read the webhook', ($otherInbox['body']['conversations'] ?? null) === []);
 
+$plant = 'EAA-webhook-rahsia-jangan-simpan';
+$signSecret = 'tandatangan-ujian';
+$unknownRaw = json_encode([
+    'object' => 'whatsapp_business_account',
+    'entry' => [[
+        'changes' => [[
+            'field' => 'messages',
+            'value' => [
+                'metadata' => ['phone_number_id' => '100000000000909'],
+                'messages' => [[
+                    'from' => '15550001009',
+                    'id' => 'wamid.UNKNOWNPHONE0001',
+                    'timestamp' => (string) time(),
+                    'type' => 'text',
+                    'text' => ['body' => 'nombor belum ada'],
+                ]],
+            ],
+        ]],
+    ]],
+], JSON_UNESCAPED_SLASHES);
+$unknownHeader = 'sha256=' . hash_hmac('sha256', (string) $unknownRaw, $signSecret);
+$tampered = (string) $unknownRaw . ' ';
+$beforeUnknown = (string) $pdo->query('SELECT COUNT(*) FROM webhook_events')->fetchColumn();
+$tamperRejected = !WhatsAppWebhook::signatureMatches($tampered, $unknownHeader, $signSecret);
+$signed = WhatsAppWebhook::signatureMatches((string) $unknownRaw, $unknownHeader, $signSecret);
+if ($signed) {
+    $webhook->ingest((string) $unknownRaw);
+    $webhook->ingest((string) $unknownRaw);
+}
+$unknownRow = $pdo->query('SELECT business_id, connection_id FROM webhook_events WHERE dedupe_key LIKE \'%UNKNOWNPHONE0001\'')->fetch();
+$afterUnknown = (string) $pdo->query('SELECT COUNT(*) FROM webhook_events')->fetchColumn();
+$check(
+    'signed unknown phone is stored once without a tenant',
+    $tamperRejected && $signed && is_array($unknownRow) && $unknownRow['business_id'] === null && $unknownRow['connection_id'] === null && (int) $afterUnknown === (int) $beforeUnknown + 1
+);
+$invalidRaw = '{"object":"page"}';
+$invalidHeader = 'sha256=' . hash_hmac('sha256', $invalidRaw, $signSecret);
+$invalidStatus = catchStatus(function () use ($webhook, $invalidRaw, $invalidHeader, $signSecret): void {
+    if (!WhatsAppWebhook::signatureMatches($invalidRaw, $invalidHeader, $signSecret)) {
+        throw new AuthException('Forbidden', 403);
+    }
+    $webhook->ingest($invalidRaw);
+});
+$afterInvalid = (string) $pdo->query('SELECT COUNT(*) FROM webhook_events')->fetchColumn();
+$check('signed invalid object is rejected without a row', $invalidStatus === 400 && $afterInvalid === $afterUnknown);
+
+$accountRaw = json_encode([
+    'object' => 'whatsapp_business_account',
+    'entry' => [[
+        'id' => $waba,
+        'changes' => [[
+            'field' => 'account_update',
+            'value' => ['event' => 'PARTNER_ADDED', 'access_token' => $plant],
+        ]],
+    ]],
+], JSON_UNESCAPED_SLASHES);
+$webhook->ingest((string) $accountRaw);
+$account = $pdo->query('SELECT business_id, dedupe_key, HEX(payload_ciphertext) AS payload_ciphertext, HEX(payload_nonce) AS payload_nonce, HEX(payload_tag) AS payload_tag, payload_key_version FROM webhook_events WHERE event_kind = \'account_update\' ORDER BY id DESC LIMIT 1')->fetch();
+$accountPlain = '';
+if (is_array($account)) {
+    $accountPlain = $seal->open(hex2bin((string) $account['payload_ciphertext']) ?: '', hex2bin((string) $account['payload_nonce']) ?: '', hex2bin((string) $account['payload_tag']) ?: '', (int) $account['payload_key_version']);
+}
+$ownerBusinessId = (int) $pdo->query('SELECT id FROM businesses WHERE name = \'Kedai Meta\'')->fetchColumn();
+$check(
+    'account update routes to the single waba tenant without the raw payload',
+    is_array($account) && (int) $account['business_id'] === $ownerBusinessId && !str_contains((string) $account['dedupe_key'], $plant) && !str_contains($accountPlain, $plant) && str_contains($accountPlain, $waba)
+);
+$secondSeal = $seal->seal('token-kedua', 100);
+$pdo->prepare(
+    'INSERT INTO whatsapp_connections (
+        business_id, waba_id, phone_number_id, display_phone, token_state, webhook_state,
+        registration_state, messaging_state, token_kind, token_ciphertext, token_nonce, token_tag,
+        token_key_version, refresh_supported, created_at, updated_at
+     ) VALUES (?, ?, ?, NULL, \'verified\', \'not_subscribed\', \'unknown\', \'unverified\', \'system_user\',
+        UNHEX(?), UNHEX(?), UNHEX(?), 1, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())'
+)->execute([
+    otherBusiness($pdo),
+    $waba,
+    '100000000000808',
+    bin2hex($secondSeal['ciphertext']),
+    bin2hex($secondSeal['nonce']),
+    bin2hex($secondSeal['tag']),
+]);
+$ambiguousRaw = json_encode([
+    'object' => 'whatsapp_business_account',
+    'entry' => [[
+        'id' => $waba,
+        'changes' => [[
+            'field' => 'account_update',
+            'value' => ['event' => 'PARTNER_REMOVED', 'secret' => $plant],
+        ]],
+    ]],
+], JSON_UNESCAPED_SLASHES);
+$webhook->ingest((string) $ambiguousRaw);
+$ambiguous = $pdo->query('SELECT business_id FROM webhook_events WHERE event_kind = \'account_update\' ORDER BY id DESC LIMIT 1')->fetch();
+$check('ambiguous waba update stays unscoped', is_array($ambiguous) && $ambiguous['business_id'] === null);
+
 $expiredSeal = $seal->seal('token-tamat', 100);
 $pdo->prepare(
     'INSERT INTO whatsapp_connections (
@@ -458,6 +561,88 @@ $staleStaff = catchStatus(function () use ($http, &$staff, $remote, $host): void
     $http->handle('POST', 'sambung', $staff, [], ['x-csrf-token' => (string) ($staff['csrf'] ?? '')], $remote, $host, 'staff-session');
 });
 $check('removed member cannot start signup', $staleStaff === 401);
+
+$cancel = [];
+$cancelIssued = $http->handle('GET', 'sesi', $cancel, [], [], $remote, $host, 'cancel-session');
+$cancelCreated = $http->handle('POST', 'daftar', $cancel, [
+    'name' => 'Pemilik Batal',
+    'email' => 'batal.meta@kedai.test',
+    'password' => 'kata-laluan-yang-panjang',
+    'business' => 'Kedai Batal',
+], ['x-csrf-token' => $cancelIssued['body']['csrf']], $remote, $host, 'cancel-session');
+$cancelStarted = $http->handle('POST', 'sambung', $cancel, [], ['x-csrf-token' => $cancelCreated['body']['csrf']], $remote, $host, 'cancel-session');
+$cancelState = (string) ($cancelStarted['body']['state'] ?? '');
+$planted = 'Garis panduan rahsia ujian 991';
+$callsBefore = count($script->calls);
+$cancelled = $http->handle('POST', 'peristiwa', $cancel, [
+    'state' => $cancelState,
+    'event' => 'CANCEL',
+    'current_step' => 'PHONE_NUMBER_SETUP',
+    'error_code' => 524126,
+    'error_id' => 'LEGACY_SHOULD_LOSE',
+    'session_id' => 'f34b51dab5e0498',
+    'error_message' => $planted,
+    'waba_id' => $waba,
+    'phone_number_id' => '100000000000707',
+], ['x-csrf-token' => $cancelStarted['body']['csrf']], $remote, $host, 'cancel-session');
+$cancelJson = json_encode($cancelled['body'], JSON_UNESCAPED_UNICODE);
+$cancelRow = $pdo->query('SELECT status, finish_event, current_step, meta_error_code, token_ciphertext IS NULL AS token_cleared FROM onboarding_sessions WHERE business_id = (SELECT id FROM businesses WHERE name = \'Kedai Batal\')')->fetch();
+$cancelAudit = (string) $pdo->query('SELECT meta_json FROM audit_logs WHERE action = \'sambungan_dibatalkan\' ORDER BY id DESC LIMIT 1')->fetchColumn();
+$cancelLinks = (string) $pdo->query('SELECT COUNT(*) FROM whatsapp_connections WHERE business_id = (SELECT id FROM businesses WHERE name = \'Kedai Batal\')')->fetchColumn();
+$check(
+    'cancel with error code stays abandoned and stores only safe diagnostics',
+    is_array($cancelRow)
+        && $cancelRow['status'] === 'abandoned'
+        && $cancelRow['finish_event'] === 'CANCEL'
+        && $cancelRow['current_step'] === 'PHONE_NUMBER_SETUP'
+        && $cancelRow['meta_error_code'] === '524126'
+        && (string) $cancelRow['token_cleared'] === '1'
+        && $cancelLinks === '0'
+        && ($cancelled['body']['connection']['linked'] ?? true) === false
+        && ($cancelled['body']['connection']['note'] ?? '') === 'Aliran Meta dibatalkan. Kod ralat 524126.'
+        && is_string($cancelJson)
+        && !str_contains($cancelJson, $planted)
+        && !str_contains($cancelJson, 'f34b51dab5e0498')
+        && str_contains(str_replace(' ', '', $cancelAudit), '"error_code":"524126"')
+        && str_contains(str_replace(' ', '', $cancelAudit), '"session_id":"f34b51dab5e0498"')
+        && str_contains(str_replace(' ', '', $cancelAudit), '"current_step":"PHONE_NUMBER_SETUP"')
+        && !str_contains($cancelAudit, $planted)
+        && !str_contains($cancelAudit, 'LEGACY_SHOULD_LOSE')
+        && count($script->calls) === $callsBefore
+);
+$callsAtExchange = $script->calls;
+$script->script = [oauthResponse('EAA-cancel-must-not-bind')];
+$cancelExchange = catchStatus(function () use ($http, &$cancel, $cancelState, $cancelled, $remote, $host): void {
+    $http->handle('POST', 'tukar', $cancel, [
+        'state' => $cancelState,
+        'code' => 'cancel-code-abcdefgh',
+    ], ['x-csrf-token' => $cancelled['body']['csrf']], $remote, $host, 'cancel-session');
+});
+$cancelLinksAfter = (string) $pdo->query('SELECT COUNT(*) FROM whatsapp_connections WHERE business_id = (SELECT id FROM businesses WHERE name = \'Kedai Batal\')')->fetchColumn();
+$check('cancel blocks a later code exchange', $cancelExchange === 409 && $cancelLinksAfter === '0' && $script->calls === $callsAtExchange);
+
+$legacyStarted = $http->handle('POST', 'sambung', $cancel, [], ['x-csrf-token' => $cancelled['body']['csrf']], $remote, $host, 'cancel-session');
+$legacy = $http->handle('POST', 'peristiwa', $cancel, [
+    'state' => (string) ($legacyStarted['body']['state'] ?? ''),
+    'event' => 'CANCEL',
+    'error_id' => 'ERR_LEGACY',
+    'current_step' => 'PERMISSIONS',
+], ['x-csrf-token' => $legacyStarted['body']['csrf']], $remote, $host, 'cancel-session');
+$legacyCode = (string) $pdo->query('SELECT meta_error_code FROM onboarding_sessions WHERE finish_event = \'CANCEL\' AND current_step = \'PERMISSIONS\'')->fetchColumn();
+$check('legacy error id is kept when error code is absent', $legacyCode === 'ERR_LEGACY' && ($legacy['body']['connection']['linked'] ?? true) === false);
+
+$plainStarted = $http->handle('POST', 'sambung', $cancel, [], ['x-csrf-token' => $legacy['body']['csrf']], $remote, $host, 'cancel-session');
+$plain = $http->handle('POST', 'peristiwa', $cancel, [
+    'state' => (string) ($plainStarted['body']['state'] ?? ''),
+    'event' => 'CANCEL',
+    'current_step' => 'BUSINESS_ACCOUNT_SELECTION',
+    'error_code' => 'kod tidak sah!',
+], ['x-csrf-token' => $plainStarted['body']['csrf']], $remote, $host, 'cancel-session');
+$plainRow = $pdo->query('SELECT meta_error_code, current_step FROM onboarding_sessions WHERE current_step = \'BUSINESS_ACCOUNT_SELECTION\'')->fetch();
+$check(
+    'plain cancel keeps the step and drops an unsafe code',
+    is_array($plainRow) && $plainRow['meta_error_code'] === null && $plainRow['current_step'] === 'BUSINESS_ACCOUNT_SELECTION' && ($plain['body']['connection']['note'] ?? '') === 'Aliran Meta dibatalkan.'
+);
 
 exit($failures === 0 ? 0 : 1);
 
