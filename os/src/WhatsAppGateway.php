@@ -804,6 +804,7 @@ final class WhatsAppGateway
             'coexistence_mismatch' => 'Nombor yang dilaporkan tidak sepadan dengan nombor WhatsApp Business App yang sah.',
             'coexistence_unavailable' => 'Pengesahan nombor WhatsApp Business App tidak selesai.',
             '2593109' => 'Perniagaan tidak berkongsi sejarah sembang.',
+            'timeout', 'interrupted' => 'Penyegerakan menunggu semakan. Tiada permintaan baharu.',
             'PARTNER_REMOVED', 'ACCOUNT_OFFBOARDED', 'ACCOUNT_DISCONNECTED', 'BUSINESS_DOWNGRADE', 'CHANGE_NUMBER', 'COMPANION_INACTIVITY', 'PRIMARY_INACTIVITY', 'USER_RE_REGISTERED' => 'Sambungan platform perniagaan diputuskan.',
             default => match ($status) {
                 'abandoned' => $code === '' ? 'Aliran Meta dibatalkan.' : 'Aliran Meta dibatalkan. Kod ralat ' . $code . '.',
