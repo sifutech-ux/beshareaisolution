@@ -286,7 +286,7 @@ final class CoexistenceSync
     {
             $statement = $this->pdo->prepare(
             'SELECT j.id, j.business_id, j.status, j.request_id, j.sync_type, j.connection_id, j.attempt_count, j.max_attempts,
-                    j.next_attempt_at, j.deadline_at > UTC_TIMESTAMP() AS deadline_open,
+                    j.next_attempt_at, c.sync_deadline_at > UTC_TIMESTAMP() AS deadline_open,
                     c.phone_number_id, c.webhook_state, c.token_state,
                     HEX(c.token_ciphertext) AS token_ciphertext, HEX(c.token_nonce) AS token_nonce,
                     HEX(c.token_tag) AS token_tag, c.token_key_version

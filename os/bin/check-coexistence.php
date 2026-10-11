@@ -1018,19 +1018,23 @@ $check(
         && $terminalConnection['sync_history'] === 'pending'
 );
 
+$bulk = [];
+for ($i = 0; $i < 320; $i++) {
+    $bulk[] = [
+        'from' => '60144444444',
+        'id' => 'wamid.HUGEPAYLOAD' . str_pad((string) $i, 5, '0', STR_PAD_LEFT),
+        'timestamp' => '1739237000',
+        'type' => 'text',
+        'text' => ['body' => 'MESAJ-BESAR-' . str_repeat('B', 3500)],
+    ];
+}
 $huge = envelope($appWaba, 'history', [
     'metadata' => ['phone_number_id' => $appPhone],
     'history' => [[
         'metadata' => ['phase' => 2, 'chunk_order' => 9, 'progress' => 100],
         'threads' => [[
             'id' => '60144444444',
-            'messages' => [[
-                'from' => '60144444444',
-                'id' => 'wamid.HUGEPAYLOAD00001',
-                'timestamp' => '1739237000',
-                'type' => 'text',
-                'text' => ['body' => str_repeat('A', 1100000)],
-            ]],
+            'messages' => $bulk,
         ]],
     ]],
 ]);
@@ -1038,7 +1042,7 @@ $hugeResult = signedIngest($webhook, $huge, $secret);
 $hugePlain = openPayload($pdo, $seal, latestEventId($pdo, 'history'));
 $check(
     'an oversized coexistence payload is retained as metadata instead of being discarded',
-    $hugeResult['stored'] === 1 && str_contains($hugePlain, '"truncated":true') && !str_contains($hugePlain, 'AAAAAAAAAA')
+    $hugeResult['stored'] === 1 && str_contains($hugePlain, '"truncated":true') && !str_contains($hugePlain, 'MESAJ-BESAR')
 );
 
 $cli = [];
