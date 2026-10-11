@@ -206,6 +206,15 @@ function insertLink(PDO $pdo, TokenSeal $seal, int $businessId, string $waba, st
     return (int) $pdo->lastInsertId();
 }
 
+function markReady(PDO $pdo, string $phone): void
+{
+    $statement = $pdo->prepare('SELECT id FROM whatsapp_connections WHERE phone_number_id = ?');
+    $statement->execute([$phone]);
+    $id = (int) $statement->fetchColumn();
+    CoexistenceSync::record($pdo, $id, 'callback');
+    CoexistenceSync::record($pdo, $id, 'fields');
+}
+
 /** @return array<string,mixed>|false */
 function connectionRow(PDO $pdo, string $phone): array|false
 {
@@ -238,7 +247,7 @@ function lab(): ?PDO
     $server->exec('DROP DATABASE IF EXISTS coexistence_lab');
     $server->exec('CREATE DATABASE coexistence_lab CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
     $server->exec('USE coexistence_lab');
-    foreach (['0001_foundation.up.sql', '0002_coexistence_sync.up.sql'] as $name) {
+    foreach (['0001_foundation.up.sql', '0002_coexistence_sync.up.sql', '0003_coexistence_worker.up.sql'] as $name) {
         $sql = (string) file_get_contents(dirname(__DIR__) . '/migrations/' . $name);
         foreach (SqlScript::statements($sql) as $statement) {
             $server->exec($statement);
@@ -675,6 +684,7 @@ $armedTransport->script = [[
     'status' => 200,
     'json' => ['messaging_product' => 'whatsapp', 'request_id' => 'req-kenalan-1'],
 ]];
+markReady($pdo, $appPhone);
 $dispatched = $armed->dispatch((int) $appRow['business_id'], $contactJob, time());
 $secondDispatch = $armed->dispatch((int) $appRow['business_id'], $contactJob, time());
 $contactCall = $armedTransport->calls[0] ?? ['method' => '', 'url' => '', 'headers' => [], 'body' => ''];
@@ -829,6 +839,7 @@ $declineTransport->script = [[
     'status' => 200,
     'json' => ['messaging_product' => 'whatsapp', 'request_id' => 'req-tolak-1'],
 ]];
+markReady($pdo, '100000000000621');
 $declineSync->dispatch(businessId($pdo, 'Kedai Tolak'), $declineJob, time());
 $refusal = envelope('100000000000721', 'history', [
     'metadata' => ['phone_number_id' => '100000000000621'],
@@ -902,6 +913,7 @@ $failTransport->script = [
     ['status' => 200, 'json' => ['messaging_product' => 'whatsapp', 'request_id' => 'req-cuba-1']],
 ];
 $now = time();
+markReady($pdo, '100000000000651');
 $firstFail = $failSync->dispatch($failBusiness, $failJob, $now);
 $duringBackoff = $failSync->dispatch($failBusiness, $failJob, $now + 30);
 $recovered = $failSync->dispatch($failBusiness, $failJob, $now + 61);
@@ -998,6 +1010,7 @@ $terminalTransport->script = [
     ['status' => 400, 'json' => ['error' => ['code' => 1]]],
 ];
 $terminalNow = time();
+markReady($pdo, $otherPhone);
 $terminalSync->dispatch(businessId($pdo, 'Kedai Lain'), $terminalJob, $terminalNow);
 $terminalSync->dispatch(businessId($pdo, 'Kedai Lain'), $terminalJob, $terminalNow + 61);
 $third = $terminalSync->dispatch(businessId($pdo, 'Kedai Lain'), $terminalJob, $terminalNow + 122);

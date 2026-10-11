@@ -447,7 +447,7 @@ final class WhatsAppWebhook
         $statement = $this->pdo->prepare(
             'UPDATE coexistence_sync_jobs
              SET status = ?, last_error_code = ?, finished_at = UTC_TIMESTAMP(), updated_at = UTC_TIMESTAMP()
-             WHERE connection_id = ? AND business_id = ? AND sync_type = ? AND status IN (\'authorized\', \'in_progress\')'
+             WHERE connection_id = ? AND business_id = ? AND sync_type = ? AND status IN (\'authorized\', \'dispatching\', \'in_progress\', \'review\')'
         );
         $statement->execute([$status, $code, $connection['id'], $connection['business_id'], $syncType]);
     }
@@ -474,7 +474,7 @@ final class WhatsAppWebhook
         $jobs = $this->pdo->prepare(
             'UPDATE coexistence_sync_jobs
              SET status = \'cancelled\', last_error_code = \'PARTNER_REMOVED\', finished_at = UTC_TIMESTAMP(), updated_at = UTC_TIMESTAMP()
-             WHERE connection_id = ? AND business_id = ? AND status IN (\'authorized\', \'in_progress\')'
+             WHERE connection_id = ? AND business_id = ? AND status IN (\'authorized\', \'dispatching\', \'in_progress\', \'review\')'
         );
         $jobs->execute([$connection['id'], $connection['business_id']]);
         $audit = $this->pdo->prepare(

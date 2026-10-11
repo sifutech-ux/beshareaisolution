@@ -1141,7 +1141,7 @@ function lab(): ?PDO
     $server->exec('DROP DATABASE IF EXISTS meta_lab');
     $server->exec('CREATE DATABASE meta_lab CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
     $server->exec('USE meta_lab');
-    foreach (['0001_foundation.up.sql', '0002_coexistence_sync.up.sql'] as $name) {
+    foreach (['0001_foundation.up.sql', '0002_coexistence_sync.up.sql', '0003_coexistence_worker.up.sql'] as $name) {
         $sql = (string) file_get_contents(dirname(__DIR__) . '/migrations/' . $name);
         foreach (SqlScript::statements($sql) as $statement) {
             $server->exec($statement);
