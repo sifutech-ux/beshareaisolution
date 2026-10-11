@@ -472,6 +472,207 @@ if ($validExport === false || $validProof === false) {
     unlink($validProof);
 }
 
+$check(
+    'check rows stay on their own table',
+    str_contains($php, 'cc.TABLE_NAME = tc.TABLE_NAME')
+);
+
+$shapeEngine = static function (string $table): array {
+    return [['table_name' => $table, 'engine' => 'InnoDB', 'table_collation' => 'utf8mb4_unicode_ci']];
+};
+$widthSql = <<<'SQL'
+CREATE TABLE sample_width (
+  id BIGINT UNSIGNED NOT NULL,
+  narrow BIGINT(8) UNSIGNED NOT NULL,
+  flag TINYINT(1) UNSIGNED NOT NULL,
+  whole SMALLINT UNSIGNED NOT NULL,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+SQL;
+$widthExpected = SchemaDefinition::fromSql($widthSql);
+$widthActual = SchemaDefinition::fromCatalog(
+    [
+        ['table_name' => 'sample_width', 'column_name' => 'id', 'column_type' => 'bigint(20) unsigned', 'is_nullable' => 'NO', 'column_default' => null, 'extra' => '', 'generation_expression' => '', 'character_set_name' => null, 'collation_name' => null, 'ordinal_position' => 1],
+        ['table_name' => 'sample_width', 'column_name' => 'narrow', 'column_type' => 'bigint(8) unsigned', 'is_nullable' => 'NO', 'column_default' => null, 'extra' => '', 'generation_expression' => '', 'character_set_name' => null, 'collation_name' => null, 'ordinal_position' => 2],
+        ['table_name' => 'sample_width', 'column_name' => 'flag', 'column_type' => 'tinyint(1) unsigned', 'is_nullable' => 'NO', 'column_default' => null, 'extra' => '', 'generation_expression' => '', 'character_set_name' => null, 'collation_name' => null, 'ordinal_position' => 3],
+        ['table_name' => 'sample_width', 'column_name' => 'whole', 'column_type' => 'smallint(5) unsigned', 'is_nullable' => 'NO', 'column_default' => null, 'extra' => '', 'generation_expression' => '', 'character_set_name' => null, 'collation_name' => null, 'ordinal_position' => 4],
+    ],
+    [
+        ['table_name' => 'sample_width', 'index_name' => 'PRIMARY', 'non_unique' => 0, 'column_name' => 'id', 'seq_in_index' => 1],
+    ],
+    [],
+    [],
+    [],
+    $shapeEngine('sample_width')
+);
+$check('default integer display widths match the migration text', SchemaDefinition::same($widthExpected, $widthActual));
+$widthActual['tables']['sample_width']['columns'][1]['type'] = 'bigint unsigned';
+$check('an explicit narrower bigint stays different', SchemaDefinition::same($widthExpected, $widthActual) === false);
+
+$jsonSql = <<<'SQL'
+CREATE TABLE sample_json (
+  id BIGINT UNSIGNED NOT NULL,
+  meta_json JSON NULL,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+SQL;
+$jsonExpected = SchemaDefinition::fromSql($jsonSql);
+$jsonColumn = ['table_name' => 'sample_json', 'column_name' => 'id', 'column_type' => 'bigint(20) unsigned', 'is_nullable' => 'NO', 'column_default' => null, 'extra' => '', 'generation_expression' => '', 'character_set_name' => null, 'collation_name' => null, 'ordinal_position' => 1];
+$jsonMeta = ['table_name' => 'sample_json', 'column_name' => 'meta_json', 'column_type' => 'longtext', 'is_nullable' => 'YES', 'column_default' => 'NULL', 'extra' => '', 'generation_expression' => null, 'character_set_name' => 'utf8mb4', 'collation_name' => 'utf8mb4_bin', 'ordinal_position' => 2];
+$jsonCheck = ['table_name' => 'sample_json', 'constraint_name' => 'meta_json', 'check_clause' => 'json_valid(`meta_json`)'];
+$jsonActual = SchemaDefinition::fromCatalog(
+    [$jsonColumn, $jsonMeta],
+    [['table_name' => 'sample_json', 'index_name' => 'PRIMARY', 'non_unique' => 0, 'column_name' => 'id', 'seq_in_index' => 1]],
+    [],
+    [$jsonCheck, $jsonCheck],
+    [],
+    $shapeEngine('sample_json')
+);
+$check('MariaDB JSON alias matches a JSON column', SchemaDefinition::same($jsonExpected, $jsonActual));
+$jsonPlain = SchemaDefinition::fromCatalog(
+    [$jsonColumn, $jsonMeta],
+    [['table_name' => 'sample_json', 'index_name' => 'PRIMARY', 'non_unique' => 0, 'column_name' => 'id', 'seq_in_index' => 1]],
+    [],
+    [],
+    [],
+    $shapeEngine('sample_json')
+);
+$check('longtext without the JSON check stays longtext', SchemaDefinition::same($jsonExpected, $jsonPlain) === false);
+
+$checkSql = <<<'SQL'
+CREATE TABLE sample_check (
+  actor_kind VARCHAR(16) NOT NULL,
+  actor_user_id BIGINT UNSIGNED NULL,
+  PRIMARY KEY (actor_kind),
+  CONSTRAINT chk_actor CHECK (
+    (actor_kind = 'user' AND actor_user_id IS NOT NULL)
+    OR (actor_kind = 'system' AND actor_user_id IS NULL)
+  )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+SQL;
+$checkExpected = SchemaDefinition::fromSql($checkSql);
+$checkActual = SchemaDefinition::fromCatalog(
+    [
+        ['table_name' => 'sample_check', 'column_name' => 'actor_kind', 'column_type' => 'varchar(16)', 'is_nullable' => 'NO', 'column_default' => null, 'extra' => '', 'generation_expression' => '', 'character_set_name' => 'utf8mb4', 'collation_name' => 'utf8mb4_unicode_ci', 'ordinal_position' => 1],
+        ['table_name' => 'sample_check', 'column_name' => 'actor_user_id', 'column_type' => 'bigint(20) unsigned', 'is_nullable' => 'YES', 'column_default' => 'NULL', 'extra' => '', 'generation_expression' => '', 'character_set_name' => null, 'collation_name' => null, 'ordinal_position' => 2],
+    ],
+    [['table_name' => 'sample_check', 'index_name' => 'PRIMARY', 'non_unique' => 0, 'column_name' => 'actor_kind', 'seq_in_index' => 1]],
+    [],
+    [[
+        'table_name' => 'sample_check',
+        'constraint_name' => 'chk_actor',
+        'check_clause' => "`actor_kind` = 'user' and `actor_user_id` is not null or `actor_kind` = 'system' and `actor_user_id` is null",
+    ]],
+    [],
+    $shapeEngine('sample_check')
+);
+$check('redundant CHECK groups match the server text', SchemaDefinition::same($checkExpected, $checkActual));
+$groupedSql = <<<'SQL'
+CREATE TABLE sample_group (
+  status VARCHAR(16) NOT NULL,
+  flag TINYINT UNSIGNED NOT NULL,
+  PRIMARY KEY (status),
+  CONSTRAINT chk_group CHECK ((status = 'a' OR status = 'b') AND flag = 1)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+SQL;
+$groupedExpected = SchemaDefinition::fromSql($groupedSql);
+$groupedLoose = SchemaDefinition::fromCatalog(
+    [
+        ['table_name' => 'sample_group', 'column_name' => 'status', 'column_type' => 'varchar(16)', 'is_nullable' => 'NO', 'column_default' => null, 'extra' => '', 'generation_expression' => '', 'character_set_name' => 'utf8mb4', 'collation_name' => 'utf8mb4_unicode_ci', 'ordinal_position' => 1],
+        ['table_name' => 'sample_group', 'column_name' => 'flag', 'column_type' => 'tinyint(3) unsigned', 'is_nullable' => 'NO', 'column_default' => null, 'extra' => '', 'generation_expression' => '', 'character_set_name' => null, 'collation_name' => null, 'ordinal_position' => 2],
+    ],
+    [['table_name' => 'sample_group', 'index_name' => 'PRIMARY', 'non_unique' => 0, 'column_name' => 'status', 'seq_in_index' => 1]],
+    [],
+    [[
+        'table_name' => 'sample_group',
+        'constraint_name' => 'chk_group',
+        'check_clause' => "`status` = 'a' or `status` = 'b' and `flag` = 1",
+    ]],
+    [],
+    $shapeEngine('sample_group')
+);
+$check('CHECK parentheses that change precedence stay different', SchemaDefinition::same($groupedExpected, $groupedLoose) === false);
+
+$fkSql = <<<'SQL'
+CREATE TABLE sample_parent (
+  id BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE sample_child (
+  id BIGINT UNSIGNED NOT NULL,
+  parent_id BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_sample_parent FOREIGN KEY (parent_id) REFERENCES sample_parent (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+SQL;
+$fkExpected = SchemaDefinition::fromSql($fkSql);
+$childColumn = static function (string $name, int $position): array {
+    return ['table_name' => 'sample_child', 'column_name' => $name, 'column_type' => 'bigint(20) unsigned', 'is_nullable' => 'NO', 'column_default' => null, 'extra' => '', 'generation_expression' => '', 'character_set_name' => null, 'collation_name' => null, 'ordinal_position' => $position];
+};
+$fkActual = SchemaDefinition::fromCatalog(
+    [
+        ['table_name' => 'sample_parent', 'column_name' => 'id', 'column_type' => 'bigint(20) unsigned', 'is_nullable' => 'NO', 'column_default' => null, 'extra' => '', 'generation_expression' => '', 'character_set_name' => null, 'collation_name' => null, 'ordinal_position' => 1],
+        $childColumn('id', 1),
+        $childColumn('parent_id', 2),
+    ],
+    [
+        ['table_name' => 'sample_parent', 'index_name' => 'PRIMARY', 'non_unique' => 0, 'column_name' => 'id', 'seq_in_index' => 1],
+        ['table_name' => 'sample_child', 'index_name' => 'PRIMARY', 'non_unique' => 0, 'column_name' => 'id', 'seq_in_index' => 1],
+        ['table_name' => 'sample_child', 'index_name' => 'fk_sample_parent', 'non_unique' => 1, 'column_name' => 'parent_id', 'seq_in_index' => 1],
+    ],
+    [[
+        'table_name' => 'sample_child',
+        'constraint_name' => 'fk_sample_parent',
+        'column_name' => 'parent_id',
+        'ordinal_position' => 1,
+        'referenced_table' => 'sample_parent',
+        'referenced_column' => 'id',
+    ]],
+    [],
+    [],
+    [
+        ['table_name' => 'sample_parent', 'engine' => 'InnoDB', 'table_collation' => 'utf8mb4_unicode_ci'],
+        ['table_name' => 'sample_child', 'engine' => 'InnoDB', 'table_collation' => 'utf8mb4_unicode_ci'],
+    ]
+);
+$check('an automatic foreign-key index matches the migration', SchemaDefinition::same($fkExpected, $fkActual));
+$fkIndexes = array_values(array_filter(
+    $fkActual['tables']['sample_child']['indexes'],
+    static fn (array $index): bool => $index['name'] !== 'fk_sample_parent'
+));
+$fkActual['tables']['sample_child']['indexes'] = $fkIndexes;
+$check('a missing foreign-key index does not match', SchemaDefinition::same($fkExpected, $fkActual) === false);
+
+$capturedPath = dirname(__DIR__) . '/tests/mariadb-1189-foundation.json';
+$captured = json_decode((string) file_get_contents($capturedPath), true);
+$capturedOk = is_array($captured) && ($captured['captured_from'] ?? '') === '11.8.9-MariaDB-ubu2404';
+$check('captured catalog is MariaDB 11.8.9', $capturedOk);
+if ($capturedOk) {
+    $capturedActual = SchemaDefinition::fromCatalog(
+        $captured['columns'],
+        $captured['indexes'],
+        $captured['foreign_keys'],
+        $captured['checks'],
+        $captured['triggers'],
+        $captured['tables']
+    );
+    $check('Foundation 0001 matches the captured MariaDB 11.8.9 catalog', SchemaDefinition::same($expected, $capturedActual));
+    $check(
+        'captured catalog without a version row is complete but unrecorded',
+        CatalogState::classify(
+            array_keys($capturedActual['tables']),
+            array_keys($capturedActual['triggers']),
+            [],
+            [],
+            [],
+            [],
+            $checksum,
+            $capturedActual,
+            $expected
+        ) === 'complete_unrecorded'
+    );
+}
+
 if ($failures > 0) {
     fwrite(STDOUT, "FAILED " . $failures . "\n");
     exit(1);
