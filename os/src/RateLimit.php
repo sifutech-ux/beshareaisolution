@@ -13,6 +13,9 @@ final class RateLimit
         if (!is_dir($this->directory) && !mkdir($this->directory, 0700, true) && !is_dir($this->directory)) {
             throw new AuthException('Had percubaan tidak dapat disediakan.', 500);
         }
+        if (!chmod($this->directory, 0700)) {
+            throw new AuthException('Had percubaan tidak dapat disediakan.', 500);
+        }
     }
 
     public function tooMany(string $key): bool
@@ -59,7 +62,9 @@ final class RateLimit
     /** @param list<int> $events */
     private function write(string $key, array $events): void
     {
-        file_put_contents($this->path($key), json_encode(array_values($events)), LOCK_EX);
+        $path = $this->path($key);
+        file_put_contents($path, json_encode(array_values($events)), LOCK_EX);
+        chmod($path, 0600);
     }
 
     private function path(string $key): string

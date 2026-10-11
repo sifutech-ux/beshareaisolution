@@ -20,6 +20,9 @@ header('X-Content-Type-Options: nosniff');
 
 $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+ini_set('session.use_strict_mode', '1');
+ini_set('session.use_only_cookies', '1');
+ini_set('session.use_trans_sid', '0');
 session_name(SessionCookie::NAME);
 session_set_cookie_params(SessionCookie::parameters($secure));
 session_start();

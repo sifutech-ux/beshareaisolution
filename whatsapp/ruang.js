@@ -173,7 +173,8 @@ function esc(value) {
 }
 
 function role(state) {
-  return state.user.role || "owner";
+  const value = state && state.user ? state.user.role : "";
+  return value === "owner" || value === "admin" || value === "staff" ? value : "staff";
 }
 
 function allow(state, key) {

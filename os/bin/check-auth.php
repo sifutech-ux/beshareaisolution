@@ -66,6 +66,19 @@ $limit->hit('login|a');
 $limit->hit('login|a');
 $limit->hit('login|a');
 $check('rate limit closes after the budget', $limit->tooMany('login|a') === true);
+$rateFile = $rateDir . '/' . hash('sha256', 'login|a') . '.json';
+$rateMode = is_file($rateFile) ? (fileperms($rateFile) & 0777) : 0;
+$rateBody = is_file($rateFile) ? (string) file_get_contents($rateFile) : '';
+$rateEvents = json_decode($rateBody, true);
+$rateInts = is_array($rateEvents) && count($rateEvents) === 3;
+foreach (is_array($rateEvents) ? $rateEvents : [] as $event) {
+    if (!is_int($event)) {
+        $rateInts = false;
+    }
+}
+$check('rate file is private and has no identifier', $rateMode === 0600 && $rateInts && !str_contains($rateBody, 'login') && !str_contains($rateBody, '@'));
+$dirMode = fileperms($rateDir) & 0777;
+$check('rate directory is private', $dirMode === 0700);
 $limit->clear('login|a');
 $check('rate limit clears', $limit->tooMany('login|a') === false);
 
@@ -85,6 +98,15 @@ try {
     $csrfBad = $error->status() === 403;
 }
 $check('csrf rejects a different token', $csrfBad);
+
+$dashboard = (string) file_get_contents(dirname(__DIR__, 2) . '/whatsapp/ruang.js');
+$pintu = (string) file_get_contents(dirname(__DIR__, 2) . '/whatsapp/akaun/pintu.php');
+$guard = (string) file_get_contents(dirname(__DIR__, 2) . '/os/.htaccess');
+$check('demo session key is gone', !str_contains($dashboard, 'beshare-os-demo') && !str_contains($dashboard, 'Peranan demo'));
+$check('dashboard auth actions call the api', str_contains($dashboard, 'callApi("masuk"') && str_contains($dashboard, 'callApi("daftar"') && str_contains($dashboard, 'callApi("keluar"') && str_contains($dashboard, 'callApi("ahli"') && str_contains($dashboard, 'callApi("buang"') && str_contains($dashboard, 'callApi("status"') && str_contains($dashboard, 'callApi("tetapan"') && str_contains($dashboard, 'callApi("pilih"') && str_contains($dashboard, 'callApi("sesi")'));
+$check('client address is not taken from a forwarded header', str_contains($pintu, 'REMOTE_ADDR') && !str_contains($pintu, 'FORWARDED_FOR') && !str_contains($pintu, 'X-Real-IP') && !str_contains($pintu, 'X_REAL_IP'));
+$check('login rotates the php session id', str_contains($pintu, 'session_regenerate_id(true)') && str_contains($pintu, "session.use_strict_mode"));
+$check('library tree is denied over http', str_contains($guard, 'Require all denied'));
 
 $pdo = lab();
 if (!$pdo instanceof PDO) {
@@ -464,6 +486,176 @@ $check('disabled user gets the same login error', $disabled);
 $loggedOut = $fresh->handle('POST', 'keluar', $newOwner, [], ['x-csrf-token' => $finished['body']['csrf']], '10.4.0.1', $host);
 $check('logout clears the user', array_key_exists('user', $loggedOut['body']) && $loggedOut['body']['user'] === null && !isset($newOwner['user_id']));
 $check('logout rotates the session id flag', $loggedOut['regenerate'] === true);
+
+$gate = new AuthHttp($pdo, new RateLimit($rateDir . '-gate', 3, 900));
+$open = static function () use ($gate, $host): array {
+    $session = [];
+    $issued = $gate->handle('GET', 'sesi', $session, [], [], '10.8.0.1', $host);
+    $session['csrf'] = $issued['body']['csrf'];
+    return $session;
+};
+$deny = static function (string $name, callable $attempt, int $status) use ($check): void {
+    $ok = false;
+    try {
+        $attempt();
+    } catch (AuthException $error) {
+        $ok = $error->status() === $status;
+    }
+    $check($name, $ok);
+};
+$alih = $open();
+$madeAlih = $gate->handle('POST', 'daftar', $alih, [
+    'name' => 'Pemilik Alih',
+    'email' => 'alih@kedai.test',
+    'password' => 'kata-laluan-yang-panjang',
+    'business' => 'Kedai Alih',
+], ['x-csrf-token' => $alih['csrf']], '10.8.0.2', $host);
+$csrfAlih = (string) $madeAlih['body']['csrf'];
+$gate->handle('POST', 'ahli', $alih, [
+    'name' => 'Anak Staf',
+    'email' => 'anak@kedai.test',
+    'password' => 'staf-laluan-panjang',
+    'role' => 'staff',
+], ['x-csrf-token' => $csrfAlih], '10.8.0.2', $host);
+$csrfAlih = (string) $alih['csrf'];
+$addedAdmin = $gate->handle('POST', 'ahli', $alih, [
+    'name' => 'Ketua Admin',
+    'email' => 'ketua@kedai.test',
+    'password' => 'admin-laluan-panjang',
+    'role' => 'admin',
+], ['x-csrf-token' => $csrfAlih], '10.8.0.2', $host);
+$csrfAlih = (string) $addedAdmin['body']['csrf'];
+$asing = $open();
+$madeAsing = $gate->handle('POST', 'daftar', $asing, [
+    'name' => 'Pemilik Asing',
+    'email' => 'asing@kedai.test',
+    'password' => 'kata-laluan-yang-panjang',
+    'business' => 'Kedai Asing',
+], ['x-csrf-token' => $asing['csrf']], '10.8.0.3', $host);
+$anak = $open();
+$anakLogin = $gate->handle('POST', 'masuk', $anak, [
+    'email' => 'anak@kedai.test',
+    'password' => 'staf-laluan-panjang',
+], ['x-csrf-token' => $anak['csrf']], '10.8.0.4', $host);
+$ketua = $open();
+$ketuaLogin = $gate->handle('POST', 'masuk', $ketua, [
+    'email' => 'ketua@kedai.test',
+    'password' => 'admin-laluan-panjang',
+], ['x-csrf-token' => $ketua['csrf']], '10.8.0.5', $host);
+$anon = $open();
+$deny('anonymous transfer is rejected', function () use ($gate, &$anon, $host): void {
+    $gate->handle('POST', 'status', $anon, ['kind' => 'begin_transfer', 'next_status' => 'provisioning'], ['x-csrf-token' => $anon['csrf']], '10.8.0.1', $host);
+}, 401);
+$deny('transfer without csrf is rejected', function () use ($gate, &$alih, $host): void {
+    $gate->handle('POST', 'status', $alih, ['kind' => 'begin_transfer'], [], '10.8.0.2', $host);
+}, 403);
+$deny('staff cannot open a transfer', function () use ($gate, &$anak, $anakLogin, $alih, $host): void {
+    $gate->handle('POST', 'status', $anak, ['kind' => 'begin_transfer', 'business_id' => (int) $alih['business_id']], ['x-csrf-token' => $anakLogin['body']['csrf']], '10.8.0.4', $host);
+}, 403);
+$deny('admin cannot open a transfer', function () use ($gate, &$ketua, $ketuaLogin, $asing, $host): void {
+    $gate->handle('POST', 'status', $ketua, ['kind' => 'begin_transfer', 'business_id' => (int) $asing['business_id']], ['x-csrf-token' => $ketuaLogin['body']['csrf']], '10.8.0.5', $host);
+}, 403);
+$deny('finish before a transfer is rejected', function () use ($gate, &$alih, $csrfAlih, $host): void {
+    $gate->handle('POST', 'status', $alih, ['kind' => 'finish_transfer', 'next_status' => 'active'], ['x-csrf-token' => $csrfAlih], '10.8.0.2', $host);
+}, 403);
+$deny('reassign before a transfer is rejected', function () use ($gate, &$alih, $csrfAlih, $asing, $host): void {
+    $gate->handle('POST', 'status', $alih, ['kind' => 'reassign_owner', 'owner_email' => 'ketua@kedai.test', 'next_owner_user_id' => (int) $asing['user_id']], ['x-csrf-token' => $csrfAlih], '10.8.0.2', $host);
+}, 403);
+$stillActive = (string) $pdo->query('SELECT status FROM businesses WHERE id = ' . (int) $alih['business_id'])->fetchColumn();
+$otherActive = (string) $pdo->query('SELECT status FROM businesses WHERE id = ' . (int) $asing['business_id'])->fetchColumn();
+$check('rejected transfer leaves both tenants active', $stillActive === 'active' && $otherActive === 'active');
+
+$opened = $gate->handle('POST', 'status', $alih, [
+    'kind' => 'begin_transfer',
+    'next_status' => 'suspended',
+    'business_id' => (int) $asing['business_id'],
+], ['x-csrf-token' => $csrfAlih], '10.8.0.2', $host);
+$csrfAlih = (string) $opened['body']['csrf'];
+$ownStatus = (string) $pdo->query('SELECT status FROM businesses WHERE id = ' . (int) $alih['business_id'])->fetchColumn();
+$foreignStatus = (string) $pdo->query('SELECT status FROM businesses WHERE id = ' . (int) $asing['business_id'])->fetchColumn();
+$check('forged business id opens only the session tenant', ($opened['body']['business']['status'] ?? '') === 'provisioning' && $ownStatus === 'provisioning' && $foreignStatus === 'active');
+$deny('a second transfer open is rejected', function () use ($gate, &$alih, $csrfAlih, $host): void {
+    $gate->handle('POST', 'status', $alih, ['kind' => 'begin_transfer'], ['x-csrf-token' => $csrfAlih], '10.8.0.2', $host);
+}, 403);
+$deny('cross tenant owner email is rejected', function () use ($gate, &$alih, $csrfAlih, $asing, $host): void {
+    $gate->handle('POST', 'status', $alih, ['kind' => 'reassign_owner', 'owner_email' => 'asing@kedai.test', 'business_id' => (int) $asing['business_id']], ['x-csrf-token' => $csrfAlih], '10.8.0.2', $host);
+}, 404);
+$ownerBefore = (int) $pdo->query('SELECT owner_user_id FROM businesses WHERE id = ' . (int) $alih['business_id'])->fetchColumn();
+$check('cross tenant email does not change the owner', $ownerBefore === (int) $alih['user_id']);
+$movedGate = $gate->handle('POST', 'status', $alih, [
+    'kind' => 'reassign_owner',
+    'owner_email' => 'KETUA@kedai.test',
+    'next_owner_user_id' => (int) $asing['user_id'],
+    'business_id' => (int) $asing['business_id'],
+], ['x-csrf-token' => $csrfAlih], '10.8.0.2', $host);
+$csrfAlih = (string) $movedGate['body']['csrf'];
+$ketuaId = (int) $pdo->query('SELECT id FROM users WHERE email = \'ketua@kedai.test\'')->fetchColumn();
+$asingOwner = (int) $pdo->query('SELECT owner_user_id FROM businesses WHERE id = ' . (int) $asing['business_id'])->fetchColumn();
+$alihOwner = (int) $pdo->query('SELECT owner_user_id FROM businesses WHERE id = ' . (int) $alih['business_id'])->fetchColumn();
+$check('numeric owner id cannot select another tenant', $alihOwner === $ketuaId && $asingOwner === (int) $asing['user_id'] && ($movedGate['body']['user']['role'] ?? '') === 'admin');
+$deny('former owner cannot suspend during transfer', function () use ($gate, &$alih, $csrfAlih, $host): void {
+    $gate->handle('POST', 'status', $alih, ['kind' => 'suspend_or_resume', 'next_status' => 'suspended'], ['x-csrf-token' => $csrfAlih], '10.8.0.2', $host);
+}, 403);
+$ketuaAgain = $open();
+$ketuaNow = $gate->handle('POST', 'masuk', $ketuaAgain, [
+    'email' => 'ketua@kedai.test',
+    'password' => 'admin-laluan-panjang',
+], ['x-csrf-token' => $ketuaAgain['csrf']], '10.8.0.6', $host);
+$deny('finish cannot return to provisioning', function () use ($gate, &$ketuaAgain, $ketuaNow, $host): void {
+    $gate->handle('POST', 'status', $ketuaAgain, ['kind' => 'finish_transfer', 'next_status' => 'provisioning'], ['x-csrf-token' => $ketuaNow['body']['csrf']], '10.8.0.6', $host);
+}, 403);
+$deny('suspend during provisioning is rejected', function () use ($gate, &$ketuaAgain, $ketuaNow, $host): void {
+    $gate->handle('POST', 'status', $ketuaAgain, ['kind' => 'suspend_or_resume', 'next_status' => 'suspended'], ['x-csrf-token' => $ketuaNow['body']['csrf']], '10.8.0.6', $host);
+}, 403);
+$closed = $gate->handle('POST', 'status', $ketuaAgain, [
+    'kind' => 'finish_transfer',
+    'next_status' => 'active',
+], ['x-csrf-token' => $ketuaNow['body']['csrf']], '10.8.0.6', $host);
+$check('valid finish restores the active tenant', ($closed['body']['business']['status'] ?? '') === 'active' && ($closed['body']['user']['role'] ?? '') === 'owner');
+
+$pdo->prepare('DELETE FROM business_users WHERE business_id = ? AND user_id = ?')->execute([(int) $anak['business_id'], (int) $anak['user_id']]);
+$stale = $gate->handle('GET', 'sesi', $anak, [], [], '10.8.0.4', $host);
+$check('removed member session is cleared', array_key_exists('user', $stale['body']) && $stale['body']['user'] === null && !isset($anak['business_id']));
+$deny('stale member cannot transfer', function () use ($gate, &$anak, $host): void {
+    $gate->handle('POST', 'status', $anak, ['kind' => 'begin_transfer'], ['x-csrf-token' => (string) ($anak['csrf'] ?? '')], '10.8.0.4', $host);
+}, 401);
+
+$fold = new AuthHttp($pdo, new RateLimit($rateDir . '-fold', 3, 900));
+$foldSession = [];
+$foldIssued = $fold->handle('GET', 'sesi', $foldSession, [], [], '10.9.0.1', $host);
+$fold->handle('POST', 'daftar', $foldSession, [
+    'name' => 'Pemilik Fold',
+    'email' => 'fold@kedai.test',
+    'password' => 'kata-laluan-yang-panjang',
+    'business' => 'Kedai Fold',
+], ['x-csrf-token' => $foldIssued['body']['csrf']], '10.9.0.2', $host);
+$variants = ['Fold@Kedai.TEST', ' fold@kedai.test ', 'FOLD@kedai.test'];
+foreach ($variants as $variant) {
+    $attempt = [];
+    $token = $fold->handle('GET', 'sesi', $attempt, [], [], '10.9.0.9', $host);
+    try {
+        $fold->handle('POST', 'masuk', $attempt, ['email' => $variant, 'password' => 'salah-salah-salah'], ['x-csrf-token' => $token['body']['csrf']], '10.9.0.9', $host);
+    } catch (AuthException) {
+    }
+}
+$lockedVariant = [];
+$lockedToken = $fold->handle('GET', 'sesi', $lockedVariant, [], [], '10.9.0.9', $host);
+$folded = false;
+try {
+    $fold->handle('POST', 'masuk', $lockedVariant, ['email' => '  FOLD@KEDAI.TEST ', 'password' => 'kata-laluan-yang-panjang'], ['x-csrf-token' => $lockedToken['body']['csrf']], '10.9.0.9', $host);
+} catch (AuthException $error) {
+    $folded = $error->status() === 429;
+}
+$check('email case and spaces share one login bucket', $folded);
+$otherAttempt = [];
+$otherToken = $fold->handle('GET', 'sesi', $otherAttempt, [], [], '10.9.0.9', $host);
+$separate = false;
+try {
+    $fold->handle('POST', 'masuk', $otherAttempt, ['email' => 'alih@kedai.test', 'password' => 'salah-salah-salah'], ['x-csrf-token' => $otherToken['body']['csrf']], '10.9.0.9', $host);
+} catch (AuthException $error) {
+    $separate = $error->status() === 401;
+}
+$check('a different account keeps its own login bucket', $separate);
 
 function lab(): ?PDO
 {
