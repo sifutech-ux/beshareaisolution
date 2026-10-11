@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createContext, runInContext } from "node:vm";
 
 const source = readFileSync(new URL("../../whatsapp/ruang.js", import.meta.url), "utf8");
-const start = source.indexOf("function metaText");
+const start = source.indexOf("function facebookSdkReady");
 const end = source.indexOf("function openEmbeddedSignup");
 if (start < 0 || end < start) {
   console.log("FAIL signup helpers are present");
@@ -53,9 +53,30 @@ check(
     && !Object.hasOwn(fields, "error_message")
 );
 
+const options = context.signupLoginOptions("1028295100269838", "https://beshareaisolution.com/whatsapp/ruang.html");
+check(
+  "v4 login omits an empty feature type and keeps the session version",
+  options.response_type === "code"
+    && options.override_default_response_type === true
+    && options.fallback_redirect_uri === "https://beshareaisolution.com/whatsapp/ruang.html"
+    && options.extras.setup && Object.keys(options.extras.setup).length === 0
+    && options.extras.sessionInfoVersion === "3"
+    && !Object.hasOwn(options.extras, "featureType")
+    && !Object.hasOwn(options, "featureType")
+);
+context.location = { origin: "https://beshareaisolution.com", pathname: "/whatsapp/ruang.html" };
+check("redirect target drops the hash and query", context.signupPageRedirect() === "https://beshareaisolution.com/whatsapp/ruang.html");
+context.window = { FB: { __buffer: { calls: [] }, login() {} } };
+check("sdk loader stub is not treated as ready", context.facebookSdkReady() === false);
+context.window = { FB: { login() {} } };
+check("loaded sdk is ready", context.facebookSdkReady() === true);
+check("meta status stays a short word", context.metaStatus({ status: "unknown", authResponse: { code: "secret-code" } }) === "unknown");
+check("meta status drops unexpected text", context.metaStatus({ status: "code=secret" }) === "");
+
 const click = source.slice(source.indexOf("function openEmbeddedSignup"), source.indexOf("function settleSignup"));
 const loginAt = click.indexOf("window.FB.login");
-const thenAt = click.indexOf("started.then");
-check("embedded signup opens on the click before the session response", loginAt > 0 && thenAt > loginAt);
+const fetchAt = click.indexOf('callApi("sambung"');
+check("embedded signup opens before the session request", loginAt > 0 && fetchAt > loginAt);
+check("signup source does not send an empty feature type", !source.includes("featureType:"));
 
 process.exit(failures === 0 ? 0 : 1);

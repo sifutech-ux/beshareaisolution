@@ -1037,20 +1037,12 @@ function prepareSignup() {
 }
 
 function loadFacebookSdk(cfg) {
-  const init = () => {
-    if (!window.FB) return;
-    window.FB.init({
-      appId: cfg.appId,
-      autoLogAppEvents: true,
-      xfbml: false,
-      version: cfg.version
-    });
-  };
-  if (window.FB) {
-    init();
+  if (signupSdkReady && facebookSdkReady()) return;
+  window.fbAsyncInit = () => markFacebookReady(cfg);
+  if (facebookSdkReady()) {
+    markFacebookReady(cfg);
     return;
   }
-  window.fbAsyncInit = init;
   if (!document.getElementById("facebook-jssdk")) {
     const script = document.createElement("script");
     script.id = "facebook-jssdk";
@@ -1059,6 +1051,45 @@ function loadFacebookSdk(cfg) {
     script.src = "https://connect.facebook.net/en_US/sdk.js";
     document.head.appendChild(script);
   }
+}
+
+let signupSdkReady = false;
+
+function facebookSdkReady() {
+  return !!(window.FB && typeof window.FB.login === "function" && !window.FB.__buffer);
+}
+
+function markFacebookReady(cfg) {
+  if (!facebookSdkReady() || signupSdkReady) return;
+  window.FB.init({
+    appId: cfg.appId,
+    autoLogAppEvents: true,
+    xfbml: false,
+    version: cfg.version
+  });
+  signupSdkReady = true;
+}
+
+function signupPageRedirect() {
+  return location.origin + location.pathname;
+}
+
+function signupLoginOptions(configId, redirectUri) {
+  return {
+    config_id: configId,
+    response_type: "code",
+    override_default_response_type: true,
+    fallback_redirect_uri: redirectUri,
+    extras: {
+      setup: {},
+      sessionInfoVersion: "3"
+    }
+  };
+}
+
+function metaStatus(response) {
+  const status = response && typeof response.status === "string" ? response.status : "";
+  return /^[a-z_]{1,40}$/.test(status) ? status : "";
 }
 
 function metaText(value) {
@@ -1096,31 +1127,25 @@ function openEmbeddedSignup() {
     showSignupNote("Hanya pemilik boleh menyambung WhatsApp.");
     return;
   }
-  if (!signupReady.appId || !signupReady.configId || !window.FB) {
+  if (!signupReady.appId || !signupReady.configId || !signupSdkReady || !facebookSdkReady()) {
     showSignupNote(signupReady.appId
       ? "SDK Meta masih dimuat. Tekan butang sekali lagi."
       : "Tetingkap Meta tidak dibuka. App ID dan Configuration ID belum dipasang pada pelayan.");
     return;
   }
-  const pending = { codeReady: false, codeSent: false, code: "", events: [], stateReady: false, failed: false };
+  const pending = { codeReady: false, codeSent: false, code: "", events: [], stateReady: false, failed: false, status: "" };
   signupQueue = pending;
-  const started = callApi("sambung", {});
   window.FB.login((response) => {
     if (signupQueue !== pending) return;
     const code = response && response.authResponse ? response.authResponse.code : "";
     pending.code = typeof code === "string" ? code : "";
+    pending.status = metaStatus(response);
     pending.codeReady = true;
     settleSignup(pending);
-  }, {
-    config_id: signupReady.configId,
-    response_type: "code",
-    override_default_response_type: true,
-    extras: {
-      setup: {},
-      featureType: "",
-      sessionInfoVersion: "3"
-    }
-  });
+  }, signupLoginOptions(signupReady.configId, signupPageRedirect()));
+  const started = callApi("sambung", {});
+  const hint = document.getElementById("signup-hint");
+  if (hint) hint.textContent = "Tetingkap Meta dibuka. Biarkan workspace ini terbuka.";
   started.then((data) => {
     if (signupQueue !== pending) return;
     if (!data || data.ok !== true || !/^[0-9a-f]{64}$/.test(data.state || "")) {
@@ -1141,7 +1166,9 @@ function settleSignup(pending) {
   if (pending.codeReady && !pending.codeSent) {
     pending.codeSent = true;
     if (pending.code) exchangeSignupCode(pending.code);
-    else showSignupNote("Tetingkap Meta ditutup sebelum kebenaran diberi.");
+    else showSignupNote(pending.status
+      ? "Tetingkap Meta ditutup sebelum kebenaran diberi. Keadaan: " + pending.status + "."
+      : "Tetingkap Meta ditutup sebelum kebenaran diberi.");
   }
   while (pending.events.length) sendSignupEvent(pending.events.shift());
 }
