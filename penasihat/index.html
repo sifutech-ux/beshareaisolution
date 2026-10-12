@@ -19,7 +19,7 @@
       } catch (e) {}
     </script>
     <link rel="stylesheet" href="../styles.css?v=20260929" />
-    <link rel="stylesheet" href="penasihat.css?v=20261012d" />
+    <link rel="stylesheet" href="penasihat.css?v=20261012f" />
   </head>
   <body class="meja" data-skrin="muat">
     <a class="lompat" href="#kandungan">Langkau ke kandungan</a>
@@ -173,22 +173,22 @@
                   <p class="kad__label">Tindakan hari ini</p>
                 </div>
                 <div id="langkah-utama"></div>
-                <p class="ingat">Tanda pada senarai ini disimpan pada telefon ini, bukan pada pelayan.</p>
+                <p class="ingat">Cadangan penasihat. Bukan tugasan yang disimpan dalam akaun.</p>
               </article>
               <article class="kad kad-kemajuan">
                 <p class="kad__label">Kemajuan minggu ini</p>
-                <div class="cincin" id="cincin-utama" style="--sudah: 0"><span>0</span></div>
-                <p id="kira-draf">0 tugasan draf</p>
-                <p class="ingat">Disimpan pada telefon ini.</p>
+                <div class="cincin cincin-kosong" id="cincin-utama" style="--sudah: 0"><span>—</span></div>
+                <p id="kira-draf">Pelan akaun belum dimuat</p>
+                <p class="ingat">Kemajuan ini hanya daripada tugasan yang disimpan dalam akaun.</p>
                 <button type="button" class="pautan-kecil" data-pergi="pelan">Lihat semua</button>
               </article>
-              <article class="kad kad-angka kad-lebar kad-contoh">
+              <article class="kad kad-angka kad-lebar">
                 <div class="kad-kepala">
                   <span class="cip" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6"/></svg></span>
                   <p class="kad__label">Angka jualan</p>
                 </div>
                 <h2 id="tajuk-angka-utama">Angka jualan belum dimasukkan</h2>
-                <p id="ayat-angka">Paparan ini bukan jualan sebenar dan tidak datang dari pelayan.</p>
+                <p id="ayat-angka">Tiada rekod hasil yang anda masukkan untuk minggu ini.</p>
                 <button type="button" class="butang butang-utama" data-pergi="angka">Masukkan angka</button>
               </article>
             </div>
@@ -223,46 +223,77 @@
           <section class="layar" data-layar="pelan">
             <div class="sapa">
               <div>
-                <p class="eyebrow">Draf telefon</p>
+                <p class="eyebrow" id="pelan-lencana">Disimpan dalam akaun</p>
                 <h1>Pelan minggu ini</h1>
-                <p class="lead">Tugasan di bawah disimpan pada telefon ini. Menanda siap tidak menghantar apa-apa ke pelayan.</p>
+                <p class="lead" id="minggu-pelan"></p>
+                <p class="ingat">Tugasan di bawah datang daripada akaun. Cadangan penasihat tidak dikira sehingga anda menambahnya.</p>
               </div>
               <div class="pelan-kemajuan">
                 <div class="cincin cincin-kosong" id="cincin-pelan" style="--sudah: 0"><span>—</span></div>
                 <p id="pelan-ringkas" class="ingat">Belum ada tugasan</p>
               </div>
             </div>
+            <p id="pelan-keadaan" class="status" role="status"></p>
+            <div id="pelan-konflik" class="jalur konflik-versi" hidden>
+              <p id="pelan-konflik-teks"></p>
+              <ul id="pelan-konflik-senarai"></ul>
+              <button type="button" id="pelan-muat" class="butang butang-senyap">Muat salinan pelayan</button>
+            </div>
             <div class="kad" id="rujukan-pelan"></div>
             <ul id="senarai-pelan" class="senarai-tugas"></ul>
-            <p id="pelan-kosong" class="kosong" hidden>Belum ada tugasan. Tambah tugasan, atau salin langkah penasihat ke telefon ini.</p>
+            <p id="pelan-kosong" class="kosong" hidden>Belum ada tugasan dalam akaun untuk minggu ini.</p>
             <form id="borang-tugas" class="tugas-baru">
-              <label class="sr" for="tulis-tugas">Tugasan baharu pada telefon ini</label>
-              <input id="tulis-tugas" maxlength="160" placeholder="Tambah tugasan pada telefon ini" />
-              <button type="submit" class="butang butang-utama">Tambah</button>
+              <label class="sr" for="tulis-tugas">Tugasan baharu dalam akaun</label>
+              <input id="tulis-tugas" maxlength="160" placeholder="Tambah tugasan dalam akaun" />
+              <button type="submit" class="butang butang-utama" id="tambah-tugas">Tambah</button>
             </form>
           </section>
 
           <section class="layar" data-layar="angka">
-            <p class="lencana">Contoh paparan</p>
+            <p class="lencana" id="angka-lencana">Disimpan dalam akaun</p>
             <h1>Angka perniagaan</h1>
-            <p class="lead">Nombor yang anda isi di sini ialah draf telefon. Ia bukan data pelanggan, bukan jualan sebenar, dan tidak dihantar ke pelayan.</p>
+            <p class="lead">Nombor ini dimasukkan sendiri. Ia bukan rekod kewangan yang disahkan, dan tidak dijana.</p>
+            <p class="ingat" id="tempoh-angka">Tempoh angka belum dimuat.</p>
+            <p id="angka-keadaan" class="status" role="status"></p>
+            <div id="angka-konflik" class="jalur konflik-versi" hidden>
+              <p id="angka-konflik-teks"></p>
+              <button type="button" id="angka-muat" class="butang butang-senyap">Muat salinan pelayan</button>
+              <button type="button" id="angka-pendua" class="butang butang-senyap" hidden>Simpan juga rekod yang sama</button>
+            </div>
             <form id="borang-angka" class="kad borang-angka">
               <label>
-                Hasil (RM)
-                <input id="hasil-angka" inputmode="decimal" maxlength="12" placeholder="Belum diisi" autocomplete="off" />
+                Tarikh
+                <input id="tarikh-angka" type="date" autocomplete="off" />
               </label>
               <label>
-                Kos (RM)
-                <input id="kos-angka" inputmode="decimal" maxlength="12" placeholder="Belum diisi" autocomplete="off" />
+                Jenis
+                <select id="jenis-angka">
+                  <option value="hasil">Hasil</option>
+                  <option value="kos">Kos</option>
+                  <option value="lain">Lain</option>
+                </select>
               </label>
-              <div class="kad kad-margin">
-                <p class="kad__label">Margin pada telefon ini</p>
-                <p class="metrik__nombor" id="margin-angka">—</p>
-                <p class="ingat">Kiraan ini hanya daripada nombor di atas. Sumber belum disambungkan.</p>
-              </div>
+              <label>
+                Unit
+                <select id="unit-angka">
+                  <option value="MYR">MYR</option>
+                  <option value="unit">Unit</option>
+                </select>
+              </label>
+              <label>
+                Nilai
+                <input id="nilai-angka" inputmode="decimal" maxlength="12" autocomplete="off" />
+              </label>
+              <label>
+                Nota, pilihan
+                <input id="nota-angka" maxlength="240" autocomplete="off" />
+              </label>
+              <p class="ingat">Dimasukkan sendiri. Bukan rekod kewangan yang disahkan.</p>
               <p id="ralat-angka" class="ralat" hidden></p>
-              <button type="submit" class="butang butang-utama">Simpan pada telefon</button>
+              <button type="submit" class="butang butang-utama" id="simpan-angka">Simpan dalam akaun</button>
             </form>
+            <ul id="senarai-angka" class="senarai-tugas"></ul>
+            <p id="angka-kosong" class="kosong">Belum ada rekod dalam akaun.</p>
           </section>
 
           <section class="layar" data-layar="profil">
@@ -296,6 +327,16 @@
               </div>
               <p class="ingat">Pilihan tema tidak dihantar ke pelayan.</p>
             </fieldset>
+            <article class="kad semak-draf" id="semak-draf">
+              <p class="kad__label">Semak draf</p>
+              <p class="ingat">Draf lama dalam kuarantin tidak dianggap milik akaun ini sehingga anda mengesahkannya. Tiada draf dihantar sendiri.</p>
+              <div id="senarai-draf"></div>
+              <label><input type="checkbox" id="draf-milik" /> Saya sahkan draf yang dipilih milik akaun yang sedang masuk.</label>
+              <label><input type="checkbox" id="draf-setuju" /> Saya bersetuju memindahkan pilihan ini ke akaun.</label>
+              <p id="draf-keadaan" class="status" role="status"></p>
+              <button type="button" class="butang butang-senyap" id="draf-hantar">Pindah pilihan ke akaun</button>
+              <button type="button" class="butang butang-senyap" id="draf-tambah" hidden>Tambah yang baharu sahaja</button>
+            </article>
             <button type="button" class="butang butang-bahaya" id="keluar-profil">Keluar</button>
           </section>
         </div>
@@ -310,7 +351,8 @@
       </div>
     </div>
 
-    <script src="../stor-draf.js?v=20261012d" defer></script>
-    <script src="penasihat.js?v=20261012d" defer></script>
+    <script src="../stor-draf.js?v=20261012f" defer></script>
+    <script src="../meja-akaun.js?v=20261012f" defer></script>
+    <script src="penasihat.js?v=20261012f" defer></script>
   </body>
 </html>

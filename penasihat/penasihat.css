@@ -464,6 +464,7 @@ body[data-skrin="mula"] .borang { display: flex; flex-direction: column; }
 .borang input,
 .borang textarea,
 .borang-angka input,
+.borang-angka select,
 .tugas-baru input,
 .mesej textarea {
   width: 100%;
@@ -792,3 +793,10 @@ body.papan-buka[data-skrin="nasihat"] .mesej { position: sticky; bottom: 0; }
 .konflik-versi[hidden] { display: none; }
 .konflik-versi ul { margin: 8px 0 0; padding-left: 18px; }
 .konflik-versi .butang { margin-top: 8px; }
+.borang-angka select { min-height: 48px; }
+.semak-draf { display: grid; gap: 8px; margin: 12px 0; }
+.semak-draf label { display: flex; gap: 8px; align-items: flex-start; font-weight: 650; }
+.semak-draf input[type="checkbox"] { width: 22px; height: 22px; margin-top: 2px; flex: none; }
+.draf-baris { display: grid; gap: 8px; margin-top: 8px; }
+.draf-baris select,
+.draf-baris input[type="date"] { min-height: 44px; font: inherit; font-size: 16px; }
