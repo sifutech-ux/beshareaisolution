@@ -1,7 +1,7 @@
 const ASAL = ['localhost', '127.0.0.1'].includes(location.hostname)
   ? 'http://127.0.0.1:3210'
   : 'https://ai-video-saas-ten.vercel.app'
-const API = `${ASAL}/api/penasihat`
+const NASIHAT_API = `${ASAL}/api/copilot/nasihat`
 const DENGAR_API = `${ASAL}/api/penasihat-dengar`
 const SUARA_API = `${ASAL}/api/penasihat-suara`
 const AKAUN = ['localhost', '127.0.0.1'].includes(location.hostname)
@@ -744,11 +744,58 @@ function ayatPelayar(error, sandaran) {
   return text
 }
 
-function giliran() {
-  return keadaan.mesej.map((item) => ({
-    dari: item.dari,
-    teks: item.langkah?.length ? `${item.teks} Langkah minggu ini: ${item.langkah.join(' ')}` : item.teks,
-  }))
+function giliranNasihat() {
+  if (!keadaan) return []
+  const giliran = []
+  for (const item of keadaan.mesej) {
+    if (!item || (item.dari !== 'klien' && item.dari !== 'penasihat') || typeof item.teks !== 'string') continue
+    const teks = item.teks.replace(/\s+/g, ' ').trim().slice(0, 600)
+    if (!teks) continue
+    giliran.push({ dari: item.dari, teks })
+  }
+  return giliran.slice(-8)
+}
+
+function storNasihat() {
+  return BeshareDraf.idAkaunSah(akaunId) ? `beshare-nasihat.${akaunId}` : null
+}
+
+function kunciNasihat(giliran) {
+  const cap = JSON.stringify(giliran)
+  const nama = storNasihat()
+  let tunda = null
+  if (nama) {
+    try { tunda = JSON.parse(localStorage.getItem(nama) || 'null') } catch { tunda = null }
+  }
+  if (tunda && tunda.cap === cap && typeof tunda.kunci === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(tunda.kunci)) {
+    return tunda.kunci
+  }
+  const kunci = MejaAkaun.kunciIdem()
+  if (nama) localStorage.setItem(nama, JSON.stringify({ kunci, cap }))
+  return kunci
+}
+
+function buangKunciNasihat() {
+  const nama = storNasihat()
+  if (!nama) return
+  try { localStorage.removeItem(nama) } catch { /* kunci sudah tiada */ }
+}
+
+function jawapanSama(jawapan, langkah) {
+  const akhir = keadaan.mesej[keadaan.mesej.length - 1]
+  if (!akhir || akhir.dari !== 'penasihat' || akhir.teks !== jawapan) return false
+  const ada = Array.isArray(akhir.langkah) ? akhir.langkah : []
+  return ada.length === langkah.length && ada.every((baris, indeks) => baris === langkah[indeks])
+}
+
+function ayatNasihat(kod, data) {
+  if (data && typeof data.error === 'string' && !data.error.includes('{')) return data.error
+  if (kod === 400) return 'Permintaan tidak sah. Semak mesej, kemudian cuba lagi.'
+  if (kod === 409) return 'Permintaan ini masih diproses.'
+  if (kod === 422) return 'Lengkapkan profil perniagaan dahulu.'
+  if (kod === 429) return 'Kuota nasihat penuh. Cuba lagi kemudian.'
+  if (kod === 503) return 'Keputusan permintaan ini belum pasti.'
+  return 'Penasihat sedang sibuk. Tunggu sebentar, kemudian hantar sekali lagi.'
 }
 
 function setCakap(rakam) {
@@ -774,50 +821,81 @@ async function hantarTeks(teks, mainkan, ulang = false) {
   hantar.disabled = true
   cakap.disabled = true
   tunjukUlang(false)
-  await simpan()
-  lukis()
-  if (!sesiAkaun() || konflikVersi) {
+  status.dataset.nasihat = ''
+  try {
+    await simpan()
+    lukis()
+    if (!sesiAkaun() || konflikVersi) return
+    const giliran = giliranNasihat()
+    const akhir = giliran[giliran.length - 1]
+    if (!akhir || akhir.dari !== 'klien') {
+      status.textContent = 'Sila tulis mesej.'
+      status.dataset.nasihat = 'ralat'
+      return
+    }
+    const sesi = sesiAkaun()
+    status.classList.add('sedang')
+    status.textContent = 'Penasihat sedang menulis…'
+    const balas = await fetch(NASIHAT_API, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sesi.token}`,
+        'Idempotency-Key': kunciNasihat(giliran),
+      },
+      body: JSON.stringify({ giliran }),
+    })
+    const data = await balas.json().catch(() => ({}))
+    status.classList.remove('sedang')
+    if (balas.status === 401) {
+      lupusSesi()
+      tunjukPintu()
+      return
+    }
+    const langkah = Array.isArray(data.langkah) ? data.langkah.filter((baris) => typeof baris === 'string').slice(0, 3) : []
+    const modelSah = balas.ok
+      && data.ok === true
+      && data.sumber === 'gemini'
+      && data.bukan_model === false
+      && typeof data.jawapan === 'string'
+      && langkah.length === 3
+    if (modelSah) {
+      if (!jawapanSama(data.jawapan, langkah)) {
+        keadaan.mesej.push({ dari: 'penasihat', teks: data.jawapan, langkah })
+        await simpan()
+      }
+      buangKunciNasihat()
+      status.textContent = ''
+      status.dataset.nasihat = 'model'
+      tunjukUlang(false)
+      lukis()
+      if (mainkan) await mainSuara(keadaan.mesej[keadaan.mesej.length - 1])
+      return
+    }
+    if (balas.status === 502 && data.bukan_model === true) {
+      const label = typeof data.label === 'string' ? data.label : 'Panduan tempatan, bukan jawapan model.'
+      status.textContent = `${label} Ini bukan jawapan model dan tidak disimpan.`
+      status.dataset.nasihat = 'tempatan'
+      tunjukUlang(true)
+      lukis()
+      return
+    }
+    status.textContent = ayatNasihat(balas.status, data)
+    status.dataset.nasihat = 'ralat'
+    tunjukUlang(balas.status !== 400 && balas.status !== 422)
+    lukis()
+  } catch (error) {
+    status.classList.remove('sedang')
+    status.textContent = ayatPelayar(error, 'Penasihat sedang sibuk. Tunggu sebentar, kemudian hantar sekali lagi.')
+    status.dataset.nasihat = 'ralat'
+    tunjukUlang(true)
+    lukis()
+  } finally {
     sibuk = false
     hantar.disabled = false
     cakap.disabled = false
     status.classList.remove('sedang')
-    return
   }
-  status.classList.add('sedang')
-  status.textContent = 'Penasihat sedang menulis…'
-  try {
-    const balas = await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        nama: keadaan.nama,
-        jualan: keadaan.jualan,
-        peringkat: keadaan.peringkat,
-        giliran: giliran(),
-      }),
-    })
-    const data = await balas.json()
-    if (!balas.ok || typeof data.jawapan !== 'string' || !Array.isArray(data.langkah) || data.langkah.length < 3) {
-      throw new Error(typeof data.error === 'string' ? data.error : 'gagal')
-    }
-    const jawapan = { dari: 'penasihat', teks: data.jawapan, langkah: data.langkah.slice(0, 3) }
-    keadaan.mesej.push(jawapan)
-    status.classList.remove('sedang')
-    status.textContent = ''
-    tunjukUlang(false)
-    await simpan()
-    lukis()
-    if (mainkan) await mainSuara(jawapan)
-  } catch (error) {
-    status.classList.remove('sedang')
-    status.textContent = ayatPelayar(error, 'Penasihat sedang sibuk. Tunggu sebentar, kemudian hantar sekali lagi.')
-    tunjukUlang(true)
-    await simpan()
-    lukis()
-  }
-  sibuk = false
-  hantar.disabled = false
-  cakap.disabled = false
 }
 
 async function mainSuara(item, butang) {
