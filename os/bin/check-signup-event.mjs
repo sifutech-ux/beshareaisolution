@@ -2,13 +2,13 @@ import { readFileSync } from "node:fs";
 import { createContext, runInContext } from "node:vm";
 
 const source = readFileSync(new URL("../../whatsapp/ruang.js", import.meta.url), "utf8");
-const start = source.indexOf("function facebookSdkReady");
+const start = source.indexOf("function facebookHost");
 const end = source.indexOf("function openEmbeddedSignup");
 if (start < 0 || end < start) {
   console.log("FAIL signup helpers are present");
   process.exit(1);
 }
-const context = createContext({});
+const context = createContext({ URL, URLSearchParams });
 runInContext(source.slice(start, end), context);
 
 let failures = 0;
@@ -86,10 +86,50 @@ check("loaded sdk is ready", context.facebookSdkReady() === true);
 check("meta status stays a short word", context.metaStatus({ status: "unknown", authResponse: { code: "secret-code" } }) === "unknown");
 check("meta status drops unexpected text", context.metaStatus({ status: "code=secret" }) === "");
 
-const click = source.slice(source.indexOf("function openEmbeddedSignup"), source.indexOf("function settleSignup"));
+const click = source.slice(source.indexOf("function beginSignup"), source.indexOf("function exchangeSignupCode"));
 const loginAt = click.indexOf("window.FB.login");
 const fetchAt = click.indexOf('callApi("sambung"');
 check("embedded signup opens before the session request", loginAt > 0 && fetchAt > loginAt);
+check("facebook messages stay on a facebook host", context.facebookHost("https://www.facebook.com") && context.facebookHost("https://web.facebook.com") && context.facebookHost("https://business.facebook.com") && context.facebookHost("https://m.facebook.com"));
+check("foreign origins are ignored", !context.facebookHost("https://facebook.com.evil.com") && !context.facebookHost("https://example.com"));
+const payload = context.signupPayload("https://business.facebook.com", JSON.stringify({
+  type: "WA_EMBEDDED_SIGNUP",
+  event: "FINISH",
+  data: { waba_id: "1104940391945821", phone_number_id: "100000000000202" }
+}));
+const finish = context.signupEventFields(payload);
+check(
+  "string postMessage from business facebook keeps finish ids",
+  payload && finish.event === "FINISH" && finish.waba_id === "1104940391945821" && finish.phone_number_id === "100000000000202"
+);
+check("unrelated postMessage is ignored", context.signupPayload("https://www.facebook.com", JSON.stringify({ type: "other" })) === null);
+const returned = context.signupQueryResult("?code=AQABCDE123_~.-ok&error_description=secret");
+check("redirect keeps a usable code and drops the description", returned.code === "AQABCDE123_~.-ok" && returned.error === "");
+check("oauth error is a short reason", context.signupQueryResult("?error_reason=user_denied").error === "user_denied");
+check(
+  "saved connection is the only success note",
+  context.signupResultNote({ ok: true, connection: { linked: true, note: "lama" } }) === "Sambungan WhatsApp disimpan."
+);
+check(
+  "incomplete result is not called success",
+  context.signupResultNote({ ok: true, connection: { linked: false, note: "" } }) === "Hasil Meta belum lengkap. Sambungan tidak disimpan."
+    && context.signupResultNote({ ok: true, connection: { linked: false, note: "Kod ditukar. Menunggu pengesahan nombor daripada Meta." } }) === "Kod ditukar. Menunggu pengesahan nombor daripada Meta."
+);
+check(
+  "in-app browser failure names Safari",
+  context.signupClientHint("Mozilla FBAN") === " Buka halaman ini dalam Safari. Pelayar dalam aplikasi sering menggugurkan hasil Meta."
+    && context.signupClientHint("Mozilla/5.0 (iPhone; Safari)") === ""
+);
+check(
+  "signup source keeps both results across a reload and does not claim a false success",
+  source.includes('const SIGNUP_RECORD = "beshare-os-signup"')
+    && source.includes("visibilitychange")
+    && source.includes("history.replaceState")
+    && source.includes("rememberSignupCode")
+    && source.includes("rememberSignupEvent")
+    && !source.includes("Peristiwa Meta direkod")
+    && !source.includes("Keadaan sambungan dikemas kini")
+);
 const standardLaunch = source.slice(source.indexOf("function openEmbeddedSignup"), source.indexOf("function openCoexistenceSignup"));
 const appLaunch = source.slice(source.indexOf("function openCoexistenceSignup"), source.indexOf("function beginSignup"));
 check(
@@ -110,5 +150,46 @@ check(
     && source.includes('data-act="connect-app"')
     && source.includes(">Sambung WhatsApp Business App<")
 );
+
+const sent = { codes: [], events: [] };
+const store = new Map();
+const storageContext = createContext({
+  URL,
+  URLSearchParams,
+  sessionStorage: {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, value),
+    removeItem: (key) => store.delete(key)
+  },
+  __sent: sent
+});
+const storageStart = source.indexOf("const SIGNUP_RECORD");
+const storageEnd = source.indexOf("function beginSignup");
+const signupCodeSource = source.slice(source.indexOf("function signupCode"), source.indexOf("function signupQueryResult"));
+runInContext(`let signupState = "";
+let signupQueue = null;
+${signupCodeSource}
+${source.slice(storageStart, storageEnd)}
+function exchangeSignupCode(code) { __sent.codes.push(code); }
+function sendSignupEvent(fields) { __sent.events.push(fields.event); }
+`, storageContext);
+const state = "a".repeat(64);
+storageContext.rememberSignupEvent({ event: "FINISH", waba_id: "123", phone_number_id: "456" });
+storageContext.rememberSignupCode("AQABCDE123_~.-ok");
+storageContext.flushSignup();
+check("finish and code wait until the server state exists", sent.codes.length === 0 && sent.events.length === 0);
+storageContext.rememberSignupState(state);
+check(
+  "finish then code is sent once the server state arrives",
+  sent.codes.length === 1 && sent.codes[0] === "AQABCDE123_~.-ok" && sent.events.length === 1 && sent.events[0] === "FINISH"
+);
+sent.codes.length = 0;
+sent.events.length = 0;
+store.clear();
+storageContext.rememberSignupState(state);
+storageContext.rememberSignupCode("AQZYXWV987_~.-ok");
+check("code after the server state is exchanged without a second copy", sent.codes.length === 1 && sent.codes[0] === "AQZYXWV987_~.-ok" && sent.events.length === 0);
+storageContext.rememberSignupEvent({ event: "FINISH", waba_id: "123", phone_number_id: "456" });
+check("a later finish is still delivered on the same session", sent.events.length === 1 && sent.events[0] === "FINISH" && sent.codes.length === 1);
 
 process.exit(failures === 0 ? 0 : 1);

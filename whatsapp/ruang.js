@@ -723,6 +723,8 @@ function onClick(event) {
       }
       applyLive(data);
       signupState = "";
+      signupQueue = null;
+      clearSignupRecord();
       inboxLoad = "";
       location.hash = "masuk";
       route();
@@ -1015,6 +1017,50 @@ function facebookHost(origin) {
   }
 }
 
+function signupCode(value) {
+  return typeof value === "string" && /^[A-Za-z0-9_\-\.~]{8,1024}$/.test(value) ? value : "";
+}
+
+function signupQueryResult(search) {
+  const raw = typeof search === "string" ? search : "";
+  const params = new URLSearchParams(raw.startsWith("?") ? raw.slice(1) : raw);
+  const reason = params.get("error_reason") || params.get("error") || "";
+  return {
+    code: signupCode(params.get("code") || ""),
+    error: /^[A-Za-z0-9_]{1,40}$/.test(reason) ? reason : ""
+  };
+}
+
+function signupPayload(origin, data) {
+  if (!facebookHost(origin)) return null;
+  let parsed = data;
+  for (let attempt = 0; attempt < 2 && typeof parsed === "string"; attempt += 1) {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed || parsed.type !== "WA_EMBEDDED_SIGNUP") return null;
+  return parsed;
+}
+
+function signupResultNote(data) {
+  const connection = data && data.connection && typeof data.connection === "object" ? data.connection : null;
+  if (data && data.ok === true && connection && connection.linked === true) return "Sambungan WhatsApp disimpan.";
+  if (connection && typeof connection.note === "string" && connection.note) return connection.note;
+  if (data && data.ok === true) return "Hasil Meta belum lengkap. Sambungan tidak disimpan.";
+  return (data && data.error) || "Hasil Embedded Signup tidak diterima. Sambungan tidak disimpan.";
+}
+
+function signupClientHint(agent) {
+  const ua = typeof agent === "string" ? agent : "";
+  if (/FBAN|FBAV|Instagram|Line\//.test(ua)) {
+    return " Buka halaman ini dalam Safari. Pelayar dalam aplikasi sering menggugurkan hasil Meta.";
+  }
+  return "";
+}
+
 function showSignupNote(note) {
   const state = load();
   if (!state) return;
@@ -1149,6 +1195,118 @@ function openCoexistenceSignup() {
   beginSignup(coexistenceLoginOptions(signupReady.configId, signupPageRedirect()));
 }
 
+const SIGNUP_RECORD = "beshare-os-signup";
+let signupReturnTimer = 0;
+
+function readSignupRecord() {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(SIGNUP_RECORD) || "");
+    if (!parsed || typeof parsed !== "object") return null;
+    if (parsed.at && Date.now() - Number(parsed.at) > 15 * 60 * 1000) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeSignupRecord(record) {
+  try {
+    sessionStorage.setItem(SIGNUP_RECORD, JSON.stringify(record));
+  } catch {
+    /* Mod peribadi pelayar tidak menyimpan rekod sementara. */
+  }
+}
+
+function clearSignupRecord() {
+  try {
+    sessionStorage.removeItem(SIGNUP_RECORD);
+  } catch {
+    /* Abaikan. */
+  }
+}
+
+function rememberSignupCode(code) {
+  const safe = signupCode(code);
+  if (!safe) return;
+  const record = readSignupRecord() || { state: "", events: [], at: Date.now(), codeSent: false, finish: false, reported: false };
+  record.code = safe;
+  writeSignupRecord(record);
+  flushSignup();
+}
+
+function rememberSignupState(state) {
+  if (!/^[0-9a-f]{64}$/.test(state || "")) return;
+  const record = readSignupRecord() || { code: "", events: [], at: Date.now(), codeSent: false, finish: false, reported: false };
+  record.state = state;
+  writeSignupRecord(record);
+  signupState = state;
+  flushSignup();
+}
+
+function rememberSignupEvent(fields) {
+  const record = readSignupRecord() || { state: signupState || "", code: "", events: [], at: Date.now(), codeSent: false, finish: false, reported: false };
+  if (!Array.isArray(record.events)) record.events = [];
+  record.events.push(fields);
+  if (fields.event === "FINISH" || fields.event === "FINISH_ONLY_WABA" || fields.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING") {
+    record.finish = true;
+  }
+  writeSignupRecord(record);
+  if (signupQueue) signupQueue.finish = record.finish === true;
+  flushSignup();
+}
+
+function consumeRedirectResult() {
+  const found = signupQueryResult(location.search);
+  if (!found.code && !found.error) return found;
+  const params = new URLSearchParams(location.search);
+  ["code", "error", "error_reason", "error_description"].forEach((key) => params.delete(key));
+  const query = params.toString();
+  history.replaceState({}, "", location.pathname + (query ? "?" + query : "") + location.hash);
+  return found;
+}
+
+function signupFailure(message) {
+  showSignupNote(message + signupClientHint(navigator.userAgent));
+}
+
+function flushSignup() {
+  const record = readSignupRecord();
+  if (!record || !/^[0-9a-f]{64}$/.test(record.state || "")) return;
+  signupState = record.state;
+  if (record.code && !record.codeSent) {
+    record.codeSent = true;
+    writeSignupRecord(record);
+    exchangeSignupCode(record.code);
+  }
+  const events = Array.isArray(record.events) ? record.events : [];
+  if (!events.length) return;
+  record.events = [];
+  writeSignupRecord(record);
+  events.forEach((fields) => sendSignupEvent(fields));
+}
+
+function reportSignupGap() {
+  const found = consumeRedirectResult();
+  if (found.code) {
+    rememberSignupCode(found.code);
+    flushSignup();
+    return;
+  }
+  const record = readSignupRecord();
+  if (!record || record.code || record.codeSent || record.reported) return;
+  if (signupQueue && signupQueue.code) return;
+  record.reported = true;
+  writeSignupRecord(record);
+  signupFailure(record.finish
+    ? "Peristiwa FINISH diterima, tetapi kod kebenaran tidak sampai. Sambungan tidak disimpan."
+    : "Pelayar tidak memulangkan kod kebenaran atau peristiwa FINISH. Sambungan tidak disimpan.");
+}
+
+function armSignupReturn() {
+  window.clearTimeout(signupReturnTimer);
+  signupReturnTimer = window.setTimeout(reportSignupGap, 2000);
+}
+
 function beginSignup(options) {
   const state = load();
   if (!state) return;
@@ -1162,95 +1320,112 @@ function beginSignup(options) {
       : "Tetingkap Meta tidak dibuka. App ID dan Configuration ID belum dipasang pada pelayan.");
     return;
   }
-  const pending = { codeReady: false, codeSent: false, code: "", events: [], stateReady: false, failed: false, status: "" };
+  const pending = { code: "", finish: false };
   signupQueue = pending;
+  writeSignupRecord({ state: "", code: "", events: [], at: Date.now(), codeSent: false, finish: false, reported: false, hidden: false });
   window.FB.login((response) => {
     if (signupQueue !== pending) return;
-    const code = response && response.authResponse ? response.authResponse.code : "";
-    pending.code = typeof code === "string" ? code : "";
+    const code = signupCode(response && response.authResponse ? response.authResponse.code : "");
     pending.status = metaStatus(response);
-    pending.codeReady = true;
-    settleSignup(pending);
+    if (code) {
+      pending.code = code;
+      rememberSignupCode(code);
+      flushSignup();
+      return;
+    }
+    if (document.visibilityState === "hidden") return;
+    pending.reported = true;
+    const record = readSignupRecord();
+    if (record) {
+      record.reported = true;
+      writeSignupRecord(record);
+    }
+    signupFailure(pending.status
+      ? "Tetingkap Meta ditutup sebelum kod kebenaran diterima. Keadaan: " + pending.status + ". Sambungan tidak disimpan."
+      : "Tetingkap Meta ditutup sebelum kod kebenaran diterima. Sambungan tidak disimpan.");
   }, options);
   const started = callApi("sambung", {});
   const hint = document.getElementById("signup-hint");
-  if (hint) hint.textContent = "Tetingkap Meta dibuka. Biarkan workspace ini terbuka.";
+  if (hint) hint.textContent = "Tetingkap Meta dibuka. Biarkan workspace ini terbuka sehingga kod diterima.";
   started.then((data) => {
     if (signupQueue !== pending) return;
     if (!data || data.ok !== true || !/^[0-9a-f]{64}$/.test(data.state || "")) {
-      pending.failed = true;
       signupQueue = null;
       signupState = "";
-      showSignupNote((data && data.error) || "Sesi sambungan tidak dapat dibuka.");
+      clearSignupRecord();
+      showSignupNote((data && data.error) || "Sesi sambungan tidak dapat dibuka. Sambungan tidak disimpan.");
       return;
     }
-    pending.stateReady = true;
-    signupState = data.state;
-    settleSignup(pending);
+    rememberSignupState(data.state);
+    flushSignup();
   });
-}
-
-function settleSignup(pending) {
-  if (pending.failed || !pending.stateReady || !signupState) return;
-  if (pending.codeReady && !pending.codeSent) {
-    pending.codeSent = true;
-    if (pending.code) exchangeSignupCode(pending.code);
-    else showSignupNote(pending.status
-      ? "Tetingkap Meta ditutup sebelum kebenaran diberi. Keadaan: " + pending.status + "."
-      : "Tetingkap Meta ditutup sebelum kebenaran diberi.");
-  }
-  while (pending.events.length) sendSignupEvent(pending.events.shift());
 }
 
 function exchangeSignupCode(code) {
   const state = signupState;
   if (!state) {
-    showSignupNote("Sesi sambungan tidak sah. Buka tetingkap Meta sekali lagi.");
+    showSignupNote("Sesi sambungan tidak sah. Buka tetingkap Meta sekali lagi. Sambungan tidak disimpan.");
     return;
   }
   callApi("tukar", { state, code }).then((data) => {
     if (data && data.user) applyLive(data);
     inboxLoad = "";
-    showSignupNote(data && data.ok
-      ? "Kod dihantar ke pelayan. Keadaan sambungan dikemas kini daripada pelayan."
-      : ((data && data.error) || "Pertukaran kod gagal."));
+    const linked = data && data.connection && data.connection.linked === true;
+    if (linked) clearSignupRecord();
+    else flushSignup();
+    showSignupNote(signupResultNote(data));
   });
 }
 
 window.addEventListener("message", (event) => {
-  if (!facebookHost(event.origin)) return;
-  let data = event.data;
-  if (typeof data === "string") {
-    try {
-      data = JSON.parse(data);
-    } catch {
-      return;
-    }
-  }
-  if (!data || data.type !== "WA_EMBEDDED_SIGNUP") return;
-  const fields = signupEventFields(data);
-  if (signupState) {
-    sendSignupEvent(fields);
+  const parsed = signupPayload(event.origin, event.data);
+  if (!parsed) return;
+  rememberSignupEvent(signupEventFields(parsed));
+  flushSignup();
+});
+
+window.addEventListener("blur", () => {
+  const record = readSignupRecord();
+  if (!record || record.codeSent) return;
+  record.hidden = true;
+  writeSignupRecord(record);
+});
+
+document.addEventListener("visibilitychange", () => {
+  const record = readSignupRecord();
+  if (!record) return;
+  if (document.visibilityState === "hidden") {
+    record.hidden = true;
+    writeSignupRecord(record);
     return;
   }
-  if (signupQueue) signupQueue.events.push(fields);
+  if (record.hidden) armSignupReturn();
+});
+
+window.addEventListener("focus", () => {
+  const record = readSignupRecord();
+  if (record && record.hidden) armSignupReturn();
 });
 
 function sendSignupEvent(fields) {
   callApi("peristiwa", Object.assign({ state: signupState }, fields)).then((result) => {
     if (result && result.user) applyLive(result);
     inboxLoad = "";
-    const current = load();
-    if (!current) return;
-    current.notice = result && result.ok
-      ? "Peristiwa Meta direkod pada pelayan."
-      : ((result && result.error) || "Peristiwa Meta tidak dapat direkod.");
-    save(current);
-    if ((location.hash.replace("#", "") || "") === "sambungan") route();
+    const linked = result && result.connection && result.connection.linked === true;
+    const note = result && result.connection && typeof result.connection.note === "string" ? result.connection.note : "";
+    if (linked) {
+      clearSignupRecord();
+      showSignupNote("Sambungan WhatsApp disimpan.");
+      return;
+    }
+    if (result && result.ok === true && !note) return;
+    showSignupNote(signupResultNote(result));
   });
 }
 
 async function boot() {
+  const returned = consumeRedirectResult();
+  if (returned.code) rememberSignupCode(returned.code);
   const root = document.getElementById("app");
   if (root) root.innerHTML = `<main class="page"><p class="muted">Memuatkan sesi…</p></main>`;
   try {
@@ -1258,8 +1433,20 @@ async function boot() {
   } catch {
     live = null;
   }
+  const stored = readSignupRecord();
+  if (stored && /^[0-9a-f]{64}$/.test(stored.state || "")) signupState = stored.state;
   ready = true;
   route();
+  if (returned.error && !returned.code) {
+    signupFailure("Meta tidak memulangkan kebenaran. Sambungan tidak disimpan.");
+  }
+  flushSignup();
+  if (returned.code) {
+    const after = readSignupRecord();
+    if (!after || !after.codeSent) {
+      signupFailure("Kod kebenaran sampai tanpa sesi sambungan yang sah. Sambungan tidak disimpan.");
+    }
+  }
 }
 
 boot();
