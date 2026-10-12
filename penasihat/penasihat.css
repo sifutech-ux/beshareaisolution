@@ -787,3 +787,8 @@ body.papan-buka[data-skrin="nasihat"] .mesej { position: sticky; bottom: 0; }
   }
   .palang { min-height: 48px; padding-bottom: 0; }
 }
+
+.konflik-versi { margin: 0 0 12px; }
+.konflik-versi[hidden] { display: none; }
+.konflik-versi ul { margin: 8px 0 0; padding-left: 18px; }
+.konflik-versi .butang { margin-top: 8px; }

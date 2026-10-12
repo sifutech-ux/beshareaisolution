@@ -8,9 +8,6 @@ const AKAUN = ['localhost', '127.0.0.1'].includes(location.hostname)
   ? 'http://127.0.0.1:8767'
   : 'https://beshare-ipo-bot.onrender.com'
 const AKAUN_KUNCI = 'beshare-akaun'
-const SIMPAN = 'beshare-penasihat'
-const PELAN = 'beshare-pelan-draf'
-const ANGKA = 'beshare-angka-draf'
 const TEMA = 'beshare-tema'
 const PERINGKAT = {
   mula: 'Baru nak mula',
@@ -41,6 +38,10 @@ const cakap = document.getElementById('cakap')
 const jalur = document.getElementById('jalur-akaun')
 
 let keadaan = null
+let akaunId = null
+let mesejVersi = null
+let konflikVersi = false
+let salinanKonflik = null
 let sibuk = false
 let media = null
 let rakaman = null
@@ -77,37 +78,11 @@ function rekodSah(data) {
   return { nama, jualan, peringkat: data.peringkat, mesej }
 }
 
-function bacaStor(stor) {
-  try {
-    return rekodSah(JSON.parse(stor.getItem(SIMPAN) || 'null'))
-  } catch {
-    return null
-  }
-}
-
-function tulisStor(stor, json) {
-  try {
-    stor.setItem(SIMPAN, json)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function baca() {
-  const kekal = bacaStor(localStorage)
-  if (kekal) return kekal
-  const sesi = bacaStor(sessionStorage)
-  if (!sesi) return null
-  tulisStor(localStorage, JSON.stringify(sesi))
-  return sesi
-}
-
 function sesiAkaun() {
   try {
     const data = JSON.parse(localStorage.getItem(AKAUN_KUNCI) || 'null')
     if (!data || typeof data.token !== 'string' || typeof data.email !== 'string') return null
-    return data
+    return { token: data.token, email: data.email }
   } catch {
     return null
   }
@@ -143,8 +118,10 @@ function langkahTerkini() {
 }
 
 function bacaPelan() {
+  const kunci = BeshareDraf.kunciSkop(akaunId, 'pelan')
+  if (!kunci) return []
   try {
-    const data = JSON.parse(localStorage.getItem(PELAN) || 'null')
+    const data = JSON.parse(localStorage.getItem(kunci) || 'null')
     if (!data || !Array.isArray(data.tugasan)) return []
     return data.tugasan.map((item) => {
       if (!item || typeof item.teks !== 'string' || typeof item.id !== 'string') return null
@@ -163,22 +140,36 @@ function idBaru() {
 }
 
 function tulisPelan(tugasan) {
+  const kunci = BeshareDraf.kunciSkop(akaunId, 'pelan')
+  if (!kunci) {
+    status.textContent = 'Draf tidak disimpan kerana akaun belum disahkan.'
+    return
+  }
   try {
-    localStorage.setItem(PELAN, JSON.stringify({ tugasan, nota: 'draf telefon, bukan pelayan' }))
+    localStorage.setItem(kunci, JSON.stringify({ tugasan, nota: 'draf telefon, bukan pelayan' }))
   } catch {
     status.textContent = 'Draf tidak muat pada telefon ini.'
   }
 }
 
 function bacaAngka() {
+  const kunci = BeshareDraf.kunciSkop(akaunId, 'angka')
+  if (!kunci) return { hasil: '', kos: '' }
   try {
-    const data = JSON.parse(localStorage.getItem(ANGKA) || 'null')
+    const data = JSON.parse(localStorage.getItem(kunci) || 'null')
     if (!data || typeof data !== 'object') return { hasil: '', kos: '' }
     const bersih = (nilai) => (typeof nilai === 'string' ? nilai.replace(/[^\d.]/g, '').slice(0, 12) : '')
     return { hasil: bersih(data.hasil), kos: bersih(data.kos) }
   } catch {
     return { hasil: '', kos: '' }
   }
+}
+
+function tulisAngka(hasil, kos) {
+  const kunci = BeshareDraf.kunciSkop(akaunId, 'angka')
+  if (!kunci) return false
+  localStorage.setItem(kunci, JSON.stringify({ hasil, kos, nota: 'draf telefon, bukan pelayan' }))
+  return true
 }
 
 function nomborAngka(nilai) {
@@ -552,44 +543,124 @@ function lukis() {
   if (document.body.dataset.skrin === 'utama') lukisUtama()
 }
 
-function keluarAkaun() {
-  localStorage.removeItem(AKAUN_KUNCI)
-  localStorage.removeItem(SIMPAN)
-  localStorage.removeItem(PELAN)
-  localStorage.removeItem(ANGKA)
-  try { sessionStorage.removeItem(SIMPAN) } catch { /* salinan sesi kosong */ }
+function lupusSesi() {
+  try { localStorage.removeItem(AKAUN_KUNCI) } catch { /* sesi sudah tiada */ }
   keadaan = null
+  akaunId = null
+  mesejVersi = null
+  konflikVersi = false
+  salinanKonflik = null
+}
+
+function keluarAkaun() {
+  lupusSesi()
   location.href = '../akaun/'
 }
 
+function tunjukKonflik(belum, tinggal, bolehMuat) {
+  const kotak = document.getElementById('konflik-versi')
+  const teks = document.getElementById('konflik-teks')
+  const senarai = document.getElementById('konflik-senarai')
+  const butang = document.getElementById('konflik-muat')
+  kotak.hidden = false
+  const adaKlien = (belum || []).some((item) => item.dari === 'klien')
+  const adaJawapan = (belum || []).some((item) => item.dari === 'penasihat')
+  let ayat = 'Tab lain sudah menyimpan salinan baharu. Teks anda tidak ditulis semula ke pelayan.'
+  if (adaKlien) ayat += ' Mesej anda masih di kotak tulis.'
+  if (adaJawapan) ayat += ' Jawapan yang belum disimpan disenaraikan di sini.'
+  if (tinggal && tinggal.length) ayat += ' Teks yang tidak muat di kotak juga disenaraikan di sini.'
+  teks.textContent = ayat
+  senarai.replaceChildren()
+  for (const item of belum || []) {
+    const baris = document.createElement('li')
+    baris.textContent = item.dari === 'klien' ? item.teks : `Jawapan belum disimpan: ${item.teks}`
+    senarai.append(baris)
+  }
+  for (const item of tinggal || []) {
+    const baris = document.createElement('li')
+    baris.textContent = item
+    senarai.append(baris)
+  }
+  butang.hidden = !bolehMuat
+  jalurAkaun('')
+  status.textContent = ''
+}
+
+function tanganiKonflik(data) {
+  const profil = rekodSah(data && data.penasihat)
+  const versi = BeshareDraf.versiSah(data && data.mesej_versi) ? data.mesej_versi : null
+  const belum = profil ? BeshareDraf.ekorBelum(keadaan, profil) : []
+  const klien = belum.filter((item) => item.dari === 'klien').map((item) => item.teks)
+  const susun = BeshareDraf.susunTeksBelum(tulis.value, klien, 600)
+  tulis.value = susun.kotak
+  salinanKonflik = profil && versi ? { profil, versi } : null
+  konflikVersi = true
+  tunjukKonflik(belum, susun.tinggal, Boolean(salinanKonflik))
+}
+
+function muatSalinanPelayan() {
+  if (!salinanKonflik) return
+  const belum = BeshareDraf.ekorBelum(keadaan, salinanKonflik.profil)
+  const klien = belum.filter((item) => item.dari === 'klien').map((item) => item.teks)
+  tulis.value = BeshareDraf.susunTeksBelum(tulis.value, klien, 600).kotak
+  keadaan = salinanKonflik.profil
+  mesejVersi = salinanKonflik.versi
+  konflikVersi = false
+  salinanKonflik = null
+  document.getElementById('konflik-muat').hidden = true
+  const ayat = 'Salinan pelayan dimuatkan. Teks yang belum dihantar kekal di kotak tulis dan tidak ditulis semula sendiri.'
+  status.textContent = ayat
+  jalurAkaun(ayat)
+  lukis()
+}
+
 async function simpanAkaun() {
-  if (!sesiAkaun() || !keadaan) return
+  if (!sesiAkaun() || !keadaan || !BeshareDraf.idAkaunSah(akaunId)) return false
+  if (konflikVersi) return false
+  const badan = BeshareDraf.badanSimpan(keadaan, mesejVersi)
+  if (!badan) {
+    jalurAkaun('Versi akaun belum disahkan. Muat semula sebelum menyimpan.')
+    return false
+  }
   const balas = await fetch(`${AKAUN}/api/akaun/penasihat`, {
     method: 'POST',
     headers: kepalaAkaun(),
-    body: JSON.stringify({ penasihat: keadaan }),
+    body: JSON.stringify(badan),
   })
+  const data = await balas.json().catch(() => ({}))
   if (balas.status === 401) {
-    keluarAkaun()
-    return
+    lupusSesi()
+    tunjukPintu()
+    return false
   }
-  if (!balas.ok) throw new Error('gagal')
+  if (balas.status === 409) {
+    tanganiKonflik(data)
+    return false
+  }
+  if (!balas.ok || !BeshareDraf.versiSah(data.mesej_versi)) throw new Error('gagal')
+  mesejVersi = data.mesej_versi
+  return true
 }
 
 async function simpan() {
-  if (!keadaan) return
+  if (!keadaan) return false
   keadaan.mesej = keadaan.mesej.slice(-40)
-  const json = JSON.stringify(keadaan)
-  if (!tulisStor(localStorage, json)) tulisStor(sessionStorage, json)
+  if (konflikVersi) {
+    document.getElementById('konflik-versi').hidden = false
+    return false
+  }
   try {
-    await simpanAkaun()
+    return await simpanAkaun()
   } catch {
-    status.textContent = 'Perubahan belum disimpan ke akaun. Semak talian, kemudian cuba lagi.'
-    jalurAkaun('Perubahan belum disimpan ke akaun. Semak talian, kemudian cuba lagi.')
+    const ayat = 'Perubahan belum disimpan ke akaun. Semak talian, kemudian cuba lagi.'
+    status.textContent = ayat
+    jalurAkaun(ayat)
+    return false
   }
 }
 
 async function mula() {
+  try { BeshareDraf.kuarantinLegasi(localStorage, sessionStorage) } catch { /* asal kekal jika kuarantin gagal */ }
   pergi('muat')
   if (!sesiAkaun()) {
     tunjukPintu()
@@ -599,28 +670,24 @@ async function mula() {
     const balas = await fetch(`${AKAUN}/api/akaun/saya`, { headers: kepalaAkaun() })
     const data = await balas.json().catch(() => ({}))
     if (balas.status === 401) {
-      localStorage.removeItem(AKAUN_KUNCI)
+      lupusSesi()
       tunjukPintu()
       return
     }
     if (!balas.ok) throw new Error(typeof data.error === 'string' ? data.error : 'gagal')
-    const jauh = rekodSah(data.penasihat)
-    if (jauh) {
-      keadaan = jauh
-      const json = JSON.stringify(keadaan)
-      if (!tulisStor(localStorage, json)) tulisStor(sessionStorage, json)
-    } else {
-      const telefon = baca()
-      if (telefon) {
-        keadaan = telefon
-        await simpanAkaun()
-      }
-    }
+    if (!BeshareDraf.idAkaunSah(data.akaun_id) || !BeshareDraf.versiSah(data.mesej_versi)) throw new Error('gagal')
+    akaunId = data.akaun_id
+    mesejVersi = data.mesej_versi
+    keadaan = rekodSah(data.penasihat)
     jalurAkaun('')
   } catch {
-    keadaan = baca()
-    jalurAkaun('Akaun tidak dapat dihubungi. Salinan telefon ditunjukkan dahulu.')
-    status.textContent = 'Akaun tidak dapat dihubungi. Salinan telefon ditunjukkan dahulu.'
+    akaunId = null
+    keadaan = null
+    const ayat = 'Akaun tidak dapat dihubungi. Draf akaun lain tidak ditunjukkan.'
+    jalurAkaun(ayat)
+    status.textContent = ayat
+    pergi('muat')
+    return
   }
   if (!keadaan) {
     tunjukBorang(true)
@@ -665,6 +732,10 @@ function tunjukUlang(boleh) {
 
 async function hantarTeks(teks, mainkan, ulang = false) {
   if ((!teks && !ulang) || sibuk || !keadaan) return
+  if (konflikVersi) {
+    tunjukKonflik(BeshareDraf.ekorBelum(keadaan, salinanKonflik && salinanKonflik.profil), [], Boolean(salinanKonflik))
+    return
+  }
   if (!ulang) {
     keadaan.mesej.push({ dari: 'klien', teks })
     tulis.value = ''
@@ -673,10 +744,17 @@ async function hantarTeks(teks, mainkan, ulang = false) {
   hantar.disabled = true
   cakap.disabled = true
   tunjukUlang(false)
+  await simpan()
+  lukis()
+  if (!sesiAkaun() || konflikVersi) {
+    sibuk = false
+    hantar.disabled = false
+    cakap.disabled = false
+    status.classList.remove('sedang')
+    return
+  }
   status.classList.add('sedang')
   status.textContent = 'Penasihat sedang menulis…'
-  simpan()
-  lukis()
   try {
     const balas = await fetch(API, {
       method: 'POST',
@@ -697,14 +775,14 @@ async function hantarTeks(teks, mainkan, ulang = false) {
     status.classList.remove('sedang')
     status.textContent = ''
     tunjukUlang(false)
-    simpan()
+    await simpan()
     lukis()
     if (mainkan) await mainSuara(jawapan)
   } catch (error) {
     status.classList.remove('sedang')
     status.textContent = ayatPelayar(error, 'Penasihat sedang sibuk. Tunggu sebentar, kemudian hantar sekali lagi.')
     tunjukUlang(true)
-    simpan()
+    await simpan()
     lukis()
   }
   sibuk = false
@@ -894,7 +972,8 @@ borang.addEventListener('submit', async (event) => {
     peringkat,
     mesej: sama ? keadaan.mesej : [{ dari: 'penasihat', teks: `Baik. Saya catat ${nama}. Cerita apa yang awak nak susun untuk minggu ini.` }],
   }
-  await simpan()
+  const disimpan = await simpan()
+  if (!disimpan) return
   lukis()
   pergi('nasihat')
   tulis.focus()
@@ -913,6 +992,7 @@ document.getElementById('tukar').addEventListener('click', () => tunjukBorang(tr
 document.getElementById('tukar-profil').addEventListener('click', () => tunjukBorang(true))
 document.getElementById('keluar').addEventListener('click', () => keluarAkaun())
 document.getElementById('keluar-profil').addEventListener('click', () => keluarAkaun())
+document.getElementById('konflik-muat').addEventListener('click', () => muatSalinanPelayan())
 cakap.addEventListener('click', () => {
   bukaAudio()
   togolCakap()
@@ -940,7 +1020,7 @@ document.getElementById('borang-angka').addEventListener('submit', (event) => {
   }
   ralatAngka.hidden = true
   try {
-    localStorage.setItem(ANGKA, JSON.stringify({ hasil, kos, nota: 'draf telefon, bukan pelayan' }))
+    if (!tulisAngka(hasil, kos)) throw new Error('akaun')
   } catch {
     ralatAngka.hidden = false
     ralatAngka.textContent = 'Draf angka tidak muat pada telefon ini.'

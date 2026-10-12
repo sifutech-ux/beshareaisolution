@@ -19,7 +19,7 @@
       } catch (e) {}
     </script>
     <link rel="stylesheet" href="../styles.css?v=20260929" />
-    <link rel="stylesheet" href="penasihat.css?v=20261012c" />
+    <link rel="stylesheet" href="penasihat.css?v=20261012d" />
   </head>
   <body class="meja" data-skrin="muat">
     <a class="lompat" href="#kandungan">Langkau ke kandungan</a>
@@ -62,6 +62,11 @@
 
         <div class="kandungan" id="kandungan">
           <p id="jalur-akaun" class="jalur" role="status" hidden></p>
+          <div id="konflik-versi" class="jalur konflik-versi" hidden>
+            <p id="konflik-teks"></p>
+            <ul id="konflik-senarai"></ul>
+            <button type="button" id="konflik-muat" class="butang butang-senyap">Muat salinan pelayan</button>
+          </div>
 
           <section class="layar layar-muat" data-layar="muat" aria-busy="true">
             <p class="kosong__tajuk">Membuka meja anda…</p>
@@ -71,7 +76,7 @@
           <section class="layar pintu" data-layar="pintu">
             <p class="eyebrow">Akaun BeShare</p>
             <h1>Masuk untuk membuka meja</h1>
-            <p class="lead">Perniagaan dan perbualan penasihat disimpan pada akaun anda. Pelan tempatan dan tema kekal pada telefon ini.</p>
+            <p class="lead">Perniagaan dan perbualan penasihat disimpan pada akaun anda. Tema kekal pada telefon ini. Draf pelan tidak berpindah ke akaun lain.</p>
             <p><a href="../">Gerbang</a></p>
             <a class="butang butang-utama" href="../akaun/?selepas=penasihat">Masuk atau daftar</a>
           </section>
@@ -305,6 +310,7 @@
       </div>
     </div>
 
-    <script src="penasihat.js?v=20261012c" defer></script>
+    <script src="../stor-draf.js?v=20261012d" defer></script>
+    <script src="penasihat.js?v=20261012d" defer></script>
   </body>
 </html>
