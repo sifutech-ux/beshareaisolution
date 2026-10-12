@@ -11,11 +11,13 @@ const emel = document.getElementById('email')
 const kata = document.getElementById('password')
 let daftar = false
 
+try { BeshareDraf.kuarantinLegasi(localStorage, sessionStorage) } catch { /* asal kekal jika kuarantin gagal */ }
+
 function sesi() {
   try {
     const data = JSON.parse(localStorage.getItem(KUNCI) || 'null')
     if (!data || typeof data.token !== 'string' || typeof data.email !== 'string') return null
-    return data
+    return { token: data.token, email: data.email }
   } catch {
     return null
   }
@@ -79,7 +81,6 @@ document.getElementById('mod-masuk').addEventListener('click', () => setDaftar(f
 document.getElementById('mod-daftar').addEventListener('click', () => setDaftar(true))
 document.getElementById('keluar').addEventListener('click', () => {
   localStorage.removeItem(KUNCI)
-  localStorage.removeItem('beshare-penasihat')
   tunjukSesi()
 })
 
