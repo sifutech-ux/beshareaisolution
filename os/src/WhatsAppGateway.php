@@ -347,30 +347,46 @@ final class WhatsAppGateway
     }
 
     /**
+     * FINISH remains the source of reported ids. When the code was exchanged and
+     * no finish event has arrived, read the single WABA and phone granted to the
+     * still-valid session token, then use the existing bind. An ambiguous or
+     * failed read leaves the session token_held. lock() still applies expiry.
+     *
      * @param array{user_id:int,business_id:int,role:string,owner_user_id:int,status:string} $actor
      */
     private function bindIfHeld(array $actor, string $state, string $sessionKey): void
     {
-        $coexistence = false;
+        $opened = $this->openForBind($actor, $state, $sessionKey);
+        if ($opened === null) {
+            return;
+        }
+        if ($opened['coexistence']) {
+            $this->bindCoexistence($actor, $opened['row'], $opened['token']);
+            return;
+        }
+        $this->bind($actor, $opened['row'], $opened['token']);
+    }
+
+    /**
+     * @param array{user_id:int,business_id:int,role:string,owner_user_id:int,status:string} $actor
+     * @return array{row:array<string,mixed>,token:string,coexistence:bool}|null
+     */
+    private function openForBind(array $actor, string $state, string $sessionKey): ?array
+    {
         $this->pdo->beginTransaction();
         try {
             $row = $this->lock($actor, $state, $sessionKey);
-            $coexistence = (string) ($row['finish_event'] ?? '') === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING';
-            $ready = $row['status'] === 'token_held'
-                && is_string($row['reported_waba_id'])
-                && is_string($row['token_ciphertext'])
-                && $row['token_ciphertext'] !== ''
-                && ($coexistence || is_string($row['reported_phone_number_id']));
-            if (!$ready) {
+            $coexistence = $this->isCoexistence($row);
+            if ($this->bindReady($row, $coexistence)) {
+                $token = $this->openToken($row);
                 $this->pdo->commit();
-                return;
+                return ['row' => $row, 'token' => $token, 'coexistence' => $coexistence];
             }
-            $token = $this->seal->open(
-                $this->binary((string) $row['token_ciphertext']),
-                $this->binary((string) $row['token_nonce']),
-                $this->binary((string) $row['token_tag']),
-                (int) $row['token_key_version']
-            );
+            if (!$this->canResolveFromToken($row)) {
+                $this->pdo->commit();
+                return null;
+            }
+            $token = $this->openToken($row);
             $this->pdo->commit();
         } catch (\Throwable $error) {
             if ($this->pdo->inTransaction()) {
@@ -378,11 +394,141 @@ final class WhatsAppGateway
             }
             throw $error;
         }
-        if ($coexistence) {
-            $this->bindCoexistence($actor, $row, $token);
-            return;
+        $resolved = $this->resolveUniqueAssets($token);
+        if ($resolved === null) {
+            return null;
         }
-        $this->bind($actor, $row, $token);
+        $this->pdo->beginTransaction();
+        try {
+            $row = $this->lock($actor, $state, $sessionKey);
+            $coexistence = $this->isCoexistence($row);
+            if ($this->bindReady($row, $coexistence)) {
+                $held = $this->openToken($row);
+                $this->pdo->commit();
+                return ['row' => $row, 'token' => $held, 'coexistence' => $coexistence];
+            }
+            if (!$this->canResolveFromToken($row)) {
+                $this->pdo->commit();
+                return null;
+            }
+            $saved = $this->pdo->prepare(
+                'UPDATE onboarding_sessions
+                 SET reported_waba_id = ?, reported_phone_number_id = ?
+                 WHERE id = ? AND business_id = ? AND status = \'token_held\'
+                   AND finish_event IS NULL
+                   AND reported_waba_id IS NULL
+                   AND reported_phone_number_id IS NULL'
+            );
+            $saved->execute([
+                $resolved['waba_id'],
+                $resolved['phone_number_id'],
+                $row['id'],
+                $actor['business_id'],
+            ]);
+            if ($saved->rowCount() !== 1) {
+                $this->pdo->commit();
+                return null;
+            }
+            $row['reported_waba_id'] = $resolved['waba_id'];
+            $row['reported_phone_number_id'] = $resolved['phone_number_id'];
+            $this->pdo->commit();
+            return ['row' => $row, 'token' => $token, 'coexistence' => false];
+        } catch (\Throwable $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $error;
+        }
+    }
+
+    /** @param array<string,mixed> $row */
+    private function isCoexistence(array $row): bool
+    {
+        return (string) ($row['finish_event'] ?? '') === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING';
+    }
+
+    /** @param array<string,mixed> $row */
+    private function bindReady(array $row, bool $coexistence): bool
+    {
+        return $row['status'] === 'token_held'
+            && is_string($row['reported_waba_id'])
+            && is_string($row['token_ciphertext'])
+            && $row['token_ciphertext'] !== ''
+            && ($coexistence || is_string($row['reported_phone_number_id']));
+    }
+
+    /** @param array<string,mixed> $row */
+    private function canResolveFromToken(array $row): bool
+    {
+        $event = $row['finish_event'] ?? null;
+        if ($row['status'] !== 'token_held' || (is_string($event) && $event !== '')) {
+            return false;
+        }
+        if (is_string($row['reported_waba_id'] ?? null) || is_string($row['reported_phone_number_id'] ?? null)) {
+            return false;
+        }
+        return is_string($row['token_ciphertext'] ?? null) && $row['token_ciphertext'] !== '';
+    }
+
+    /** @param array<string,mixed> $row */
+    private function openToken(array $row): string
+    {
+        return $this->seal->open(
+            $this->binary((string) $row['token_ciphertext']),
+            $this->binary((string) $row['token_nonce']),
+            $this->binary((string) $row['token_tag']),
+            (int) $row['token_key_version']
+        );
+    }
+
+    /**
+     * @return array{waba_id:string,phone_number_id:string}|null
+     */
+    private function resolveUniqueAssets(string $token): ?array
+    {
+        try {
+            $debug = $this->graph->debugToken($token);
+            $data = is_array($debug['data'] ?? null) ? $debug['data'] : [];
+            if (($data['is_valid'] ?? false) !== true || (string) ($data['app_id'] ?? '') !== $this->appId) {
+                return null;
+            }
+            $expiresAt = $data['expires_at'] ?? 0;
+            $expiresAt = is_int($expiresAt) ? $expiresAt : (is_numeric($expiresAt) ? (int) $expiresAt : 0);
+            if ($expiresAt > 0 && $expiresAt <= time()) {
+                return null;
+            }
+            $management = array_values(array_unique($this->targetIds($data, 'whatsapp_business_management')));
+            $messaging = array_values(array_unique($this->targetIds($data, 'whatsapp_business_messaging')));
+            if (count($management) !== 1 || $management !== $messaging) {
+                return null;
+            }
+            $wabaId = $management[0];
+            $waba = $this->graph->waba($token, $wabaId);
+            if ((string) ($waba['id'] ?? '') !== $wabaId) {
+                return null;
+            }
+            $listed = $this->graph->phones($token, $wabaId);
+            if (isset($listed['paging']['next'])) {
+                return null;
+            }
+            $phoneIds = [];
+            foreach (is_array($listed['data'] ?? null) ? $listed['data'] : [] as $item) {
+                if (!is_array($item)) {
+                    return null;
+                }
+                $phoneId = isset($item['id']) ? (string) $item['id'] : '';
+                if (preg_match('/\A\d{5,32}\z/', $phoneId) !== 1) {
+                    return null;
+                }
+                $phoneIds[$phoneId] = $phoneId;
+            }
+            if (count($phoneIds) !== 1) {
+                return null;
+            }
+            return ['waba_id' => $wabaId, 'phone_number_id' => array_values($phoneIds)[0]];
+        } catch (MetaCallException) {
+            return null;
+        }
     }
 
     /**

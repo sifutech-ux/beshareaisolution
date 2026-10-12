@@ -276,7 +276,7 @@ $early = $http->handle('POST', 'tukar', $owner, [
 $csrf = (string) $early['body']['csrf'];
 $earlyJson = json_encode($early['body'], JSON_UNESCAPED_SLASHES);
 $check('code exchange before the finish event stores no browser token', ($early['body']['connection']['token'] ?? '') === 'Tersimpan' && is_string($earlyJson) && !str_contains($earlyJson, $token) && !str_contains($earlyJson, $code) && !str_contains($earlyJson, $secret));
-$check('oauth exchange uses the documented get query', count($script->calls) === 1 && oauthExchangeIsDocumented($script->calls[0], $appId, $secret, $code) && credentialTextIsRedacted((string) $earlyJson, $secret, $code));
+$check('oauth exchange uses the documented get query', isset($script->calls[0]) && oauthExchangeIsDocumented($script->calls[0], $appId, $secret, $code) && credentialTextIsRedacted((string) $earlyJson, $secret, $code) && !str_contains(callTargets($script->calls), 'subscribed_apps'));
 
 $script->script = [
     debugResponse($appId, $waba),
