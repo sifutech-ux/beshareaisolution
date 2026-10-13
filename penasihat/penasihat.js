@@ -29,6 +29,7 @@ const TAJUK = {
 const pintu = document.querySelector('[data-layar="pintu"]')
 const borang = document.getElementById('borang')
 const log = document.getElementById('log')
+let logTertambat = true
 const ringkas = document.getElementById('ringkas')
 const status = document.getElementById('status')
 const ralat = document.getElementById('ralat-borang')
@@ -209,7 +210,7 @@ function gunaTema(nilai) {
   document.documentElement.dataset.tema = tema
   const cerah = tema === 'cerah' || (tema === 'sistem' && window.matchMedia('(prefers-color-scheme: light)').matches)
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.content = cerah ? '#F3F6FB' : '#0B1120'
+  if (meta) meta.content = cerah ? '#F4F0FA' : '#090716'
   const radio = document.querySelector(`input[name="tema"][value="${tema}"]`)
   if (radio) radio.checked = true
   document.getElementById('tema-pantas').setAttribute('aria-pressed', tema === 'cerah' ? 'true' : 'false')
@@ -506,8 +507,15 @@ function lukisProfil() {
   lukisDraf()
 }
 
+function logDiHujung() {
+  if (log.clientHeight < 1) return logTertambat
+  return log.scrollHeight - log.scrollTop - log.clientHeight <= 12
+}
+
 function lukis() {
   if (!keadaan) return
+  const diHujung = logDiHujung()
+  const kedudukan = log.scrollTop
   const emel = sesiAkaun()?.email
   ringkas.textContent = `${keadaan.nama} · ${PERINGKAT[keadaan.peringkat] || ''}${emel ? ` · ${emel}` : ''}`
   log.replaceChildren()
@@ -563,7 +571,8 @@ function lukis() {
     }
     log.append(balon)
   }
-  log.scrollTop = log.scrollHeight
+  if (diHujung) log.scrollTop = log.scrollHeight
+  else log.scrollTop = kedudukan
   if (document.body.dataset.skrin === 'utama') lukisUtama()
 }
 
@@ -1879,6 +1888,28 @@ document.getElementById('tema-pantas').addEventListener('click', () => {
   const cerah = sekarang === 'cerah' || (sekarang === 'sistem' && window.matchMedia('(prefers-color-scheme: light)').matches)
   gunaTema(cerah ? 'gelap' : 'cerah')
 })
+
+let tinggiLog = 0
+let abaikanSkrol = false
+log.addEventListener('scroll', () => {
+  if (abaikanSkrol || log.clientHeight < 1) return
+  if (tinggiLog !== 0 && log.clientHeight !== tinggiLog) {
+    tinggiLog = log.clientHeight
+    return
+  }
+  tinggiLog = log.clientHeight
+  logTertambat = logDiHujung()
+}, { passive: true })
+if (typeof ResizeObserver !== 'undefined') {
+  const pemerhatiLog = new ResizeObserver(() => {
+    tinggiLog = log.clientHeight
+    if (!logTertambat || log.clientHeight < 1) return
+    abaikanSkrol = true
+    log.scrollTop = log.scrollHeight
+    abaikanSkrol = false
+  })
+  pemerhatiLog.observe(log)
+}
 
 function larasPapan() {
   const vv = window.visualViewport
