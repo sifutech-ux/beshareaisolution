@@ -1,97 +1,358 @@
 <!doctype html>
-<html lang="ms">
+<html lang="ms" data-tema="sistem">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0B1120" />
     <meta
       name="description"
-      content="Penasihat Perniagaan BeShare. Bantu susun perniagaan dan gerak kerja minggu ini dalam Bahasa Malaysia."
+      content="Meja penasihat perniagaan BeShare. Susun minggu ini dalam Bahasa Melayu, pada telefon atau desktop."
     />
     <title>Penasihat Perniagaan — BeShare AI Solution</title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <script>
+      try {
+        var temaAwal = localStorage.getItem('beshare-tema') || 'sistem'
+        if (temaAwal === 'gelap' || temaAwal === 'cerah' || temaAwal === 'sistem') {
+          document.documentElement.dataset.tema = temaAwal
+        }
+      } catch (e) {}
+    </script>
     <link rel="stylesheet" href="../styles.css?v=20260929" />
-    <link rel="stylesheet" href="penasihat.css?v=20260930a" />
+    <link rel="stylesheet" href="penasihat.css?v=20261012g" />
   </head>
-  <body>
-    <div class="bg-glow" aria-hidden="true"></div>
+  <body class="meja" data-skrin="muat">
+    <a class="lompat" href="#kandungan">Langkau ke kandungan</a>
+    <div class="aura" aria-hidden="true"></div>
 
-    <header class="nasihat-atas">
-      <a class="brand" href="../">
-        <span class="brand__mark" aria-hidden="true">
-          <svg viewBox="0 0 32 32" width="34" height="34">
-            <defs>
-              <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#7c9cff" />
-                <stop offset="1" stop-color="#b28bff" />
-              </linearGradient>
-            </defs>
-            <rect width="32" height="32" rx="8" fill="#131734" />
-            <path d="M8 9h16l-8 15z" fill="url(#g)" />
-          </svg>
-        </span>
-        <span class="brand__name">BeShare<span class="brand__accent"> AI Solution</span></span>
-      </a>
-    </header>
-
-    <main class="nasihat">
-      <p class="nasihat__kembali"><a href="../">Gerbang</a></p>
-      <h1>Penasihat Perniagaan</h1>
-      <p class="nasihat__ayat">Bantu susun perniagaan dan gerak kerja minggu ini. Boleh tulis, atau tekan Cakap. Akaun BeShare menyimpan perniagaan ini.</p>
-
-      <section id="pintu" class="borang" hidden>
-        <p>Log masuk dengan akaun BeShare. Perniagaan dan langkah minggu ini disimpan pada akaun, bukan hanya pada telefon ini.</p>
-        <a class="pintu-masuk" href="../akaun/?selepas=penasihat">Masuk atau daftar</a>
-      </section>
-
-      <form id="borang" class="borang" hidden>
-        <label>
-          Nama perniagaan atau produk
-          <input id="nama" name="nama" maxlength="80" required autocomplete="organization" />
-        </label>
-        <label>
-          Apa yang dijual, dan kepada siapa
-          <textarea id="jualan" name="jualan" maxlength="240" required rows="3"></textarea>
-        </label>
-        <fieldset>
-          <legend>Peringkat</legend>
-          <div class="pilihan">
-            <label><input type="radio" name="peringkat" value="mula" required /> Baru nak mula</label>
-            <label><input type="radio" name="peringkat" value="jual" /> Sudah jual</label>
-            <label><input type="radio" name="peringkat" value="kembang" /> Nak kembangkan</label>
+    <div class="bingkai">
+      <aside class="sisi" aria-label="Navigasi desktop">
+        <a class="jenama" href="../">
+          <img class="jenama__tanda" src="../favicon.svg" alt="" width="36" height="36" />
+          <span class="jenama__ayat"><strong>BeShare AI</strong><small>Business Copilot</small></span>
+        </a>
+        <p class="sisi__nama" id="nama-sisi" hidden></p>
+        <nav class="senarai-sisi" aria-label="Skrin meja">
+          <button type="button" data-pergi="utama"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/></svg><span>Utama</span></button>
+          <button type="button" data-pergi="nasihat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9l-4 3v-3H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/></svg><span>Nasihat</span></button>
+          <button type="button" data-pergi="pelan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h11M8 12h11M8 17h11M4.5 7h.01M4.5 12h.01M4.5 17h.01"/></svg><span>Pelan</span></button>
+          <button type="button" data-pergi="angka"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6"/></svg><span>Angka</span></button>
+          <button type="button" data-pergi="profil"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a3.2 3.2 0 1 0-3.2-3.2A3.2 3.2 0 0 0 12 12zm-6.2 7c1.2-2.6 3.3-3.8 6.2-3.8s5 1.2 6.2 3.8"/></svg><span>Profil</span></button>
+        </nav>
+        <div class="sisi-tema">
+          <div class="sisi-tema__butang">
+            <button type="button" data-pilih-tema="gelap" aria-label="Tema gelap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 13.5A6.5 6.5 0 0 1 9.2 5 6.5 6.5 0 1 0 16 13.5z"/></svg></button>
+            <button type="button" data-pilih-tema="cerah" aria-label="Tema cerah"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v2M12 18v2M4 12H2M22 12h-2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"/></svg></button>
+            <button type="button" data-pilih-tema="sistem">Sistem</button>
           </div>
-        </fieldset>
-        <p id="ralat-borang" class="ralat" hidden></p>
-        <button type="submit">Mula perbualan</button>
-      </form>
-
-      <section id="sembang" class="sembang" hidden>
-        <div class="ringkas">
-          <div>
-            <p id="ringkas"></p>
-            <p class="ingat">Akaun ini ingat perniagaan dan langkah minggu ini.</p>
-          </div>
-          <div class="ringkas-aksi">
-            <button type="button" id="tukar">Tukar butiran</button>
-            <button type="button" id="keluar">Keluar</button>
-          </div>
+          <p id="label-tema">Tema: Sistem</p>
         </div>
-        <div id="log" class="log" aria-live="polite"></div>
-        <form id="mesej" class="mesej">
-          <label class="sr" for="tulis">Mesej kepada penasihat</label>
-          <textarea id="tulis" maxlength="600" rows="2" placeholder="Tulis soalan atau perkara yang nak disusun"></textarea>
-          <div class="mesej-aksi">
-            <button type="button" id="cakap">Cakap</button>
-            <button type="submit" id="hantar">Hantar</button>
+        <p class="sisi__nota">Cukai, undang-undang, dan SSM perlu dirujuk kepada orang yang berkelayakan.</p>
+      </aside>
+
+      <div class="ruang">
+        <header class="palang">
+          <a class="palang-jenama" href="../">
+            <img src="../favicon.svg" alt="" width="28" height="28" />
+            <span>BeShare AI</span>
+          </a>
+          <p class="palang__tajuk" id="tajuk-skrin">Membuka</p>
+          <button type="button" class="tema-pantas" id="tema-pantas" aria-pressed="false" aria-label="Tukar tema">Tema</button>
+        </header>
+
+        <div class="kandungan" id="kandungan">
+          <p id="jalur-akaun" class="jalur" role="status" hidden></p>
+          <div id="konflik-versi" class="jalur konflik-versi" hidden>
+            <p id="konflik-teks"></p>
+            <ul id="konflik-senarai"></ul>
+            <button type="button" id="konflik-muat" class="butang butang-senyap">Muat salinan pelayan</button>
           </div>
-        </form>
-        <p id="status" class="status" role="status"></p>
-      </section>
 
-      <p class="nota">
-        Penasihat ini bantu fikir perniagaan. Cukai, undang-undang, dan SSM perlu dirujuk kepada orang yang berkelayakan.
-      </p>
-    </main>
+          <section class="layar layar-muat" data-layar="muat" aria-busy="true">
+            <p class="kosong__tajuk">Membuka meja anda…</p>
+            <p>Menyemak akaun BeShare pada peranti ini.</p>
+          </section>
 
-    <script src="penasihat.js?v=20260930a" defer></script>
+          <section class="layar pintu" data-layar="pintu">
+            <p class="eyebrow">Akaun BeShare</p>
+            <h1>Masuk untuk membuka meja</h1>
+            <p class="lead">Perniagaan dan perbualan penasihat disimpan pada akaun anda. Tema kekal pada telefon ini. Draf pelan tidak berpindah ke akaun lain.</p>
+            <p><a href="../">Gerbang</a></p>
+            <a class="butang butang-utama" href="../akaun/?selepas=penasihat">Masuk atau daftar</a>
+          </section>
+
+          <form id="borang" class="layar borang" data-layar="mula" novalidate>
+            <p class="eyebrow" id="kecil-mula">Mula</p>
+            <h1 id="tajuk-mula">Pilih peringkat perniagaan anda</h1>
+            <p class="lead" id="keterangan-langkah">Langkah 1 daripada 2</p>
+            <ol class="kemajuan" aria-label="Langkah onboarding">
+              <li data-kemajuan="1" aria-current="step">1</li>
+              <li data-kemajuan="2">2</li>
+              <li data-kemajuan="3">3</li>
+            </ol>
+
+            <div data-langkah="1">
+              <fieldset>
+                <legend class="sr">Anda berada di mana sekarang?</legend>
+                <div class="pilihan pilihan-kad">
+                  <label class="kad-pilih">
+                    <input type="radio" name="jenis" value="baru" />
+                    <span><strong>Baru nak mula</strong><small>Saya ada idea dan nak mulakan perniagaan.</small></span>
+                  </label>
+                  <label class="kad-pilih">
+                    <input type="radio" name="jenis" value="sedia" />
+                    <span><strong>Sudah berniaga</strong><small>Saya sudah berniaga dan mahu langkah seterusnya.</small></span>
+                  </label>
+                </div>
+              </fieldset>
+              <p class="ayat-jenis" id="ayat-jenis">Pilih satu. Soalan seterusnya ikut jawapan ini.</p>
+            </div>
+
+            <div data-langkah="2" hidden>
+              <label>
+                Nama perniagaan atau produk
+                <input id="nama" name="nama" maxlength="80" autocomplete="organization" placeholder="Nama yang pelanggan kenal" />
+              </label>
+              <label>
+                Apa yang dijual, dan kepada siapa
+                <textarea id="jualan" name="jualan" maxlength="240" rows="3" placeholder="Contoh: kuih kering untuk pejabat kecil"></textarea>
+              </label>
+            </div>
+
+            <div data-langkah="3" hidden>
+              <fieldset>
+                <legend>Peringkat perniagaan</legend>
+                <div class="pilihan pilihan-kad">
+                  <label class="kad-pilih"><input type="radio" name="peringkat" value="mula" /> <span><strong>Baru nak mula</strong><small>Belum ada jualan yang tetap.</small></span></label>
+                  <label class="kad-pilih"><input type="radio" name="peringkat" value="jual" /> <span><strong>Sudah jual</strong><small>Ada pelanggan, dan minggu ini perlu disusun.</small></span></label>
+                  <label class="kad-pilih"><input type="radio" name="peringkat" value="kembang" /> <span><strong>Nak kembangkan</strong><small>Jualan sudah berjalan dan anda mahu meluaskannya.</small></span></label>
+                </div>
+              </fieldset>
+            </div>
+
+            <p id="ralat-borang" class="ralat" hidden></p>
+            <div class="baris-butang">
+              <button type="button" class="butang butang-senyap" id="borang-kembali">Kembali</button>
+              <button type="button" class="butang butang-utama" id="borang-terus">Teruskan</button>
+              <button type="submit" class="butang butang-utama" id="borang-siap" hidden>Mula dengan soalan</button>
+            </div>
+          </form>
+
+          <section class="layar" data-layar="utama">
+            <div class="sapa">
+              <div>
+                <p class="eyebrow" id="salam-utama">Selamat datang</p>
+                <h1 id="nama-utama">Meja anda</h1>
+                <p class="lead" id="ayat-utama">Teruskan langkah seterusnya untuk capai matlamat perniagaan anda.</p>
+                <p class="ingat" id="emel-utama"></p>
+              </div>
+              <button type="button" class="butang butang-utama" data-pergi="nasihat">Tanya Copilot</button>
+            </div>
+            <div class="papan">
+              <article class="kad kad-matlamat">
+                <div class="kad-kepala">
+                  <span class="cip ikon-teal" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2"/></svg></span>
+                  <p class="kad__label">Fokus perniagaan</p>
+                  <button type="button" class="pautan-kecil" id="edit-matlamat">Edit</button>
+                </div>
+                <h2 id="jualan-utama">Belum ditulis</h2>
+                <p id="peringkat-utama"></p>
+                <p class="ingat">Daripada profil akaun anda, bukan sasaran yang dijana.</p>
+              </article>
+              <article class="kad kad-wawasan">
+                <div class="kad-kepala">
+                  <span class="cip ikon-ungu" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5 13.6 8.4 18.5 10 13.6 11.6 12 16.5 10.4 11.6 5.5 10 10.4 8.4z"/></svg></span>
+                  <p class="kad__label">Wawasan penasihat</p>
+                </div>
+                <div id="wawasan-utama"><p>Belum ada wawasan. Mulakan dengan satu soalan.</p></div>
+                <button type="button" class="butang butang-senyap" data-pergi="nasihat">Buka nasihat</button>
+              </article>
+              <article class="kad kad-tindakan">
+                <div class="kad-kepala">
+                  <span class="cip" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 7h11M8 12h11M8 17h11M4.5 7h.01M4.5 12h.01M4.5 17h.01"/></svg></span>
+                  <p class="kad__label">Tindakan hari ini</p>
+                </div>
+                <div id="langkah-utama"></div>
+                <p class="ingat">Cadangan penasihat. Bukan tugasan yang disimpan dalam akaun.</p>
+              </article>
+              <article class="kad kad-kemajuan">
+                <p class="kad__label">Kemajuan minggu ini</p>
+                <div class="cincin cincin-kosong" id="cincin-utama" style="--sudah: 0"><span>—</span></div>
+                <p id="kira-draf">Pelan akaun belum dimuat</p>
+                <p class="ingat">Kemajuan ini hanya daripada tugasan yang disimpan dalam akaun.</p>
+                <button type="button" class="pautan-kecil" data-pergi="pelan">Lihat semua</button>
+              </article>
+              <article class="kad kad-angka kad-lebar">
+                <div class="kad-kepala">
+                  <span class="cip" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6"/></svg></span>
+                  <p class="kad__label">Angka jualan</p>
+                </div>
+                <h2 id="tajuk-angka-utama">Angka jualan belum dimasukkan</h2>
+                <p id="ayat-angka">Tiada rekod hasil yang anda masukkan untuk minggu ini.</p>
+                <button type="button" class="butang butang-utama" data-pergi="angka">Masukkan angka</button>
+              </article>
+            </div>
+          </section>
+
+          <section class="layar sembang" data-layar="nasihat" id="sembang">
+            <div class="ringkas">
+              <img class="ringkas-jenama" src="../favicon.svg" alt="" width="28" height="28" />
+              <div class="ringkas-teks">
+                <p class="penasihat-tanda">Penasihat</p>
+                <p id="ringkas"></p>
+              </div>
+              <div class="ringkas-aksi">
+                <button type="button" id="tukar">Tukar butiran</button>
+                <button type="button" id="keluar">Keluar</button>
+              </div>
+            </div>
+            <div id="log" class="log" aria-live="polite"></div>
+            <form id="mesej" class="mesej">
+              <label class="sr" for="tulis">Mesej kepada penasihat</label>
+              <textarea id="tulis" maxlength="600" rows="1" enterkeyhint="send" placeholder="Tulis mesej…"></textarea>
+              <div class="mesej-aksi">
+                <button type="button" id="cakap" aria-label="Cakap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V7a3 3 0 0 1 3-3zM8 12a4 4 0 0 0 8 0M12 16v3"/></svg></button>
+                <button type="submit" id="hantar" aria-label="Hantar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h12M13 6l6 6-6 6"/></svg></button>
+              </div>
+            </form>
+            <p id="status" class="status" role="status"></p>
+            <button type="button" id="cuba-lagi" class="butang butang-senyap" hidden>Cuba lagi</button>
+            <p class="nota">Akaun ini ingat perniagaan dan langkah minggu ini. Penasihat ini bantu fikir perniagaan. Cukai, undang-undang, dan SSM perlu dirujuk kepada orang yang berkelayakan.</p>
+          </section>
+
+          <section class="layar" data-layar="pelan">
+            <div class="sapa">
+              <div>
+                <p class="eyebrow" id="pelan-lencana">Disimpan dalam akaun</p>
+                <h1>Pelan minggu ini</h1>
+                <p class="lead" id="minggu-pelan"></p>
+                <p class="ingat">Tugasan di bawah datang daripada akaun. Cadangan penasihat tidak dikira sehingga anda menambahnya.</p>
+              </div>
+              <div class="pelan-kemajuan">
+                <div class="cincin cincin-kosong" id="cincin-pelan" style="--sudah: 0"><span>—</span></div>
+                <p id="pelan-ringkas" class="ingat">Belum ada tugasan</p>
+              </div>
+            </div>
+            <p id="pelan-keadaan" class="status" role="status"></p>
+            <div id="pelan-konflik" class="jalur konflik-versi" hidden>
+              <p id="pelan-konflik-teks"></p>
+              <ul id="pelan-konflik-senarai"></ul>
+              <button type="button" id="pelan-muat" class="butang butang-senyap">Muat salinan pelayan</button>
+            </div>
+            <div class="kad" id="rujukan-pelan"></div>
+            <ul id="senarai-pelan" class="senarai-tugas"></ul>
+            <p id="pelan-kosong" class="kosong" hidden>Belum ada tugasan dalam akaun untuk minggu ini.</p>
+            <form id="borang-tugas" class="tugas-baru">
+              <label class="sr" for="tulis-tugas">Tugasan baharu dalam akaun</label>
+              <input id="tulis-tugas" maxlength="160" placeholder="Tambah tugasan dalam akaun" />
+              <button type="submit" class="butang butang-utama" id="tambah-tugas">Tambah</button>
+            </form>
+          </section>
+
+          <section class="layar" data-layar="angka">
+            <p class="lencana" id="angka-lencana">Disimpan dalam akaun</p>
+            <h1>Angka perniagaan</h1>
+            <p class="lead">Nombor ini dimasukkan sendiri. Ia bukan rekod kewangan yang disahkan, dan tidak dijana.</p>
+            <p class="ingat" id="tempoh-angka">Tempoh angka belum dimuat.</p>
+            <p id="angka-keadaan" class="status" role="status"></p>
+            <div id="angka-konflik" class="jalur konflik-versi" hidden>
+              <p id="angka-konflik-teks"></p>
+              <button type="button" id="angka-muat" class="butang butang-senyap">Muat salinan pelayan</button>
+              <button type="button" id="angka-pendua" class="butang butang-senyap" hidden>Simpan juga rekod yang sama</button>
+            </div>
+            <form id="borang-angka" class="kad borang-angka">
+              <label>
+                Tarikh
+                <input id="tarikh-angka" type="date" autocomplete="off" />
+              </label>
+              <label>
+                Jenis
+                <select id="jenis-angka">
+                  <option value="hasil">Hasil</option>
+                  <option value="kos">Kos</option>
+                  <option value="lain">Lain</option>
+                </select>
+              </label>
+              <label>
+                Unit
+                <select id="unit-angka">
+                  <option value="MYR">MYR</option>
+                  <option value="unit">Unit</option>
+                </select>
+              </label>
+              <label>
+                Nilai
+                <input id="nilai-angka" inputmode="decimal" maxlength="12" autocomplete="off" />
+              </label>
+              <label>
+                Nota, pilihan
+                <input id="nota-angka" maxlength="240" autocomplete="off" />
+              </label>
+              <p class="ingat">Dimasukkan sendiri. Bukan rekod kewangan yang disahkan.</p>
+              <p id="ralat-angka" class="ralat" hidden></p>
+              <button type="submit" class="butang butang-utama" id="simpan-angka">Simpan dalam akaun</button>
+            </form>
+            <ul id="senarai-angka" class="senarai-tugas"></ul>
+            <p id="angka-kosong" class="kosong">Belum ada rekod dalam akaun.</p>
+          </section>
+
+          <section class="layar" data-layar="profil">
+            <p class="eyebrow">Akaun</p>
+            <h1>Profil perniagaan</h1>
+            <article class="kad kad-identiti">
+              <span class="huruf" id="huruf-profil" aria-hidden="true">B</span>
+              <div>
+                <p class="kad__label">E-mel akaun</p>
+                <p id="emel-profil"></p>
+              </div>
+            </article>
+            <article class="kad">
+              <p class="kad__label">Nama perniagaan</p>
+              <p id="nama-profil" class="profil-nilai"></p>
+              <p class="kad__label">Apa yang dijual</p>
+              <p id="jualan-profil"></p>
+              <p class="kad__label">Peringkat</p>
+              <p id="peringkat-profil"></p>
+              <button type="button" class="butang butang-senyap" id="tukar-profil">Tukar butiran</button>
+            </article>
+            <fieldset class="kad tema-pilihan">
+              <legend>Tema pada telefon ini</legend>
+              <div class="segmen">
+                <input id="tema-sistem" type="radio" name="tema" value="sistem" />
+                <label for="tema-sistem">Sistem</label>
+                <input id="tema-gelap" type="radio" name="tema" value="gelap" />
+                <label for="tema-gelap">Gelap</label>
+                <input id="tema-cerah" type="radio" name="tema" value="cerah" />
+                <label for="tema-cerah">Cerah</label>
+              </div>
+              <p class="ingat">Pilihan tema tidak dihantar ke pelayan.</p>
+            </fieldset>
+            <article class="kad semak-draf" id="semak-draf">
+              <p class="kad__label">Semak draf</p>
+              <p class="ingat">Draf lama dalam kuarantin tidak dianggap milik akaun ini sehingga anda mengesahkannya. Tiada draf dihantar sendiri.</p>
+              <div id="senarai-draf"></div>
+              <label><input type="checkbox" id="draf-milik" /> Saya sahkan draf yang dipilih milik akaun yang sedang masuk.</label>
+              <label><input type="checkbox" id="draf-setuju" /> Saya bersetuju memindahkan pilihan ini ke akaun.</label>
+              <p id="draf-keadaan" class="status" role="status"></p>
+              <button type="button" class="butang butang-senyap" id="draf-hantar">Pindah pilihan ke akaun</button>
+              <button type="button" class="butang butang-senyap" id="draf-tambah" hidden>Tambah yang baharu sahaja</button>
+            </article>
+            <button type="button" class="butang butang-bahaya" id="keluar-profil">Keluar</button>
+          </section>
+        </div>
+
+        <nav class="kaki" aria-label="Navigasi telefon">
+          <button type="button" data-pergi="utama"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/></svg><span>Utama</span></button>
+          <button type="button" data-pergi="nasihat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9l-4 3v-3H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/></svg><span>Nasihat</span></button>
+          <button type="button" data-pergi="pelan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h11M8 12h11M8 17h11M4.5 7h.01M4.5 12h.01M4.5 17h.01"/></svg><span>Pelan</span></button>
+          <button type="button" data-pergi="angka"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6"/></svg><span>Angka</span></button>
+          <button type="button" data-pergi="profil"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a3.2 3.2 0 1 0-3.2-3.2A3.2 3.2 0 0 0 12 12zm-6.2 7c1.2-2.6 3.3-3.8 6.2-3.8s5 1.2 6.2 3.8"/></svg><span>Profil</span></button>
+        </nav>
+      </div>
+    </div>
+
+    <script src="../stor-draf.js?v=20261012g" defer></script>
+    <script src="../meja-akaun.js?v=20261012g" defer></script>
+    <script src="penasihat.js?v=20261012g" defer></script>
   </body>
 </html>
