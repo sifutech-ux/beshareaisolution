@@ -364,15 +364,21 @@ function lukisUtama() {
   }
 }
 
+function lencanaSimpan(nama, konflik, gagal, dimuat) {
+  if (konflik) return 'Konflik — semak salinan pelayan'
+  if (!dimuat && gagal) return `${nama} tidak dapat dihubungi`
+  if (!dimuat) return `${nama} belum dimuat`
+  if (gagal) return 'Belum berjaya disimpan'
+  return 'Disimpan dalam akaun'
+}
+
 function lukisAngka() {
   const jenis = document.getElementById('jenis-angka')
   const unit = document.getElementById('unit-angka')
   const unitPilihan = unit.querySelector('option[value="unit"]')
   if (unitPilihan) unitPilihan.disabled = jenis.value !== 'lain'
   if (jenis.value !== 'lain') unit.value = 'MYR'
-  document.getElementById('angka-lencana').textContent = angkaKonflik
-    ? 'Konflik — semak salinan pelayan'
-    : (angkaGagal ? 'Belum berjaya disimpan' : 'Disimpan dalam akaun')
+  document.getElementById('angka-lencana').textContent = lencanaSimpan('Angka akaun', angkaKonflik, angkaGagal, angkaDimuat)
   const minggu = mingguSemasa()
   const dari = MejaAkaun.tolakHari(minggu.hari, 90)
   const tempoh = document.getElementById('tempoh-angka')
@@ -419,9 +425,7 @@ function lukisAngka() {
 function lukisPelan() {
   const minggu = mingguSemasa()
   document.getElementById('minggu-pelan').textContent = `Minggu Isnin ${minggu.isnin}`
-  document.getElementById('pelan-lencana').textContent = pelanKonflik
-    ? 'Konflik — semak salinan pelayan'
-    : (pelanGagal ? 'Belum berjaya disimpan' : 'Disimpan dalam akaun')
+  document.getElementById('pelan-lencana').textContent = lencanaSimpan('Pelan akaun', pelanKonflik, pelanGagal, pelanDimuat)
   const konflik = document.getElementById('pelan-konflik')
   konflik.hidden = !pelanKonflik
   if (pelanKonflik) {
@@ -794,8 +798,9 @@ function ayatNasihat(kod, data) {
   if (kod === 409) return 'Permintaan ini masih diproses.'
   if (kod === 422) return 'Lengkapkan profil perniagaan dahulu.'
   if (kod === 429) return 'Kuota nasihat penuh. Cuba lagi kemudian.'
+  if (kod === 404 || kod === 405) return 'Nasihat akaun belum dipasang pada pelayan. Jawapan tidak diterima dan tidak disimpan.'
   if (kod === 503) return 'Keputusan permintaan ini belum pasti.'
-  return 'Penasihat sedang sibuk. Tunggu sebentar, kemudian hantar sekali lagi.'
+  return 'Nasihat akaun tidak dapat dihubungi. Jawapan tidak diterima dan tidak disimpan.'
 }
 
 function setCakap(rakam) {
@@ -823,9 +828,19 @@ async function hantarTeks(teks, mainkan, ulang = false) {
   tunjukUlang(false)
   status.dataset.nasihat = ''
   try {
-    await simpan()
+    const tersimpan = await simpan()
     lukis()
     if (!sesiAkaun() || konflikVersi) return
+    if (!tersimpan) {
+      if (!ulang && teks && keadaan.mesej.at(-1)?.dari === 'klien' && keadaan.mesej.at(-1)?.teks === teks) {
+        keadaan.mesej.pop()
+        tulis.value = teks
+        lukis()
+      }
+      status.textContent = 'Mesej belum disimpan ke akaun. Nasihat tidak diminta, dan jawapan tidak disimpan.'
+      status.dataset.nasihat = 'ralat'
+      return
+    }
     const giliran = giliranNasihat()
     const akhir = giliran[giliran.length - 1]
     if (!akhir || akhir.dari !== 'klien') {
@@ -860,9 +875,16 @@ async function hantarTeks(teks, mainkan, ulang = false) {
       && typeof data.jawapan === 'string'
       && langkah.length === 3
     if (modelSah) {
-      if (!jawapanSama(data.jawapan, langkah)) {
-        keadaan.mesej.push({ dari: 'penasihat', teks: data.jawapan, langkah })
-        await simpan()
+      const baharu = !jawapanSama(data.jawapan, langkah)
+      if (baharu) keadaan.mesej.push({ dari: 'penasihat', teks: data.jawapan, langkah })
+      const jawapanTersimpan = baharu ? await simpan() : true
+      if (baharu && !jawapanTersimpan) {
+        keadaan.mesej.pop()
+        lukis()
+        status.textContent = 'Jawapan model diterima, tetapi belum disimpan ke akaun. Ia tidak dimasukkan ke rekod.'
+        status.dataset.nasihat = 'ralat'
+        tunjukUlang(true)
+        return
       }
       buangKunciNasihat()
       status.textContent = ''
@@ -882,11 +904,11 @@ async function hantarTeks(teks, mainkan, ulang = false) {
     }
     status.textContent = ayatNasihat(balas.status, data)
     status.dataset.nasihat = 'ralat'
-    tunjukUlang(balas.status !== 400 && balas.status !== 422)
+    tunjukUlang(balas.status !== 400 && balas.status !== 422 && balas.status !== 404 && balas.status !== 405)
     lukis()
   } catch (error) {
     status.classList.remove('sedang')
-    status.textContent = ayatPelayar(error, 'Penasihat sedang sibuk. Tunggu sebentar, kemudian hantar sekali lagi.')
+    status.textContent = ayatPelayar(error, 'Nasihat akaun tidak dapat dihubungi. Jawapan tidak diterima dan tidak disimpan.')
     status.dataset.nasihat = 'ralat'
     tunjukUlang(true)
     lukis()
