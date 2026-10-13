@@ -2,7 +2,7 @@
 <html lang="ms">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta
       name="description"
       content="Penasihat Perniagaan BeShare. Bantu susun perniagaan dan gerak kerja minggu ini dalam Bahasa Malaysia."
@@ -10,12 +10,14 @@
     <title>Penasihat Perniagaan — BeShare AI Solution</title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <link rel="stylesheet" href="../styles.css?v=20260929" />
-    <link rel="stylesheet" href="penasihat.css?v=20260930a" />
+    <link rel="stylesheet" href="penasihat.css?v=20261013meja" />
   </head>
-  <body>
-    <div class="bg-glow" aria-hidden="true"></div>
+  <body class="meja">
+    <a class="meja__lompat" href="#kandungan">Langkau ke kandungan</a>
+    <div class="meja__aura" aria-hidden="true"></div>
+    <div class="meja__grid" aria-hidden="true"></div>
 
-    <header class="nasihat-atas">
+    <header class="meja__nav">
       <a class="brand" href="../">
         <span class="brand__mark" aria-hidden="true">
           <svg viewBox="0 0 32 32" width="34" height="34">
@@ -31,19 +33,25 @@
         </span>
         <span class="brand__name">BeShare<span class="brand__accent"> AI Solution</span></span>
       </a>
+      <nav class="meja__pautan" aria-label="Utama">
+        <a href="../">Gerbang</a>
+        <a href="./" aria-current="page">Copilot</a>
+      </nav>
     </header>
 
-    <main class="nasihat">
-      <p class="nasihat__kembali"><a href="../">Gerbang</a></p>
-      <h1>Penasihat Perniagaan</h1>
-      <p class="nasihat__ayat">Bantu susun perniagaan dan gerak kerja minggu ini. Boleh tulis, atau tekan Cakap. Akaun BeShare menyimpan perniagaan ini.</p>
+    <main id="kandungan" class="nasihat">
+      <header class="meja__tajuk">
+        <p class="meja__lencana">Business Copilot · Beta</p>
+        <h1>Penasihat Perniagaan</h1>
+        <p class="nasihat__ayat">Bantu susun perniagaan dan gerak kerja minggu ini. Boleh tulis, atau tekan Cakap. Akaun BeShare menyimpan perniagaan ini.</p>
+      </header>
 
       <section id="pintu" class="borang" hidden>
         <p>Log masuk dengan akaun BeShare. Perniagaan dan langkah minggu ini disimpan pada akaun, bukan hanya pada telefon ini.</p>
         <a class="pintu-masuk" href="../akaun/?selepas=penasihat">Masuk atau daftar</a>
       </section>
 
-      <form id="borang" class="borang" hidden>
+      <form id="borang" class="borang" hidden novalidate>
         <label>
           Nama perniagaan atau produk
           <input id="nama" name="nama" maxlength="80" required autocomplete="organization" />
@@ -60,13 +68,14 @@
             <label><input type="radio" name="peringkat" value="kembang" /> Nak kembangkan</label>
           </div>
         </fieldset>
-        <p id="ralat-borang" class="ralat" hidden></p>
+        <p id="ralat-borang" class="ralat" role="alert" hidden></p>
         <button type="submit">Mula perbualan</button>
       </form>
 
       <section id="sembang" class="sembang" hidden>
-        <div class="ringkas">
+        <aside class="ringkas">
           <div>
+            <p class="ringkas__label">Perniagaan pada akaun ini</p>
             <p id="ringkas"></p>
             <p class="ingat">Akaun ini ingat perniagaan dan langkah minggu ini.</p>
           </div>
@@ -74,11 +83,11 @@
             <button type="button" id="tukar">Tukar butiran</button>
             <button type="button" id="keluar">Keluar</button>
           </div>
-        </div>
+        </aside>
         <div id="log" class="log" aria-live="polite"></div>
         <form id="mesej" class="mesej">
           <label class="sr" for="tulis">Mesej kepada penasihat</label>
-          <textarea id="tulis" maxlength="600" rows="2" placeholder="Tulis soalan atau perkara yang nak disusun"></textarea>
+          <textarea id="tulis" maxlength="600" rows="2" placeholder="Tulis soalan atau perkara yang nak disusun" enterkeyhint="send"></textarea>
           <div class="mesej-aksi">
             <button type="button" id="cakap">Cakap</button>
             <button type="submit" id="hantar">Hantar</button>
