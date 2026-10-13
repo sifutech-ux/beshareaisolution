@@ -10,7 +10,7 @@
     <title>Penasihat Perniagaan — BeShare AI Solution</title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <link rel="stylesheet" href="../styles.css?v=20260929" />
-    <link rel="stylesheet" href="penasihat.css?v=20261013meja" />
+    <link rel="stylesheet" href="penasihat.css?v=20261013premium" />
   </head>
   <body class="meja">
     <a class="meja__lompat" href="#kandungan">Langkau ke kandungan</a>
@@ -72,7 +72,7 @@
         <button type="submit">Mula perbualan</button>
       </form>
 
-      <section id="sembang" class="sembang" hidden>
+      <section id="sembang" class="sembang" aria-label="Perbualan penasihat" hidden>
         <aside class="ringkas">
           <div>
             <p class="ringkas__label">Perniagaan pada akaun ini</p>
@@ -84,7 +84,7 @@
             <button type="button" id="keluar">Keluar</button>
           </div>
         </aside>
-        <div id="log" class="log" aria-live="polite"></div>
+        <div id="log" class="log" role="log" aria-label="Mesej perbualan" aria-live="polite" aria-relevant="additions text"></div>
         <form id="mesej" class="mesej">
           <label class="sr" for="tulis">Mesej kepada penasihat</label>
           <textarea id="tulis" maxlength="600" rows="2" placeholder="Tulis soalan atau perkara yang nak disusun" enterkeyhint="send"></textarea>
