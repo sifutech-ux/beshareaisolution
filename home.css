@@ -128,3 +128,53 @@ figcaption { max-width: 620px; margin: 0 auto; color: #aab4cd; font-size: 11px; 
   .butang, .kad, .laluan a, .dua a, .nav__menu summary { border: 1px solid ButtonText; }
   .aura, .grid, .pentas__aura, .pentas__plat { display: none; }
 }
+
+/* V3.1: product presentation and closing conversion section.
+   Approved V3 hero selectors and desktop composition remain unchanged. */
+.papan { align-items: stretch; }
+.papan .kad { gap: 18px; }
+.papan .kad > p { max-width: 48ch; }
+.papan .kad .kad__status {
+  padding-top: 14px;
+  border-top: 1px solid var(--garis);
+  color: #b4bdd2;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.papan .kad .kad__pergi { padding-top: 8px; }
+.papan .kad:focus-visible, .laluan a:focus-visible {
+  border-color: #c5b9ff;
+  box-shadow: inset 0 0 0 1px #c5b9ff, 0 0 24px #7568ed20;
+}
+.penutup {
+  position: relative;
+  width: min(1200px, calc(100% - 48px));
+  margin: 88px auto 0;
+  padding: 64px 32px;
+  border: 1px solid #a3a6ff35;
+  border-radius: 24px;
+  background: radial-gradient(ellipse at 50% 0, #6d64d924, transparent 70%), linear-gradient(140deg, #141c32, #0d1122);
+  box-shadow: inset 0 1px 0 #ffffff0c;
+  text-align: center;
+}
+.penutup h2 {
+  max-width: 760px;
+  margin: 0 auto;
+  font-size: clamp(1.8rem, 3.2vw, 2.8rem);
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -.04em;
+  text-wrap: balance;
+}
+.penutup__ayat { max-width: 620px; margin: 20px auto 0; color: var(--senyap); font-size: 15px; line-height: 1.8; }
+.penutup__tindakan { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 28px; }
+@media (max-width: 859px) {
+  .penutup { width: calc(100% - 40px); margin-top: 64px; padding: 40px 24px; }
+}
+@media (max-width: 480px) {
+  .penutup { padding: 32px 20px; }
+  .penutup__tindakan { flex-direction: column; }
+  .penutup__ayat { font-size: 14px; }
+  /* Keep product badges in flow when text is enlarged or the viewport is narrow. */
+  .papan .kad > .lencana { position: static; order: -1; }
+}
