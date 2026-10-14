@@ -1,6 +1,7 @@
-const AKAUN = ['localhost', '127.0.0.1'].includes(location.hostname)
-  ? 'http://127.0.0.1:8767'
-  : 'https://beshare-ipo-bot.onrender.com'
+const perkhidmatan = (typeof BeshareAsal !== 'undefined' && BeshareAsal && typeof BeshareAsal.asalPerkhidmatan === 'function')
+  ? BeshareAsal.asalPerkhidmatan(location.origin)
+  : null
+const AKAUN = perkhidmatan ? perkhidmatan.akaun : null
 const KUNCI = 'beshare-akaun'
 
 const borang = document.getElementById('borang')
@@ -54,6 +55,10 @@ borang.addEventListener('submit', async (event) => {
   const password = kata.value
   if (!email.includes('@') || password.length < 8) {
     ralatTeks('Guna e-mel yang sah dan kata laluan sekurang-kurangnya 8 aksara.')
+    return
+  }
+  if (!AKAUN) {
+    ralatTeks('Laman ini tidak disambungkan ke akaun.')
     return
   }
   ralat.hidden = true
