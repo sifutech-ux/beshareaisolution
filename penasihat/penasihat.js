@@ -1,12 +1,11 @@
-const ASAL = ['localhost', '127.0.0.1'].includes(location.hostname)
-  ? 'http://127.0.0.1:3210'
-  : 'https://ai-video-saas-ten.vercel.app'
-const NASIHAT_API = `${ASAL}/api/copilot/nasihat`
-const DENGAR_API = `${ASAL}/api/penasihat-dengar`
-const SUARA_API = `${ASAL}/api/penasihat-suara`
-const AKAUN = ['localhost', '127.0.0.1'].includes(location.hostname)
-  ? 'http://127.0.0.1:8767'
-  : 'https://beshare-ipo-bot.onrender.com'
+const perkhidmatan = (typeof BeshareAsal !== 'undefined' && BeshareAsal && typeof BeshareAsal.asalPerkhidmatan === 'function')
+  ? BeshareAsal.asalPerkhidmatan(location.origin)
+  : null
+const AKAUN = perkhidmatan ? perkhidmatan.akaun : null
+const NASIHAT = perkhidmatan ? perkhidmatan.nasihat : null
+const NASIHAT_API = NASIHAT ? `${NASIHAT}/api/copilot/nasihat` : null
+const DENGAR_API = NASIHAT ? `${NASIHAT}/api/penasihat-dengar` : null
+const SUARA_API = NASIHAT ? `${NASIHAT}/api/penasihat-suara` : null
 const AKAUN_KUNCI = 'beshare-akaun'
 const TEMA = 'beshare-tema'
 const PERINGKAT = {
@@ -658,7 +657,7 @@ function muatSalinanPelayan() {
 }
 
 async function simpanAkaun() {
-  if (!sesiAkaun() || !keadaan || !BeshareDraf.idAkaunSah(akaunId)) return false
+  if (!AKAUN || !sesiAkaun() || !keadaan || !BeshareDraf.idAkaunSah(akaunId)) return false
   if (konflikVersi) return false
   const badan = BeshareDraf.badanSimpan(keadaan, mesejVersi)
   if (!badan) {
@@ -707,6 +706,14 @@ async function mula() {
   pergi('muat')
   if (!sesiAkaun()) {
     tunjukPintu()
+    return
+  }
+  if (!AKAUN) {
+    akaunId = null
+    keadaan = null
+    const ayat = 'Laman ini tidak disambungkan ke akaun.'
+    status.textContent = ayat
+    jalurAkaun(ayat)
     return
   }
   try {
@@ -860,6 +867,12 @@ async function hantarTeks(teks, mainkan, ulang = false) {
     const sesi = sesiAkaun()
     status.classList.add('sedang')
     status.textContent = 'Penasihat sedang menulis…'
+    if (!NASIHAT_API || !sesi) {
+      status.classList.remove('sedang')
+      status.textContent = 'Nasihat tidak disambungkan dari laman ini.'
+      status.dataset.nasihat = 'ralat'
+      return
+    }
     const balas = await fetch(NASIHAT_API, {
       method: 'POST',
       headers: {
@@ -932,6 +945,11 @@ async function hantarTeks(teks, mainkan, ulang = false) {
 async function mainSuara(item, butang) {
   if (butang) butang.disabled = true
   status.textContent = 'Menyediakan suara…'
+  if (!SUARA_API) {
+    status.textContent = 'Suara tidak disambungkan dari laman ini.'
+    if (butang) butang.disabled = false
+    return
+  }
   try {
     const balas = await fetch(SUARA_API, {
       method: 'POST',
@@ -985,6 +1003,7 @@ async function hantarRakaman(blob) {
     })
     const padan = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
     if (!padan) throw new Error('Rakaman tidak lengkap. Cuba cakap sekali lagi.')
+    if (!DENGAR_API) throw new Error('Suara tidak disambungkan dari laman ini.')
     const balas = await fetch(DENGAR_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1086,6 +1105,7 @@ function lukisCincinPelan(cincinId, teksId) {
 }
 
 async function mintaAkaun(laluan, pilihan = {}) {
+  if (!AKAUN) throw new Error('asal_tidak_dibenarkan')
   const balas = await fetch(`${AKAUN}${laluan}`, {
     method: pilihan.method || 'GET',
     headers: {
