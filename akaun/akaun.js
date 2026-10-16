@@ -3,6 +3,7 @@ const perkhidmatan = (typeof BeshareAsal !== 'undefined' && BeshareAsal && typeo
   : null
 const AKAUN = perkhidmatan ? perkhidmatan.akaun : null
 const KUNCI = 'beshare-akaun'
+const DASHBOARD = '../penasihat/#utama'
 
 const borang = document.getElementById('borang')
 const sudah = document.getElementById('sudah')
@@ -17,7 +18,7 @@ try { BeshareDraf.kuarantinLegasi(localStorage, sessionStorage) } catch { /* asa
 function sesi() {
   try {
     const data = JSON.parse(localStorage.getItem(KUNCI) || 'null')
-    if (!data || typeof data.token !== 'string' || typeof data.email !== 'string') return null
+    if (!data || typeof data.token !== 'string' || !data.token.trim() || typeof data.email !== 'string') return null
     return { token: data.token, email: data.email }
   } catch {
     return null
@@ -31,9 +32,9 @@ function tunjukSesi() {
     borang.hidden = false
     return
   }
-  document.getElementById('emel-semasa').textContent = data.email
-  sudah.hidden = false
+  // Dashboard mengesahkan sesi dengan pelayan sebelum membuka data akaun.
   borang.hidden = true
+  location.replace(DASHBOARD)
 }
 
 function setDaftar(nilai) {
@@ -70,12 +71,12 @@ borang.addEventListener('submit', async (event) => {
       body: JSON.stringify({ email, password }),
     })
     const data = await balas.json().catch(() => ({}))
-    if (!balas.ok || typeof data.token !== 'string') {
+    if (!balas.ok || typeof data.token !== 'string' || !data.token.trim()) {
       throw new Error(typeof data.error === 'string' ? data.error : 'Akaun tidak dapat dihubungi. Cuba semula.')
     }
     localStorage.setItem(KUNCI, JSON.stringify({ token: data.token, email: data.email || email }))
-    const selepas = new URLSearchParams(location.search).get('selepas')
-    location.href = selepas === 'penasihat' ? '../penasihat/' : '../'
+    kata.value = ''
+    location.replace(DASHBOARD)
   } catch (error) {
     ralatTeks(error instanceof Error && error.message && !error.message.includes('{') ? error.message : 'Akaun tidak dapat dihubungi. Cuba semula.')
     hantar.disabled = false
@@ -86,6 +87,7 @@ document.getElementById('mod-masuk').addEventListener('click', () => setDaftar(f
 document.getElementById('mod-daftar').addEventListener('click', () => setDaftar(true))
 document.getElementById('keluar').addEventListener('click', () => {
   localStorage.removeItem(KUNCI)
+  kata.value = ''
   tunjukSesi()
 })
 
