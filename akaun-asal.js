@@ -10,11 +10,11 @@
     const peta = {
       'https://beshareaisolution.com': {
         akaun: 'https://akaun.beshareaisolution.com',
-        nasihat: 'https://ai-video-saas-ten.vercel.app',
+        nasihat: 'https://nasihat.beshareaisolution.com',
       },
       'https://www.beshareaisolution.com': {
         akaun: 'https://akaun.beshareaisolution.com',
-        nasihat: 'https://ai-video-saas-ten.vercel.app',
+        nasihat: 'https://nasihat.beshareaisolution.com',
       },
       'https://staging.beshareaisolution.com': {
         akaun: 'https://akaun-staging.beshareaisolution.com',
