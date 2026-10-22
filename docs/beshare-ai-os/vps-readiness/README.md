@@ -4,7 +4,7 @@ Audit date: 23 October 2026, Asia/Kuala_Lumpur. **Decision: BLOCKED for starting
 
 The marketing website stays on Hostinger Web Hosting/CDN. The proposed destination for OS PHP, its MySQL-compatible database and its workers is VPS `srv2061175`. No service was started, migration/restore executed, DNS/Meta/WABA changed, or message sent. IPO, Telegram, Business Copilot and Caddy are outside the change boundary.
 
-Latest follow-up: [Pre-Standby Gate Closure](GATE-CLOSURE.md) contains fresh pinned-source tests, access gaps and the owner-requested provisional RPO ≤15 minutes / RTO ≤2 hours. Its observations supersede earlier observations where explicitly stated.
+Latest owner decision: [Fresh VPS database plan](FRESH-DATABASE.md) selects a fresh isolated target while retaining the old DB and requiring a preservation register. It records new read-only observations and pending exact-engine tests; it supersedes a default whole-database import assumption, not the safety gates. [Pre-Standby Gate Closure](GATE-CLOSURE.md) contains prior pinned-source tests, access gaps and the owner-requested provisional RPO ≤15 minutes / RTO ≤2 hours.
 
 Read [the migration runbook](RUNBOOK.md) and [the isolated Compose design](COMPOSE-DESIGN.md). All future actions there are plans, not executed steps or release authorization.
 

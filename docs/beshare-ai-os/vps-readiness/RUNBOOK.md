@@ -1,5 +1,7 @@
 # Staged migration runbook — do not execute from this PR
 
+Owner decision addendum: [FRESH-DATABASE.md](FRESH-DATABASE.md). Use a fresh isolated VPS database; preserve and inventory the existing database. Gate 4's full restore is conditional on a separately approved preservation/transfer decision, not the default. All other acceptance gates remain applicable.
+
 ## Gate 0 — evidence and secure artifact
 
 Read the [audit](README.md). Resolve P0 review and identify a secure immutable release artifact in a separate approved change. Do not merge old #41/#42 heads to recover code already in main. Capture a complete selected-file manifest for OS, not a whole-site upload that could overwrite marketing/Copilot. Separate release approval from documentation acceptance.
