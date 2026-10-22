@@ -1,0 +1,31 @@
+{
+  "diagnostic_checks": {
+    "pinned_source": true,
+    "mysql_8_4_13": true,
+    "diagnostic_ddl": true,
+    "p0_suites": true,
+    "signup_js": true,
+    "restricted_source": true,
+    "restricted_restored": true,
+    "persistence": true,
+    "restore": true,
+    "encrypted_recovery": true,
+    "partial_refused": true,
+    "stopped": true,
+    "isolated_source": true,
+    "isolated_restore": true,
+    "isolated_partial": true,
+    "isolated_p0": true,
+    "isolated_app": true,
+    "isolated_recovery": true,
+    "isolated_recovery-app": true
+  },
+  "diagnostic_result": "PASS",
+  "foundation_and_standby": "BLOCKED",
+  "production_RPO_RTO": "NOT PROVEN",
+  "blockers": [
+    "BackupProof rejects genuine MySQL version",
+    "FoundationMigrator references missing cc.TABLE_NAME",
+    "Approved ledger/migration-role and target runtime/host/ownership/recovery gates remain open"
+  ]
+}

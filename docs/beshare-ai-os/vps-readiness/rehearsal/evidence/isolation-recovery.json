@@ -1,0 +1,30 @@
+{
+  "network": "none",
+  "ports": {},
+  "mounts": [
+    {
+      "Type": "volume",
+      "Name": "beshare-mysql84-20261023-r2-recovery-data",
+      "Source": "/var/lib/docker/volumes/beshare-mysql84-20261023-r2-recovery-data/_data",
+      "Destination": "/var/lib/mysql",
+      "Driver": "local",
+      "Mode": "z",
+      "RW": true,
+      "Propagation": ""
+    },
+    {
+      "Type": "volume",
+      "Name": "beshare-mysql84-20261023-r2-recovery-socket",
+      "Source": "/var/lib/docker/volumes/beshare-mysql84-20261023-r2-recovery-socket/_data",
+      "Destination": "/var/run/mysqld",
+      "Driver": "local",
+      "Mode": "z",
+      "RW": true,
+      "Propagation": ""
+    }
+  ],
+  "restart": {
+    "Name": "no",
+    "MaximumRetryCount": 0
+  }
+}
