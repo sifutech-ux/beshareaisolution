@@ -25,8 +25,13 @@ final class PrivateConfig
             return null;
         }
         ob_start();
-        $config = include $real;
-        $leak = ob_get_clean();
+        try {
+            $config = include $real;
+        } catch (\Throwable) {
+            return null;
+        } finally {
+            $leak = ob_get_clean();
+        }
         if ($leak !== '' || !is_array($config)) {
             return null;
         }

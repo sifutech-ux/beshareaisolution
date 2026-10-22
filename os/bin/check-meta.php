@@ -428,6 +428,7 @@ $check('inbound message marks receive verified', $messaging === 'receive_verifie
 $statusRaw = json_encode([
     'object' => 'whatsapp_business_account',
     'entry' => [[
+        'id' => $waba,
         'changes' => [[
             'field' => 'messages',
             'value' => [

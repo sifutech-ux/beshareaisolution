@@ -135,6 +135,7 @@ final class WhatsAppWebhook
                             'phone' => $phone,
                             'body' => [
                                 'phone_number_id' => $phone,
+                                'waba_id' => $this->id($entry['id'] ?? ''),
                                 'wamid' => $wamid,
                                 'from' => $from,
                                 'timestamp' => $this->stamp((string) ($message['timestamp'] ?? '')),
@@ -160,6 +161,7 @@ final class WhatsAppWebhook
                             'phone' => $phone,
                             'body' => [
                                 'phone_number_id' => $phone,
+                                'waba_id' => $this->id($entry['id'] ?? ''),
                                 'wamid' => $wamid,
                                 'status' => $name,
                                 'timestamp' => $stamp,
@@ -196,6 +198,11 @@ final class WhatsAppWebhook
         $sealed = $this->sealBody($event['body'], $wide);
         $json = $sealed['json'];
         $connection = $this->route($event);
+        // An unscoped event must not consume a known tenant's dedupe key.
+        $dedupeKey = $event['key'];
+        if ($connection === null && in_array($event['kind'], ['message', 'status'], true)) {
+            $dedupeKey = $this->key('unscoped:' . ($event['body']['waba_id'] ?? '') . ':' . $dedupeKey);
+        }
         $businessId = $connection['business_id'] ?? null;
         $connectionId = $connection['id'] ?? null;
         $this->pdo->beginTransaction();
@@ -209,7 +216,7 @@ final class WhatsAppWebhook
             $insert->execute([
                 $businessId,
                 $connectionId,
-                $event['key'],
+                $dedupeKey,
                 $event['kind'],
                 hash('sha256', $json),
                 bin2hex($sealed['sealed']['ciphertext']),
@@ -252,7 +259,7 @@ final class WhatsAppWebhook
     private function route(array $event): ?array
     {
         if ($event['phone'] !== '') {
-            return $this->connection($event['phone']);
+            return $this->connection($event['phone'], $this->id($event['body']['waba_id'] ?? ''));
         }
         $waba = $this->id($event['body']['waba_id'] ?? '');
         if ($waba === '') {
@@ -286,12 +293,15 @@ final class WhatsAppWebhook
     }
 
     /** @return array{id:int,business_id:int}|null */
-    private function connection(string $phoneId): ?array
+    private function connection(string $phoneId, string $wabaId): ?array
     {
+        if ($wabaId === '') {
+            return null;
+        }
         $statement = $this->pdo->prepare(
-            'SELECT id, business_id FROM whatsapp_connections WHERE phone_number_id = ? AND disconnected_at IS NULL LIMIT 1'
+            'SELECT id, business_id FROM whatsapp_connections WHERE phone_number_id = ? AND waba_id = ? AND disconnected_at IS NULL LIMIT 1'
         );
-        $statement->execute([$phoneId]);
+        $statement->execute([$phoneId, $wabaId]);
         $row = $statement->fetch();
         if (!is_array($row)) {
             return null;
