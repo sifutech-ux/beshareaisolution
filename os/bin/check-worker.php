@@ -378,11 +378,13 @@ $check(
         && $mainStill['status'] === 'in_progress'
 );
 
-$foreignWaba = insertLink($pdo, $seal, $businessId, 'NOTNUMERIC', '100000000000822', '+60 12 300 0822', 'future');
+$foreignWaba = insertLink($pdo, $seal, $businessId, '100000000000922', '100000000000822', '+60 12 300 0822', 'future');
 markReady($pdo, $foreignWaba, 'callback');
 markReady($pdo, $foreignWaba, 'fields');
 $foreignWabaAuth = post($http, $session, 'segera', ['sync_type' => 'smb_app_state_sync'], 'worker-owner');
 $foreignWabaJob = (int) ($foreignWabaAuth['body']['sync']['job_id'] ?? 0);
+// Corrupt the association after valid signed delivery/authorization.
+$pdo->prepare('UPDATE whatsapp_connections SET waba_id = ? WHERE id = ?')->execute(['NOTNUMERIC', $foreignWaba]);
 $foreignWabaResult = $sync->dispatch($businessId, $foreignWabaJob, time());
 $foreignWabaState = jobState($pdo, $foreignWabaJob);
 $check(

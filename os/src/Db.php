@@ -58,8 +58,13 @@ final class Db
             throw new AuthException('Konfigurasi pangkalan ditolak.', 500);
         }
         ob_start();
-        $loaded = require $real;
-        $leak = ob_get_clean();
+        try {
+            $loaded = require $real;
+        } catch (\Throwable) {
+            throw new AuthException('Konfigurasi pangkalan ditolak.', 503);
+        } finally {
+            $leak = ob_get_clean();
+        }
         if ($leak !== '' || !is_array($loaded)) {
             throw new AuthException('Konfigurasi pangkalan ditolak.', 500);
         }
