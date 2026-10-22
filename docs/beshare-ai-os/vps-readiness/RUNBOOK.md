@@ -1,5 +1,7 @@
 # Staged migration runbook — do not execute from this PR
 
+**23 October 2026 rehearsal update:** The owner-authorized [disposable MySQL 8.4.13 compatibility and restore rehearsal](rehearsal/README.md) is complete. Diagnostic SQL, 400 existing checks, restricted-role checks and isolated synthetic restore pass. The original foundation backup guard and catalog inspection are incompatible with MySQL; initialization/ledger acceptance and standby remain **BLOCKED**. Historical NOT RUN / separate-test-approval text below describes the earlier planning state, not this completed rehearsal. No production action is authorized.
+
 Owner decision addendum: [FRESH-DATABASE.md](FRESH-DATABASE.md). Use a fresh isolated VPS database; preserve and inventory the existing database. Gate 4's full restore is conditional on a separately approved preservation/transfer decision, not the default. All other acceptance gates remain applicable.
 
 ## Gate 0 — evidence and secure artifact

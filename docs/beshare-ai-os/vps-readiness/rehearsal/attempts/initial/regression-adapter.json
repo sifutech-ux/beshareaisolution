@@ -1,0 +1,1 @@
+{"adapter": "socket-only external disposable MySQL, no MariaDB process; fixed baseline read; remove obsolete NO_AUTO_CREATE_USER in test-only copied suites", "adapted_runner_sha256": "80cacc16df6f664d034a52e33fd7427d85ca3c1770f82c6bae60de41f0220442"}

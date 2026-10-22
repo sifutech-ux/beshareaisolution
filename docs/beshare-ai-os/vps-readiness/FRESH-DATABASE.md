@@ -1,5 +1,7 @@
 # Fresh VPS database decision — 23 October 2026 MYT
 
+**23 October 2026 rehearsal update:** The owner-authorized [disposable MySQL 8.4.13 compatibility and restore rehearsal](rehearsal/README.md) is complete. Diagnostic SQL, 400 existing checks, restricted-role checks and isolated synthetic restore pass. The original foundation backup guard and catalog inspection are incompatible with MySQL; initialization/ledger acceptance and standby remain **BLOCKED**. Historical NOT RUN / separate-test-approval text below describes the earlier planning state, not this completed rehearsal. No production action is authorized.
+
 **Readiness: BLOCKED for service start. Planning is reviewable; no deployment is authorized.** This addendum to [RUNBOOK.md](RUNBOOK.md) records the owner's decision: create a fresh MySQL/MariaDB database on VPS 2061175, with OS backend and workers in dedicated containers/networks/volumes. Marketing stays on Hostinger Web Hosting/CDN. It supersedes the default assumption in Gate 4 that every old row will be imported. It does not waive preservation, schema testing, recovery or security gates.
 
 Fresh means a new, independently owned database volume. It does **not** mean the old database or administrative state is disposable. There are two separate datasets: synthetic standby fixtures, and a future production dataset whose retained identities/configuration must be explicitly reconciled. No automatic import, new live onboarding or regenerated encryption keys for existing ciphertext.

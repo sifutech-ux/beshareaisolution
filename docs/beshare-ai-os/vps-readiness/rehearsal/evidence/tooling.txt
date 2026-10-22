@@ -1,0 +1,44 @@
+curl	7.88.1-10+deb12u15
+git	1:2.39.5-0+deb12u3
+libonig5:arm64	6.9.8-1
+nodejs	18.20.4+dfsg-1~deb12u3
+python3	3.11.2-1+b1
+[PHP Modules]
+Core
+ctype
+curl
+date
+dom
+fileinfo
+filter
+hash
+iconv
+json
+libxml
+mbstring
+mysqlnd
+openssl
+pcre
+PDO
+pdo_mysql
+pdo_sqlite
+Phar
+posix
+random
+readline
+Reflection
+session
+SimpleXML
+sodium
+SPL
+sqlite3
+standard
+tokenizer
+xml
+xmlreader
+xmlwriter
+Zend OPcache
+zlib
+
+[Zend Modules]
+Zend OPcache

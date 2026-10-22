@@ -1,5 +1,7 @@
 # WhatsApp AI OS — VPS migration and Coexistence readiness
 
+**23 October 2026 rehearsal update:** The owner-authorized [disposable MySQL 8.4.13 compatibility and restore rehearsal](rehearsal/README.md) is complete. Diagnostic SQL, 400 existing checks, restricted-role checks and isolated synthetic restore pass. The original foundation backup guard and catalog inspection are incompatible with MySQL; initialization/ledger acceptance and standby remain **BLOCKED**. Historical NOT RUN / separate-test-approval text below describes the earlier planning state, not this completed rehearsal. No production action is authorized.
+
 Audit date: 23 October 2026, Asia/Kuala_Lumpur. **Decision: BLOCKED for starting standby services; readiness documentation is complete.** This is a documentation-only proposal, based on `main` at `69e4d3fb7693db6d199dce7005eed73d65f60069`. It neither includes nor releases PR #63.
 
 The marketing website stays on Hostinger Web Hosting/CDN. The proposed destination for OS PHP, its MySQL-compatible database and its workers is VPS `srv2061175`. No service was started, migration/restore executed, DNS/Meta/WABA changed, or message sent. IPO, Telegram, Business Copilot and Caddy are outside the change boundary.
