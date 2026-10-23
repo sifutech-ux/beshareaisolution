@@ -28,9 +28,10 @@ connection, Meta change, deployment or real WhatsApp send is implied by passing 
 
 ## What is implemented
 
-- A read-only preflight verifies token app, scopes, type and expiry, portfolio ownership,
-  the exact WABA/phone/display number and the expected app subscription. It cannot create
-  a number, change a phone account, subscribe an app or send a message.
+- A read-only preflight verifies token app, scopes, type and expiry, portfolio ownership
+  through the exact WABA's `owner_business_info.id`, the exact phone/display number and
+  the expected app subscription. It cannot create a number, change a phone account,
+  subscribe an app or send a message.
 - A matching preflight fingerprint allows one local transaction to bind the encrypted
   credential to the existing SaaS owner. A foreign tenant mapping is rejected. An identical
   existing mapping is preserved. Any replacement of an old same-tenant test connection
@@ -80,9 +81,16 @@ gemini_model = <supported model name verified for this project>
 ```
 
 The existing `app_secret`, `token_key` and key version remain necessary. The configured
-token must have the WhatsApp management and messaging permissions and must allow the
-portfolio-owned WABA read used by preflight. Prefer the existing authorized system-user
-credential. A failed ownership read is not inferred from a screenshot or bypassed.
+token must have the WhatsApp management and messaging permissions and must allow
+`GET /<WABA_ID>?fields=id,name,owner_business_info`. Both the returned WABA `id` and its
+`owner_business_info.id` must exactly match the configured WABA and business portfolio.
+This proof is repeated on apply. Missing, malformed or mismatched ownership data and
+failed reads block binding; there is no fallback to names, screenshots or another edge.
+The importer does not enumerate the portfolio's assets or require the broader
+`business_management` permission. Prefer the existing authorized system-user credential.
+Meta documents the owner field as the source of the WABA owner's business portfolio ID
+in [Managing credit lines](https://developers.facebook.com/documentation/business-messaging/whatsapp/solution-providers/share-and-revoke-credit-lines)
+and its [official WABA request examples](https://www.postman.com/meta/whatsapp-business-platform/request/nem6vuw/waba-id).
 
 Instead of `owner_whatsapp_access_token`, a protected copy of the existing token JSON can
 be selected with `owner_whatsapp_legacy_token_path`. Specify exactly one source. The JSON

@@ -196,12 +196,22 @@ final class OwnerConnectionImporter
         $replacement = $this->replacement($owner, $assets, $replaceId, $existing);
         $debug = $this->metaRead('token', fn (): array => $this->graph->debugToken($token));
         $tokenProof = $this->tokenProof($debug, $assets['waba_id']);
-        $owned = $this->metaRead('ownership', fn (): array => $this->graph->ownerWabas($token, $assets['portfolio_id']));
-        $this->oneAsset($owned, $assets['waba_id'], 'portfolio_waba_mismatch');
-        $waba = $this->metaRead('waba', fn (): array => $this->graph->waba($token, $assets['waba_id']));
+        $waba = $this->metaRead('ownership', fn (): array => $this->graph->ownerWaba($token, $assets['waba_id']));
         $readWabaId = $waba['id'] ?? null;
         if ((!is_string($readWabaId) && !is_int($readWabaId)) || (string) $readWabaId !== $assets['waba_id']) {
             throw new OwnerBindingException('waba_mismatch');
+        }
+        // Meta documents owner_business_info.id as the WABA owner's business portfolio ID.
+        // Missing or mismatched proof is terminal; names and other asset edges are not substitutes.
+        $portfolio = $waba['owner_business_info'] ?? null;
+        $readPortfolioId = is_array($portfolio) ? ($portfolio['id'] ?? null) : null;
+        if (!is_array($portfolio) || array_is_list($portfolio)
+            || (!is_string($readPortfolioId) && !is_int($readPortfolioId))
+            || preg_match('/\A[1-9][0-9]{4,31}\z/D', (string) $readPortfolioId) !== 1) {
+            throw new OwnerBindingException('portfolio_owner_invalid');
+        }
+        if ((string) $readPortfolioId !== $assets['portfolio_id']) {
+            throw new OwnerBindingException('portfolio_waba_mismatch');
         }
         $phones = $this->metaRead('phone', fn (): array => $this->graph->ownerPhones($token, $assets['waba_id']));
         $phone = $this->oneAsset($phones, $assets['phone_number_id'], 'phone_waba_mismatch');
@@ -293,7 +303,7 @@ final class OwnerConnectionImporter
             }
         }
         // Owned-system-user tokens may omit granular target IDs. Ownership and exact phone
-        // access are independently verified through the fixed read-only Graph edges above.
+        // access are independently verified through the WABA owner field and fixed phone edge above.
         $positive = array_values(array_filter([$expires, $dataExpires], static fn (int $value): bool => $value > 0));
         return [
             'type' => $type,

@@ -122,6 +122,13 @@ final class MetaGraph
         return $this->request('GET', $wabaId, $this->bearer($token), '', ['fields' => 'id,name']);
     }
 
+    /** Read the WABA's authoritative owning portfolio without enumerating business assets. */
+    public function ownerWaba(string $token, string $wabaId): array
+    {
+        $this->assertId($wabaId);
+        return $this->request('GET', $wabaId, $this->bearer($token), '', ['fields' => 'id,name,owner_business_info']);
+    }
+
     /** Read-only owner import edges. Never follow a response-provided URL. */
     public function ownerWabas(string $token, string $portfolioId): array
     {

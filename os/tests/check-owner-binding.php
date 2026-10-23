@@ -95,7 +95,8 @@ final class OwnerFixtureTransport implements MetaTransport
 {
     public array $calls = [];
     public array $debug;
-    public array $owned;
+    public array $waba;
+    public int $wabaStatus = 200;
     public array $phoneList;
     public array $apps;
     public array $pageOverrides = [];
@@ -105,7 +106,8 @@ final class OwnerFixtureTransport implements MetaTransport
     {
         $this->debug = ['data' => ['is_valid' => true, 'app_id' => OWNER_TEST_APP, 'type' => 'SYSTEM_USER', 'expires_at' => 0,
             'scopes' => ['whatsapp_business_management', 'whatsapp_business_messaging']]];
-        $this->owned = ['data' => [['id' => $assets['waba_id']]]];
+        $this->waba = ['id' => $assets['waba_id'], 'name' => 'Fixture WABA',
+            'owner_business_info' => ['id' => $assets['portfolio_id'], 'name' => 'Fixture portfolio']];
         $this->phoneList = ['data' => [['id' => $assets['phone_number_id'], 'display_phone_number' => '+60 (11) 5555-0018', 'status' => 'CONNECTED']]];
         $this->apps = ['data' => [['whatsapp_business_api_data' => ['id' => OWNER_TEST_APP]]]];
     }
@@ -118,22 +120,21 @@ final class OwnerFixtureTransport implements MetaTransport
         }
         $path = preg_replace('#\A/v[0-9]+\.[0-9]+/#', '', (string) ($parts['path'] ?? ''));
         parse_str((string) ($parts['query'] ?? ''), $query);
-        $this->calls[] = ['method' => $method, 'path' => $path, 'after' => $query['after'] ?? null];
+        $this->calls[] = ['method' => $method, 'path' => $path, 'after' => $query['after'] ?? null, 'fields' => $query['fields'] ?? null];
         $key = $path . ':' . ($query['after'] ?? '');
         if (array_key_exists($key, $this->pageOverrides)) {
             $json = $this->pageOverrides[$key];
         } else {
             $json = match ($path) {
                 'debug_token' => $this->debug,
-                $this->assets['portfolio_id'] . '/owned_whatsapp_business_accounts' => $this->owned,
-                $this->assets['waba_id'] => ['id' => $this->assets['waba_id']],
+                $this->assets['waba_id'] => $this->waba,
                 $this->assets['waba_id'] . '/phone_numbers' => $this->phoneList,
                 $this->assets['waba_id'] . '/subscribed_apps' => $this->apps,
                 default => throw new RuntimeException('Unexpected synthetic Graph path'),
             };
         }
         if ($this->afterRead !== null) ($this->afterRead)($path);
-        return ['status' => 200, 'json' => $json];
+        return ['status' => $path === $this->assets['waba_id'] ? $this->wabaStatus : 200, 'json' => $json];
     }
 }
 
@@ -216,7 +217,10 @@ $f = ownerFixture($pdo);
 $proof = ownerInspect($f);
 ownerCheck($proof['change'] === 'would_insert' && $proof['status'] === 'preflight', 'Preflight reports intended local change');
 ownerCheck(ownerCount($f, 'whatsapp_connections') === 0 && ownerCount($f, 'audit_logs') === 0, 'Preflight has no writes');
-ownerCheck(count($f['transport']->calls) === 5 && array_unique(array_column($f['transport']->calls, 'method')) === ['GET'], 'Only required Meta GETs');
+ownerCheck(count($f['transport']->calls) === 4 && array_unique(array_column($f['transport']->calls, 'method')) === ['GET'], 'Only required Meta GETs');
+ownerCheck($f['transport']->calls[1]['path'] === $f['assets']['waba_id']
+    && $f['transport']->calls[1]['fields'] === 'id,name,owner_business_info'
+    && !in_array('business_management', $f['transport']->debug['data']['scopes'], true), 'Exact WABA ownership proof uses existing WhatsApp scopes');
 ownerCheck(!str_contains(json_encode($proof, JSON_THROW_ON_ERROR), $f['token']), 'Receipt contains no credential');
 $bound = ownerApply($f, $proof);
 $row = ownerRow($pdo, $bound['connection_id']);
@@ -268,10 +272,44 @@ ownerDenied('token_waba_scope_mismatch', fn () => ownerInspect($f));
 $f['transport']->debug['data']['granular_scopes'][0]['target_ids'] = [['malformed']];
 ownerDenied('token_waba_scope_mismatch', fn () => ownerInspect($f));
 
-// The actual owned WABA and exact phone/display must match the requested internal mapping.
+// Authoritative owner proof is mandatory on preflight and apply; no business-edge fallback.
+foreach (['missing', 'null', 'string', 'list', 'missing_id', 'invalid_id', 'boolean_id', 'wrong_portfolio', 'wrong_waba', 'read_failure'] as $case) {
+    $f = ownerFixture($pdo);
+    $proof = ownerInspect($f);
+    $reason = 'portfolio_owner_invalid';
+    switch ($case) {
+        case 'missing': unset($f['transport']->waba['owner_business_info']); break;
+        case 'null': $f['transport']->waba['owner_business_info'] = null; break;
+        case 'string': $f['transport']->waba['owner_business_info'] = $f['assets']['portfolio_id']; break;
+        case 'list': $f['transport']->waba['owner_business_info'] = [['id' => $f['assets']['portfolio_id']]]; break;
+        case 'missing_id': $f['transport']->waba['owner_business_info'] = ['name' => 'Fixture portfolio']; break;
+        case 'invalid_id': $f['transport']->waba['owner_business_info']['id'] = ['id' => $f['assets']['portfolio_id']]; break;
+        case 'boolean_id': $f['transport']->waba['owner_business_info']['id'] = true; break;
+        case 'wrong_portfolio':
+            $f['transport']->waba['owner_business_info']['id'] = '99999999999';
+            $f['transport']->waba['on_behalf_of_business_info'] = ['id' => $f['assets']['portfolio_id']];
+            $reason = 'portfolio_waba_mismatch';
+            break;
+        case 'wrong_waba':
+            $f['transport']->waba['id'] = '79999999999';
+            $reason = 'waba_mismatch';
+            break;
+        case 'read_failure':
+            $f['transport']->wabaStatus = 403;
+            $reason = 'meta_ownership_read_failed';
+            break;
+    }
+    ownerDenied($reason, fn () => ownerInspect($f));
+    ownerDenied($reason, fn () => ownerApply($f, $proof));
+    ownerCheck(ownerCount($f, 'whatsapp_connections') === 0 && ownerCount($f, 'audit_logs') === 0, 'Invalid or changed owner proof makes no writes: ' . $case);
+    ownerCheck(!in_array($f['assets']['portfolio_id'] . '/owned_whatsapp_business_accounts', array_column($f['transport']->calls, 'path'), true), 'No portfolio-edge fallback after rejected owner proof: ' . $case);
+}
 $f = ownerFixture($pdo);
-$f['transport']->owned = ['data' => []];
-ownerDenied('portfolio_waba_mismatch', fn () => ownerInspect($f));
+$f['transport']->waba['id'] = (int) $f['assets']['waba_id'];
+$f['transport']->waba['owner_business_info']['id'] = (int) $f['assets']['portfolio_id'];
+ownerCheck(ownerInspect($f)['status'] === 'preflight', 'Exact numeric WABA and portfolio IDs remain supported');
+
+// The exact phone/display must still match the requested internal mapping.
 $f = ownerFixture($pdo);
 $f['transport']->phoneList['data'][0]['id'] = '89999999999';
 ownerDenied('phone_waba_mismatch', fn () => ownerInspect($f));
@@ -288,12 +326,12 @@ ownerCheck($bound['meta_mutations'] === false && $bound['message_sent'] === fals
 
 // Fixed-edge bounded pagination accepts a later match without following supplied URLs.
 $f = ownerFixture($pdo);
-$path = $f['assets']['portfolio_id'] . '/owned_whatsapp_business_accounts';
+$path = $f['assets']['waba_id'] . '/phone_numbers';
 $f['transport']->pageOverrides[$path . ':'] = ['data' => [['id' => '79999999999']], 'paging' => ['next' => 'https://attacker.invalid/do-not-follow', 'cursors' => ['after' => 'page2']]];
-$f['transport']->pageOverrides[$path . ':page2'] = $f['transport']->owned;
-ownerCheck(ownerInspect($f)['observed_app_subscribed'] === true && count($f['transport']->calls) === 6, 'Later-page ownership is verified on fixed Graph path');
+$f['transport']->pageOverrides[$path . ':page2'] = $f['transport']->phoneList;
+ownerCheck(ownerInspect($f)['observed_app_subscribed'] === true && count($f['transport']->calls) === 5, 'Later-page phone membership is verified on fixed Graph path');
 $f['transport']->pageOverrides[$path . ':page2'] = ['data' => [], 'paging' => ['next' => 'https://attacker.invalid/do-not-follow', 'cursors' => ['after' => 'page2']]];
-ownerDenied('meta_ownership_read_failed', fn () => ownerInspect($f));
+ownerDenied('meta_phone_read_failed', fn () => ownerInspect($f));
 $f = ownerFixture($pdo);
 $f['transport']->phoneList['data'][] = $f['transport']->phoneList['data'][0];
 ownerDenied('phone_waba_mismatch', fn () => ownerInspect($f));
