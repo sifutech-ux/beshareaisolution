@@ -1,0 +1,16 @@
+{
+  "start_allowed": false,
+  "blocked": [
+    "backup_custody",
+    "host_capacity_listeners",
+    "least_privilege",
+    "ledger_review",
+    "owner_start_approval",
+    "preservation_inventory",
+    "restore_drill",
+    "runtime_digest",
+    "security_review",
+    "target_architecture"
+  ],
+  "outbound": false
+}

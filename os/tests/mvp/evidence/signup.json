@@ -1,0 +1,30 @@
+OK documented cancel prefers error_code
+OK diagnostic result has no message field
+OK numeric error code is kept and an unsafe session id is dropped
+OK legacy error id remains a fallback
+OK cancel event fields keep ids and omit the message
+OK v4 login omits an empty feature type and keeps the session version
+OK coexistence launch adds only the business app feature type
+OK redirect target drops the hash and query
+OK sdk loader stub is not treated as ready
+OK loaded sdk is ready
+OK meta status stays a short word
+OK meta status drops unexpected text
+OK embedded signup opens before the session request
+OK facebook messages stay on a facebook host
+OK foreign origins are ignored
+OK string postMessage from business facebook keeps finish ids
+OK unrelated postMessage is ignored
+OK redirect keeps a usable code and drops the description
+OK oauth error is a short reason
+OK saved connection is the only success note
+OK incomplete result is not called success
+OK in-app browser failure names Safari
+OK signup source keeps both results across a reload and does not claim a false success
+OK standard signup keeps its own launch options
+OK business app signup uses the coexistence launch
+OK signup source sends the named coexistence feature and no empty feature type
+OK finish and code wait until the server state exists
+OK finish then code is sent once the server state arrives
+OK code after the server state is exchanged without a second copy
+OK a later finish is still delivered on the same session

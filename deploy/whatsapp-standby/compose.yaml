@@ -1,0 +1,46 @@
+name: beshare-whatsapp-standby
+services:
+  database:
+    profiles: [owner-approved-standby]
+    image: mysql@sha256:76f0358884cb92d9a086d24e5671c38048d3fef40f2588703d73eb55392d6b69
+    network_mode: none
+    restart: 'no'
+    mem_limit: 768m
+    cpus: 0.75
+    pids_limit: 200
+    security_opt: [no-new-privileges:true]
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root
+      MYSQL_DATABASE: u879723783_beshare_os
+    secrets: [mysql_root]
+    command: [--skip-networking, --mysqlx=0, --innodb-buffer-pool-size=128M, --log-bin-trust-function-creators=1]
+    volumes:
+      - database:/var/lib/mysql
+      - socket:/var/run/mysqld
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: '2'}
+  synthetic-check:
+    profiles: [local-synthetic-only]
+    # Build and review a platform-specific immutable runtime before VPS use.
+    image: ${BESHARE_SYNTHETIC_IMAGE:?reviewed image name at sha256 digest required}
+    network_mode: none
+    restart: 'no'
+    user: '65532:65532'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.25
+    pids_limit: 32
+    tmpfs: [/tmp:rw,noexec,nosuid,size=16m,mode=1777]
+    command: [php, /app/os/tests/mvp/check.php]
+    # No DB/root secrets, provider keys, callback, ports or shared host mounts.
+volumes:
+  database:
+    name: beshare-whatsapp-standby-data-v1
+  socket:
+    name: beshare-whatsapp-standby-socket-v1
+secrets:
+  mysql_root:
+    file: ${BESHARE_STANDBY_ROOT_FILE:?private absolute file outside repository required}

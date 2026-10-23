@@ -1,0 +1,10 @@
+{
+    "passed": 5,
+    "checks": [
+        "partial_drift_or_unrecorded",
+        "checksum_mismatch",
+        "target_mismatch",
+        "migration_lock_busy",
+        "complete unrecorded retained only genuine 0001"
+    ]
+}
