@@ -1,0 +1,75 @@
+name: Owner WhatsApp AI pilot
+on:
+  pull_request:
+    paths:
+      - 'os/src/**'
+      - 'os/bin/bind-owner-whatsapp.php'
+      - 'os/bin/prepare-ai-replies.php'
+      - 'os/bin/process-ai-replies.php'
+      - 'os/migrations/0004_ai_replies.up.sql'
+      - 'os/tests/check-owner-*.php'
+      - 'os/tests/check-ai-*.php'
+      - 'os/tests/check-reply-transports.php'
+      - 'webhook/index.php'
+      - 'whatsapp/akaun/pintu.php'
+      - 'whatsapp/ruang.js'
+      - '.github/workflows/owner-ai-replies.yml'
+permissions:
+  contents: read
+jobs:
+  owner-pilot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: beshare-synthetic-ci-only
+          MYSQL_ROOT_HOST: '%'
+        ports:
+          - 33306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pbeshare-synthetic-ci-only --silent"
+          --health-interval=5s --health-timeout=5s --health-retries=24
+    env:
+      BESHARE_OWNER_TEST_DSN: mysql:host=127.0.0.1;port=33306;dbname=beshare_owner_binding_test;charset=utf8mb4
+      BESHARE_OWNER_TEST_USER: root
+      BESHARE_OWNER_TEST_PASSWORD: beshare-synthetic-ci-only
+      BESHARE_AI_TEST_DSN: mysql:host=127.0.0.1;port=33306;dbname=beshare_ai_reply_test
+      BESHARE_AI_SETTINGS_TEST_DSN: mysql:host=127.0.0.1;port=33306;dbname=beshare_ai_settings_test
+      BESHARE_OWNER_INTAKE_TEST_DSN: mysql:host=127.0.0.1;port=33306;dbname=beshare_owner_intake_test
+      BESHARE_AI_TEST_USER: root
+      BESHARE_AI_TEST_PASSWORD: beshare-synthetic-ci-only
+    steps:
+      - name: Fetch proposed source without persisted credentials
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git init .
+          git remote add origin https://github.com/sifutech-ux/beshareaisolution.git
+          git fetch --depth=1 origin "$SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+      - name: Prepare PHP for the new checks
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, pdo_sqlite, curl, openssl, posix
+          coverage: none
+          tools: none
+      - name: Syntax of changed runtime files
+        run: |
+          for file in os/src/OwnerConnectionImporter.php os/src/OwnerIntakeBridge.php os/src/MetaGraph.php os/src/AiReplySchema.php os/src/AiReplyStore.php os/src/AiReplyWorker.php os/src/GeminiTransport.php os/src/WhatsAppTextSender.php os/src/AuthHttp.php os/src/bootstrap.php os/bin/bind-owner-whatsapp.php os/bin/prepare-ai-replies.php os/bin/process-ai-replies.php webhook/index.php whatsapp/akaun/pintu.php; do php -l "$file"; done
+          node --check whatsapp/ruang.js
+      - name: Create disposable fixture databases
+        run: |
+          php -r '$pdo = new PDO("mysql:host=127.0.0.1;port=33306", "root", getenv("BESHARE_AI_TEST_PASSWORD"), [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]); foreach (["beshare_owner_binding_test", "beshare_ai_reply_test", "beshare_owner_intake_test"] as $db) { $pdo->exec("CREATE DATABASE " . $db . " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"); }'
+      - name: Owner binding and replacement with read-only synthetic Meta
+        run: php os/tests/check-owner-binding.php
+      - name: Existing callback to owner queue with signed synthetic payloads
+        run: php os/tests/check-owner-intake.php
+      - name: Fixed provider adapters without real network calls
+        run: php os/tests/check-reply-transports.php
+      - name: Additive schema and tenant-bound AI controls
+        run: php os/tests/check-ai-settings.php
+      - name: Durable single-attempt replies and recovery
+        run: php os/tests/check-ai-replies.php

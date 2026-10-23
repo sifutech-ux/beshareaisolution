@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use BesharOs\AuthException;
 use BesharOs\AuthHttp;
+use BesharOs\AiReplyStore;
 use BesharOs\Db;
 use BesharOs\MetaGraph;
 use BesharOs\PrivateConfig;
@@ -72,14 +73,15 @@ try {
     $secret = is_array($private) ? (string) ($private['app_secret'] ?? '') : '';
     $seal = TokenSeal::tryFrom(is_array($private) ? $private : null);
     $gateway = null;
-    if ($secret !== '' && $seal instanceof TokenSeal && BESHARE_META_APP_ID !== '' && BESHARE_META_CONFIG_ID !== '') {
+    if ($secret !== '' && $seal instanceof TokenSeal && BESHARE_META_APP_ID !== '') {
         try {
             $gateway = new WhatsAppGateway($pdo, new MetaGraph(BESHARE_META_APP_ID, $secret, BESHARE_META_GRAPH), $seal, BESHARE_META_APP_ID);
         } catch (AuthException) {
             $gateway = null;
         }
     }
-    $http = new AuthHttp($pdo, new RateLimit(RateLimit::resolveDirectory()), $gateway);
+    $ai = $seal instanceof TokenSeal && is_array($private) ? new AiReplyStore($pdo, $seal, $private) : null;
+    $http = new AuthHttp($pdo, new RateLimit(RateLimit::resolveDirectory()), $gateway, $ai);
     $result = $http->handle($method, $action, $_SESSION, $body, $headers, $remote, $host, session_id());
     if ($result['regenerate']) {
         session_regenerate_id(true);

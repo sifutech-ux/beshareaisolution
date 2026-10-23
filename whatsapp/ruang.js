@@ -119,6 +119,7 @@ function load() {
     contacts: Array.isArray(live.contacts) ? live.contacts : [],
     conversations: Array.isArray(live.conversations) ? live.conversations : [],
     connection: serverConnection(),
+    ai: live.ai && typeof live.ai === "object" ? live.ai : { available: false, enabled: false },
     inboxReady: live.inbox_ready === true,
     rules: [],
     invoices: [],
@@ -250,9 +251,9 @@ function actionLabel(action) {
 function metrics(state) {
   const items = state.conversations;
   const incoming = items.length;
-  const aiReplied = items.filter((item) => item.messages.some((message) => message.from === "ai")).length;
+  const aiReplied = items.filter((item) => item.messages.some((message) => message.from === "ai" && ["sent", "delivered", "read"].includes(message.status))).length;
   const human = items.filter((item) => item.mode === "human_takeover").length;
-  const unanswered = items.filter((item) => item.messages.at(-1)?.from === "customer" && item.mode !== "resolved").length;
+  const unanswered = items.filter((item) => item.messages.filter((message) => message.from === "customer" || ["sent", "delivered", "read"].includes(message.status)).at(-1)?.from === "customer" && item.mode !== "resolved").length;
   const deliveries = items.flatMap((item) => item.messages);
   const sent = deliveries.filter((message) => message.status === "sent" || message.status === "delivered" || message.status === "read").length;
   const failed = deliveries.filter((message) => message.status === "failed").length;
@@ -326,7 +327,7 @@ function route() {
   place();
   requestAnimationFrame(place);
   if (hash === "sambungan") prepareSignup();
-  if (state && (hash === "peti" || hash === "kenalan" || hash === "papan" || hash === "sambungan") && inboxLoad !== hash) {
+  if (state && (hash === "peti" || hash === "kenalan" || hash === "papan" || hash === "sambungan" || hash === "pengetahuan") && inboxLoad !== hash) {
     const requested = hash;
     inboxLoad = hash;
     const action = hash === "peti" || hash === "kenalan" ? "peti" : "sesi";
@@ -408,7 +409,7 @@ function shell(state, hash, body) {
       </div>
     </aside>
     <section>
-      <p class="demo-banner">${state.inboxReady ? "Akaun, pasukan, dan keadaan sambungan datang dari pelayan. Peti masuk hanya memaparkan mesej webhook yang disahkan. Pengetahuan, automasi, analitik, dan bil belum disambung." : "Akaun dan pasukan datang dari pelayan. Sambungan Meta belum dikonfigurasi pada pelayan ini. Peti masuk, pengetahuan, automasi, analitik, dan bil belum disambung."}</p>
+      <p class="demo-banner">${state.ai.available ? "Peti masuk dan tetapan AI disimpan pada pelayan. Ujian AI hanya membalas nombor yang ditetapkan dalam Pengetahuan. Peraturan automasi, analitik dan bil belum disambung." : state.inboxReady ? "Akaun, pasukan, dan keadaan sambungan datang dari pelayan. Peti masuk hanya memaparkan mesej webhook yang disahkan. Pengetahuan, automasi, analitik, dan bil belum disambung." : "Akaun dan pasukan datang dari pelayan. Sambungan Meta belum dikonfigurasi pada pelayan ini. Peti masuk, pengetahuan, automasi, analitik, dan bil belum disambung."}</p>
       ${state.notice ? `<p class="error">${esc(state.notice)}</p>` : ""}
       ${body}
     </section>
@@ -446,6 +447,7 @@ function inbox(state) {
   const filters = [["semua", "Semua"], ["belum", "Belum dibaca"], ["saya", "Tugasan saya"], ["ai", "AI"], ["manusia", "Manusia"], ["selesai", "Selesai"]];
   return `<article class="panel inbox-screen" data-screen="${esc(state.inboxPane || "list")}">
     <h1>Peti masuk</h1>
+    <p><button class="btn btn--ghost" type="button" data-act="refresh-inbox">Muat semula mesej</button></p>
     <div class="inbox-find">
     <label class="field">Cari<input name="q" value="${esc(state.inboxQuery || "")}" placeholder="Nama atau tag"></label>
     <div class="chips">${filters.map(([id, name]) => `<button class="btn btn--ghost ${state.inboxFilter === id ? "is-on" : ""}" type="button" data-act="filter" data-value="${id}">${name}</button>`).join("")}</div>
@@ -474,10 +476,10 @@ function talk(state, current) {
   const composer = current.window === "closed"
     ? `<p class="error">Tetingkap perkhidmatan pelanggan telah tamat. Mesej biasa tidak dihantar. Templat yang diluluskan diperlukan.</p>`
     : current.mode === "human_takeover"
-      ? `<form id="reply"><label class="field">Balasan staf<input name="text" required></label><button class="btn" type="submit">Hantar</button></form>`
-      : `<p class="muted">AI sedang aktif. Ambil alih dahulu supaya tidak ada dua balasan serentak.</p>`;
+      ? current.can_control ? `<p class="muted">AI dijeda untuk perbualan ini. Penghantaran manual oleh staf belum tersedia dalam peti masuk.</p>` : `<form id="reply"><label class="field">Balasan staf<input name="text" required></label><button class="btn" type="submit">Hantar</button></form>`
+      : `<p class="muted">${current.mode === "ai_active" ? "AI aktif untuk mesej baharu yang memenuhi tetapan ujian. Ambil alih untuk menjeda balasan dalam perbualan ini." : "AI dijeda. Semak tetapan dalam Pengetahuan sebelum ujian seterusnya."}</p>`;
   const actions = current.mode === "human_takeover"
-    ? `<button class="btn btn--ghost" type="button" data-act="release">Pulangkan kepada AI</button> <button class="btn btn--ghost" type="button" data-act="resolve">Selesai</button>`
+    ? `<button class="btn btn--ghost" type="button" data-act="release">Pulangkan kepada AI</button>${current.can_control ? "" : ' <button class="btn btn--ghost" type="button" data-act="resolve">Selesai</button>'}`
     : `<button class="btn" type="button" data-act="take">Ambil alih</button>`;
   return `${back}<p>Mod: <strong>${esc(label(current.mode))}</strong></p><div class="msgs">${messages}</div>${composer}<p class="actions">${actions}</p>`;
 }
@@ -519,6 +521,7 @@ function contacts(state) {
 }
 
 function knowledge(state) {
+  if (state.ai.available) return aiSettings(state);
   const rows = state.knowledge.map((item) =>
     `<tr><td>${esc(item.section)}</td><td>${esc(item.title)}</td><td>${esc(item.body)}</td><td>${item.enabled ? "Hidup" : "Mati"}</td>
       <td><button class="btn btn--ghost" type="button" data-act="know-toggle" data-value="${esc(item.id)}">${item.enabled ? "Matikan" : "Hidupkan"}</button></td></tr>`
@@ -541,6 +544,33 @@ function knowledge(state) {
     </form>
     <p id="answer" class="muted"></p>
     <p id="source" class="muted"></p>
+  </article>`;
+}
+
+function aiSettings(state) {
+  const ai = state.ai;
+  if (!ai.can_manage) return `<article class="panel"><h1>Pengetahuan AI</h1><p>Pemilik perniagaan mengurus fakta dan pengaktifan AI. Mod semasa: ${ai.enabled && ai.deployment_ready ? "ujian aktif" : "dimatikan"}.</p></article>`;
+  const connections = Array.isArray(ai.connections) ? ai.connections : [];
+  return `<article class="panel">
+    <h1>Pengetahuan dan ujian AI</h1>
+    <p>AI menjawab menggunakan fakta yang anda sahkan di sini. Soalan yang memerlukan tindakan atau maklumat tambahan diserahkan kepada manusia.</p>
+    <p><strong>${ai.enabled && ai.deployment_ready ? "Ujian AI aktif" : "Ujian AI dimatikan"}</strong> · Penggunaan hari ini: ${esc(ai.quota_used || 0)} / ${esc(ai.daily_limit || 20)} cubaan jawapan.</p>
+    ${!ai.deployment_ready ? '<p class="muted">Pengaktifan AI pada pelayan belum tersedia. Anda boleh menyimpan fakta dan nombor ujian dahulu.</p>' : ""}
+    ${ai.enabled ? '<p><button class="btn btn--ghost" type="button" data-act="ai-stop">Hentikan AI</button></p>' : ""}
+    ${connections.length ? `<form id="ai-settings">
+      <p class="error" id="form-error" hidden></p>
+      <input name="revision" type="hidden" value="${esc(ai.revision || 0)}">
+      <label class="field">Nombor perniagaan<select name="connection" required>${connections.map((c) => `<option value="${esc(c.id)}" ${Number(c.id) === Number(ai.connection_id) ? "selected" : ""}>${esc(c.display_phone || "Nombor belum disahkan")}</option>`).join("")}</select></label>
+      <label class="field">Fakta yang boleh digunakan AI<textarea name="knowledge" rows="10" required maxlength="8000" placeholder="Nyatakan perkhidmatan, harga yang disahkan, waktu operasi dan cara mendapatkan bantuan.">${esc(ai.knowledge || "")}</textarea></label>
+      <label class="field">Nombor telefon untuk ujian<textarea name="allowlist" rows="3" required placeholder="Satu nombor pada setiap baris, bermula dengan kod negara.">${esc((ai.allowlist || []).join("\n"))}</textarea></label>
+      <p class="muted">Gunakan nombor telefon lain yang anda kawal untuk menghantar mesej kepada nombor perniagaan. Maksimum 10 nombor ujian.</p>
+      <label class="field">Had cubaan jawapan sehari<input name="daily_limit" type="number" min="1" max="1000" required value="${esc(ai.daily_limit || 20)}"></label>
+      <label><input name="approved" type="checkbox" required> Saya sahkan fakta ini sesuai digunakan dalam balasan kepada nombor ujian.</label>
+      <p><label><input name="enabled" type="checkbox" ${ai.enabled && ai.deployment_ready ? "checked" : ""} ${ai.deployment_ready ? "" : "disabled"}> Aktifkan balasan untuk mesej baharu daripada nombor ujian.</label></p>
+      <button class="btn" type="submit">Simpan fakta dan tetapan</button>
+    </form>` : '<p>Sambungkan nombor perniagaan pada pelayan dahulu. Tetapan AI boleh disimpan selepas sambungan itu tersedia.</p>'}
+    <p class="muted">Selepas menyimpan, hantar mesej baharu daripada nombor ujian. Lihat jawapan dan status penghantaran dalam Peti masuk. Perbualan yang diambil alih boleh dipulangkan kepada AI dari situ.</p>
+    <p><a class="btn btn--ghost" href="#peti">Buka peti masuk</a></p>
   </article>`;
 }
 
@@ -636,6 +666,7 @@ function connection(state) {
     </div>
     ${state.connection.phone ? `<p>Nombor paparan: ${esc(state.connection.phone)}</p>` : ""}
     <p>Ralat terakhir: ${esc(state.connection.note || "Tiada.")}</p>
+    ${state.ai.available ? '<p><a class="btn" href="#pengetahuan">Tetapkan pengetahuan dan ujian AI</a></p>' : ""}
     <div class="record-actions">
       <button class="btn" type="button" data-act="connect">Buka tetingkap Meta</button>
       ${role(state) === "owner" ? `<button class="btn btn--ghost" type="button" data-act="connect-app">Sambung WhatsApp Business App</button>` : ""}
@@ -716,10 +747,21 @@ function showError(message) {
   error.textContent = message || "";
 }
 
-function setMode() {
+function setMode(next) {
   const state = load();
   if (!state) return;
-  state.notice = "Mod perbualan belum disambung. AI tidak membalas automatik.";
+  const current = currentConversation(state);
+  if (current && current.can_control && ["human_takeover", "ai_active"].includes(next)) {
+    callApi("aimode", { conversation_id: current.id, mode: next === "ai_active" ? "ai" : "human" }).then((result) => {
+      state.modal = "";
+      state.notice = result.ok ? (next === "ai_active" ? "AI disambung untuk mesej baharu." : "AI dijeda untuk perbualan ini.") : result.error || "Mod tidak dapat ditukar.";
+      save(state);
+      if (result.ok) applyLive(result);
+      route();
+    });
+    return;
+  }
+  state.notice = "Kawalan ini belum tersedia untuk perbualan yang dipilih.";
   state.modal = "";
   save(state);
   route();
@@ -759,6 +801,16 @@ function onClick(event) {
     return;
   }
   if (!state) return;
+  if (act === "ai-stop" || act === "refresh-inbox") {
+    button.disabled = true;
+    callApi(act === "ai-stop" ? "aistop" : "peti", act === "ai-stop" ? {} : undefined).then((result) => {
+      state.notice = result.ok ? (act === "ai-stop" ? "AI dihentikan." : "") : result.error || "Permintaan gagal.";
+      save(state);
+      if (result.ok) applyLive(result);
+      route();
+    });
+    return;
+  }
   if (act === "suspend" || act === "resume") {
     callApi("status", {
       kind: "suspend_or_resume",
@@ -928,6 +980,27 @@ function onSubmit(event) {
   }
   const state = load();
   if (!state) return;
+  if (formId === "ai-settings") {
+    const submit = form.querySelector('button[type="submit"]');
+    if (submit) submit.disabled = true;
+    callApi("aiconfig", {
+      connection_id: Number(data.get("connection")), expected_revision: Number(data.get("revision")),
+      knowledge: String(data.get("knowledge") || ""),
+      allowlist: String(data.get("allowlist") || "").split(/[\n,]+/).map((s) => s.trim()).filter(Boolean),
+      daily_limit: Number(data.get("daily_limit")), approved: data.get("approved") === "on", enabled: data.get("enabled") === "on"
+    }).then((result) => {
+      if (!result.ok) {
+        if (submit) submit.disabled = false;
+        showError(result.error || "Tetapan AI tidak dapat disimpan.");
+        return;
+      }
+      state.notice = "Fakta dan tetapan AI disimpan pada pelayan.";
+      save(state);
+      applyLive(result);
+      route();
+    });
+    return;
+  }
   if (formId === "reply" || formId === "know") {
     showError("Belum disambung ke pelayan.");
     return;
