@@ -7,6 +7,7 @@ declare(strict_types=1);
  * Tanpa konfigurasi di luar web root, skrip membalas 503 dan tidak menggemakan cabaran.
  */
 
+ini_set('display_errors', '0');
 require __DIR__ . '/config.php';
 
 use BesharOs\AuthException;
@@ -24,7 +25,11 @@ function beshare_os_webhook_finish(int $status, string $body, string $type = 'te
     exit;
 }
 
-$config = beshare_os_private_config();
+try {
+    $config = beshare_os_private_config();
+} catch (Throwable) {
+    beshare_os_webhook_finish(503, 'Unavailable');
+}
 $tokenValue = is_array($config) ? ($config['verify_token'] ?? '') : '';
 $secret = is_array($config) ? ($config['app_secret'] ?? '') : '';
 if (!is_string($tokenValue) || $tokenValue === '' || !is_string($secret) || $secret === '') {
@@ -50,7 +55,7 @@ if ($method !== 'POST') {
     beshare_os_webhook_finish(405, 'Method not allowed');
 }
 
-$raw = file_get_contents('php://input');
+$raw = file_get_contents('php://input', false, null, 0, 1048577);
 if (!is_string($raw) || strlen($raw) > 1048576) {
     beshare_os_webhook_finish(413, 'Payload too large');
 }

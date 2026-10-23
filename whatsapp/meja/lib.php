@@ -433,56 +433,8 @@ function petik_berkaitan(string $teks, string $soalan): string
 
 function hantar_whatsapp(string $phoneId, string $token, string $kepada, string $teks): bool
 {
-    $badan = json_encode([
-        'messaging_product' => 'whatsapp',
-        'to' => $kepada,
-        'type' => 'text',
-        'text' => ['body' => $teks],
-    ], JSON_UNESCAPED_UNICODE);
-    if ($badan === false || $token === '' || $kepada === '') {
-        return false;
-    }
-    $url = 'https://graph.facebook.com/v21.0/' . rawurlencode($phoneId) . '/messages';
-    $header = [
-        'Authorization: Bearer ' . $token,
-        'Content-Type: application/json',
-    ];
-    if (function_exists('curl_init')) {
-        $curl = curl_init($url);
-        if ($curl === false) {
-            return false;
-        }
-        curl_setopt_array($curl, [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $badan,
-            CURLOPT_HTTPHEADER => $header,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 20,
-        ]);
-        curl_exec($curl);
-        $kod = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
-        curl_close($curl);
-        return $kod >= 200 && $kod < 300;
-    }
-    $konteks = stream_context_create([
-        'http' => [
-            'method' => 'POST',
-            'header' => implode("\r\n", $header) . "\r\n",
-            'content' => $badan,
-            'timeout' => 20,
-            'ignore_errors' => true,
-        ],
-    ]);
-    @file_get_contents($url, false, $konteks);
-    $kod = 0;
-    if (isset($http_response_header) && is_array($http_response_header)) {
-        foreach ($http_response_header as $baris) {
-            if (preg_match('#^HTTP/\S+\s+(\d+)#', (string) $baris, $padan)) {
-                $kod = (int) $padan[1];
-            }
-        }
-    }
-    return $kod >= 200 && $kod < 300;
+    // Deliberate hard stop for Security P0. Activation requires a separate change.
+    return false;
 }
 
 function laluan_perbualan(): string

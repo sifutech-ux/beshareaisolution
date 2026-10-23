@@ -58,7 +58,7 @@ final class StreamMetaTransport implements MetaTransport
             return true;
         });
         try {
-            $fetched = file_get_contents($url, false, $context);
+            $fetched = file_get_contents($url, false, $context, 0, 1048577);
         } finally {
             restore_error_handler();
             error_clear_last();
@@ -120,6 +120,72 @@ final class MetaGraph
     {
         $this->assertId($wabaId);
         return $this->request('GET', $wabaId, $this->bearer($token), '', ['fields' => 'id,name']);
+    }
+
+    /** Read the WABA's authoritative owning portfolio without enumerating business assets. */
+    public function ownerWaba(string $token, string $wabaId): array
+    {
+        $this->assertId($wabaId);
+        return $this->request('GET', $wabaId, $this->bearer($token), '', ['fields' => 'id,name,owner_business_info']);
+    }
+
+    /** Read-only owner import edges. Never follow a response-provided URL. */
+    public function ownerWabas(string $token, string $portfolioId): array
+    {
+        $this->assertId($portfolioId);
+        return $this->ownerPages($token, $portfolioId . '/owned_whatsapp_business_accounts', ['fields' => 'id,name']);
+    }
+
+    public function ownerPhones(string $token, string $wabaId): array
+    {
+        $this->assertId($wabaId);
+        return $this->ownerPages($token, $wabaId . '/phone_numbers', [
+            'fields' => 'id,display_phone_number,verified_name,code_verification_status,status',
+        ]);
+    }
+
+    public function ownerSubscribedApps(string $token, string $wabaId): array
+    {
+        $this->assertId($wabaId);
+        return $this->ownerPages($token, $wabaId . '/subscribed_apps', []);
+    }
+
+    /** @param array<string,string> $query @return array{data:list<array<string,mixed>>} */
+    private function ownerPages(string $token, string $path, array $query): array
+    {
+        $this->requireTransport();
+        if ($token === '' || strlen($token) > 1800 || preg_match('/[\r\n]/', $token) === 1) {
+            throw new MetaCallException('token', 400);
+        }
+        $rows = [];
+        $seen = [];
+        $query['limit'] = '100';
+        for ($page = 0; $page < 20; $page++) {
+            $json = $this->request('GET', $path, $this->bearer($token), '', $query);
+            if (!isset($json['data']) || !is_array($json['data']) || !array_is_list($json['data'])) {
+                throw new MetaCallException('owner_edge_shape', 502);
+            }
+            foreach ($json['data'] as $row) {
+                if (!is_array($row) || count($rows) >= 2000) {
+                    throw new MetaCallException('owner_edge_limit', 502);
+                }
+                $rows[] = $row;
+            }
+            $paging = $json['paging'] ?? [];
+            if (!is_array($paging)) {
+                throw new MetaCallException('owner_edge_paging', 502);
+            }
+            if (!isset($paging['next']) || $paging['next'] === '') {
+                return ['data' => $rows];
+            }
+            $after = $paging['cursors']['after'] ?? null;
+            if (!is_string($paging['next']) || !is_string($after) || preg_match('/\A[A-Za-z0-9_+\/=\-]{1,2048}\z/', $after) !== 1 || isset($seen[$after])) {
+                throw new MetaCallException('owner_edge_cursor', 502);
+            }
+            $seen[$after] = true;
+            $query['after'] = $after;
+        }
+        throw new MetaCallException('owner_edge_limit', 502);
     }
 
     /** @return array<string,mixed> */
@@ -251,7 +317,7 @@ final class MetaGraph
     /** @param array<string,string> $headers @param array<string,string> $query @return array<string,mixed> */
     private function request(string $method, string $path, array $headers, string $body, array $query = []): array
     {
-        if (preg_match('#\A(?:oauth/access_token|debug_token|\d{5,32}(?:/phone_numbers|/subscribed_apps|/smb_app_data)?)\z#', $path) !== 1) {
+        if (preg_match('#\A(?:oauth/access_token|debug_token|\d{5,32}(?:/phone_numbers|/subscribed_apps|/smb_app_data|/owned_whatsapp_business_accounts)?)\z#', $path) !== 1) {
             throw new MetaCallException('path', 502);
         }
         $url = 'https://graph.facebook.com/' . $this->version . '/' . $path;

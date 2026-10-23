@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once dirname(__DIR__) . '/whatsapp/meja/lib.php';
+ini_set('display_errors', '0');
 
 const WEBHOOK_TOKEN_HASH = '384957d2a80da96f47c954979d2f01b93a1f5c3586a501cc254d897ce78b4560';
 const NOMBOR_011 = '1443799975474056';
@@ -27,19 +27,74 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET') {
 }
 
 header('Content-Type: application/json; charset=utf-8');
-$mentah = file_get_contents('php://input');
-$data = json_decode(is_string($mentah) ? $mentah : '', true);
-if (!is_array($data)) {
-    echo '{"ok":true}';
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    http_response_code(405);
+    exit('{"ok":false}');
+}
+// Authenticate the exact bytes before loading legacy handlers or decoding JSON.
+require_once dirname(__DIR__) . '/os/src/bootstrap.php';
+try {
+    $private = \BesharOs\PrivateConfig::load();
+} catch (Throwable) {
+    $private = null;
+}
+$secret = $private['app_secret'] ?? '';
+if (!is_string($secret) || $secret === '') {
+    http_response_code(503);
+    exit('{"ok":false}');
+}
+$mentah = file_get_contents('php://input', false, null, 0, 1048577);
+if (!is_string($mentah) || strlen($mentah) > 1048576) {
+    http_response_code(413);
+    exit('{"ok":false}');
+}
+$signature = $_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? '';
+if (!is_string($signature) || !\BesharOs\WhatsAppWebhook::signatureMatches($mentah, $signature, $secret)) {
+    http_response_code(403);
+    exit('{"ok":false}');
+}
+$data = json_decode($mentah, true, 512, JSON_BIGINT_AS_STRING);
+if (!is_array($data) || ($data['object'] ?? '') !== 'whatsapp_business_account' || !is_array($data['entry'] ?? null)) {
+    http_response_code(400);
+    echo '{"ok":false}';
     exit;
 }
 
+$ownerIntake = \BesharOs\OwnerIntakeBridge::deliver($mentah, $signature, $private);
+if ($ownerIntake['status'] === 'rejected' || $ownerIntake['status'] === 'failed') {
+    http_response_code($ownerIntake['status'] === 'rejected' ? 403 : 503);
+    exit('{"ok":false}');
+}
+$ownerIntakeHandled = $ownerIntake['status'] === 'stored' && $ownerIntake['owner_slice'];
+require_once dirname(__DIR__) . '/whatsapp/meja/lib.php';
+
+// Missing binding must be retryable, never silently acknowledge and drop intake.
+foreach ($data['entry'] as $entry) {
+    foreach (is_array($entry) && is_array($entry['changes'] ?? null) ? $entry['changes'] : [] as $change) {
+        if (owner_intake_dikendali($entry, $change, $private, $ownerIntakeHandled)) {
+            continue;
+        }
+        if (is_array($change) && ($change['field'] ?? '') === 'messages'
+            && (preg_match('/\A[1-9][0-9]*\z/', $private['legacy_business_id'] ?? '') !== 1
+                || preg_match('/\A[0-9]{1,32}\z/', $private['legacy_waba_id'] ?? '') !== 1)) {
+            http_response_code(503);
+            exit('{"ok":false}');
+        }
+    }
+}
+
 foreach ($data['entry'] ?? [] as $entri) {
-    if (!is_array($entri)) {
+    if (!is_array($entri) || !is_string($private['legacy_waba_id'] ?? null)
+        || ($private['legacy_waba_id'] ?? '') === ''
+        || (string) ($entri['id'] ?? '') !== $private['legacy_waba_id']
+        || preg_match('/\A[1-9][0-9]*\z/', $private['legacy_business_id'] ?? '') !== 1) {
         continue;
     }
     foreach ($entri['changes'] ?? [] as $perubahan) {
-        if (!is_array($perubahan)) {
+        if (owner_intake_dikendali($entri, $perubahan, $private, $ownerIntakeHandled)) {
+            continue;
+        }
+        if (!is_array($perubahan) || ($perubahan['field'] ?? '') !== 'messages') {
             continue;
         }
         $nilai = $perubahan['value'] ?? null;
@@ -51,7 +106,7 @@ foreach ($data['entry'] ?? [] as $entri) {
         if ($nombor === '' || $nombor === NOMBOR_DHERBS || $nombor !== NOMBOR_011) {
             continue;
         }
-        $token = token_nombor($nombor);
+        // P0: intake only. No token reads, AI generation or outbound replies.
         foreach ($nilai['messages'] ?? [] as $mesej) {
             if (!is_array($mesej)) {
                 continue;
@@ -74,28 +129,8 @@ foreach ($data['entry'] ?? [] as $entri) {
                 if (nampak_pesanan($badan)) {
                     rekod_pesanan($dari, $badan);
                 }
-                if (nombor_dijeda($dari)) {
-                    if ($id !== '') {
-                        tandakan_dilihat($id);
-                    }
-                    continue;
-                }
-                $teks = $token === '' ? '' : bina_balasan($badan, baca_meja());
             } else {
                 rekod_perbualan($dari, 'user', 'Mesej bukan teks.');
-                if (nombor_dijeda($dari) || $token === '') {
-                    if ($id !== '') {
-                        tandakan_dilihat($id);
-                    }
-                    continue;
-                }
-                $teks = 'Sila taip mesej teks. Saya pembantu WhatsApp BeShare AI Solution.';
-            }
-            if ($token !== '' && $teks !== '' && hantar_whatsapp($nombor, $token, $dari, $teks)) {
-                rekod_perbualan($dari, 'assistant', $teks, 'ai');
-                if (nampak_pesanan($teks)) {
-                    rekod_pesanan($dari, $teks);
-                }
             }
             if ($id !== '') {
                 tandakan_dilihat($id);
@@ -121,6 +156,18 @@ if ($keputusan === 'failed') {
 }
 
 echo '{"ok":true}';
+
+function owner_intake_dikendali(mixed $entry, mixed $change, array $private, bool $handled): bool
+{
+    if (!$handled || !is_array($entry) || !is_array($change) || ($change['field'] ?? '') !== 'messages'
+        || !is_array($change['value'] ?? null) || !is_array($change['value']['metadata'] ?? null)) {
+        return false;
+    }
+    $waba = $entry['id'] ?? null;
+    $phone = $change['value']['metadata']['phone_number_id'] ?? null;
+    return (is_string($waba) || is_int($waba)) && (string) $waba === ($private['owner_whatsapp_waba_id'] ?? '')
+        && (is_string($phone) || is_int($phone)) && (string) $phone === ($private['owner_whatsapp_phone_number_id'] ?? '');
+}
 
 function ada_peristiwa_hayat(string $mentah): bool
 {
@@ -150,35 +197,6 @@ function pertanyaan(string $nama): string
     $kunci = str_replace('.', '_', $nama);
     $nilai = $_GET[$kunci] ?? $_GET[$nama] ?? '';
     return is_string($nilai) ? $nilai : '';
-}
-
-function token_nombor(string $phoneId): string
-{
-    if ($phoneId === NOMBOR_011) {
-        $token = token_meja();
-        if ($token !== '') {
-            return $token;
-        }
-    }
-    $path = dirname(__DIR__) . '/admin/stor/data.json';
-    if (!is_file($path)) {
-        return '';
-    }
-    $mentah = file_get_contents($path);
-    $data = json_decode(is_string($mentah) ? $mentah : '', true);
-    if (!is_array($data)) {
-        return '';
-    }
-    foreach ($data['pelanggan'] ?? [] as $pelanggan) {
-        if (!is_array($pelanggan)) {
-            continue;
-        }
-        if ((string) ($pelanggan['phone_number_id'] ?? '') !== $phoneId) {
-            continue;
-        }
-        return trim((string) ($pelanggan['token_meta'] ?? ''));
-    }
-    return '';
 }
 
 function laluan_dilihat(): string

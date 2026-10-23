@@ -44,16 +44,17 @@ $root = dirname(__DIR__, 2);
 $indexPath = $root . '/webhook/index.php';
 $index = (string) file_get_contents($indexPath);
 $bridge = (string) file_get_contents(dirname(__DIR__) . '/src/LifecycleBridge.php');
-$sendAt = strpos($index, 'hantar_whatsapp');
+$sendAt = strpos($index, 'rekod_perbualan');
 $bridgeAt = strpos($index, 'LifecycleBridge::deliver');
 preg_match("/const NOMBOR_011 = '(\\d+)'/", $index, $liveMatch);
 preg_match("/const NOMBOR_DHERBS = '(\\d+)'/", $index, $otherMatch);
 $livePhone = $liveMatch[1] ?? '';
 $otherPhone = $otherMatch[1] ?? '';
 $check(
-    'lifecycle bridge is attached after the existing message loop',
+    'verified intake precedes lifecycle bridge with outbound absent',
     $livePhone !== ''
         && $otherPhone !== ''
+        && !str_contains($index, 'hantar_whatsapp')
         && is_int($sendAt)
         && is_int($bridgeAt)
         && $sendAt < $bridgeAt
@@ -123,6 +124,8 @@ $stor = sys_get_temp_dir() . '/beshare-phase-e-stor-' . bin2hex(random_bytes(4))
 mkdir($stor, 0700, true);
 file_put_contents($configPath, "<?php\nreturn " . var_export([
     'verify_token' => 'pengesah-fasa-e',
+    'legacy_business_id' => '1',
+    'legacy_waba_id' => '100000000002091',
     'app_secret' => $secret,
     'token_key' => base64_encode($key),
     'token_key_version' => '1',
@@ -376,8 +379,8 @@ $check(
     'ordinary status flow keeps the existing acknowledgement',
     $get['status'] === 403
         && $get['body'] === 'Tidak sah.'
-        && $invalid['status'] === 200
-        && $invalid['body'] === '{"ok":true}'
+        && $invalid['status'] === 403
+        && $invalid['body'] === '{"ok":false}'
         && $statusHit['status'] === 200
         && $statusHit['body'] === '{"ok":true}'
         && talks($stor, '60198765432') === []
@@ -400,8 +403,8 @@ $message = [
     ],
 ];
 $messageRaw = batch([['id' => '100000000002091', 'changes' => [$message]]]);
-$firstMessage = $post($messageRaw, '');
-$secondMessage = $post($messageRaw, '');
+$firstMessage = $post($messageRaw, sign($messageRaw, $secret));
+$secondMessage = $post($messageRaw, sign($messageRaw, $secret));
 $foreignRaw = batch([[
     'id' => '100000000002091',
     'changes' => [[
@@ -419,7 +422,7 @@ $foreignRaw = batch([[
         ],
     ]],
 ]]);
-$foreignHit = $post($foreignRaw, '');
+$foreignHit = $post($foreignRaw, sign($foreignRaw, $secret));
 $wordRaw = batch([[
     'id' => '100000000002091',
     'changes' => [[
@@ -437,7 +440,7 @@ $wordRaw = batch([[
         ],
     ]],
 ]]);
-$wordHit = $post($wordRaw, '');
+$wordHit = $post($wordRaw, sign($wordRaw, $secret));
 $lines = talks($stor, '60198765432');
 $roles = array_map(static fn (array $row): string => (string) ($row['role'] ?? ''), $lines);
 $check(
@@ -475,8 +478,8 @@ $check(
         && is_array($ambiguousRow)
         && $ambiguousRow['business_id'] === null
         && $ambiguousRow['connection_id'] === null
-        && $missingSignature['status'] === 200
-        && $badSignature['status'] === 200
+        && $missingSignature['status'] === 403
+        && $badSignature['status'] === 403
         && $eventsAfterReject === 1
         && linkState($pdo, $lifeId)['token_state'] === 'verified'
         && linkState($pdo, $siblingId)['token_state'] === 'verified'
@@ -488,7 +491,7 @@ $unconfigured = $post($ambiguous, sign($ambiguous, $secret));
 rename($configPath . '.away', $configPath);
 $check(
     'a lifecycle event without server config is not acknowledged',
-    $unconfigured['status'] === 500
+    $unconfigured['status'] === 503
         && $unconfigured['body'] === '{"ok":false}'
         && (int) $pdo->query('SELECT COUNT(*) FROM webhook_events')->fetchColumn() === 1
         && !str_contains($unconfigured['body'], $secret)
@@ -534,8 +537,7 @@ $check(
         && $failed['body'] === '{"ok":false}'
         && $duringFailure['token_state'] === 'verified'
         && $duringFailure['disconnected'] === 0
-        && count($linesDuringFailure) === 3
-        && ($linesDuringFailure[2]['content'] ?? '') === 'mesej-campuran-ujian'
+        && count($linesDuringFailure) === 2 // Foreign WABA cannot enter the legacy tenant store.
         && is_array($spoolFiles)
         && count($spoolFiles) === 1
         && !str_contains($spoolText, $secret)
@@ -574,10 +576,10 @@ $retryLines = talks($stor, '60198765432');
 $retryAudit = (int) $pdo->query('SELECT COUNT(*) FROM audit_logs WHERE action = \'rakan_diputuskan\' AND business_id = ' . $businessId)->fetchColumn();
 $retryEvents = (int) $pdo->query('SELECT COUNT(*) FROM webhook_events WHERE event_kind = \'message\'')->fetchColumn();
 $check(
-    'a mixed retry keeps the ordinary message and does not revoke again',
+    'a mixed retry excludes foreign-WABA messages and does not revoke again',
     $retry['status'] === 200
         && $retry['body'] === '{"ok":true}'
-        && count($retryLines) === 3
+        && count($retryLines) === 2
         && $retryAudit === 1
         && $retryEvents === 0
         && linkState($pdo, $siblingId)['token_state'] === 'verified'

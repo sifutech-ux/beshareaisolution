@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "candidate": "whatsapp-connection-20261023",
+  "baseline_commit": "69e4d3fb7693db6d199dce7005eed73d65f60069",
+  "status": "prepared_only_not_deployed",
+  "entry_url": "https://beshareaisolution.com/whatsapp/ruang.html#sambungan",
+  "source_commits": {
+    "security_p0": "c955270cf393c435bc51356ce9f261eda4ceb2fb",
+    "onboarding": "d44a8512b2151a8f79ca646735cc0b9e593edede"
+  },
+  "runtime_files": [
+    {
+      "path": "os/src/Db.php",
+      "baseline_blob_sha": "2a02f04ec03681d9a4b6cf420c4656a4fd79f3ef",
+      "candidate_blob_sha": "417bb9d8e9d355e7d737082e30078597b075f3ed",
+      "source_commit": "c955270cf393c435bc51356ce9f261eda4ceb2fb",
+      "source_blob_sha": "417bb9d8e9d355e7d737082e30078597b075f3ed",
+      "local_change": null
+    },
+    {
+      "path": "os/src/LegacyDesk.php",
+      "baseline_blob_sha": null,
+      "candidate_blob_sha": "ebd5676a33e7e92ba7deff96bcf36599dac46fdf",
+      "source_commit": "c955270cf393c435bc51356ce9f261eda4ceb2fb",
+      "source_blob_sha": "ebd5676a33e7e92ba7deff96bcf36599dac46fdf",
+      "local_change": null
+    },
+    {
+      "path": "os/src/PrivateConfig.php",
+      "baseline_blob_sha": "be9f760b025b50658595e44026f679a25eee41f3",
+      "candidate_blob_sha": "a05cc41506a12c0014bb3699c2acd1d10bb4e73e",
+      "source_commit": "c955270cf393c435bc51356ce9f261eda4ceb2fb",
+      "source_blob_sha": "a05cc41506a12c0014bb3699c2acd1d10bb4e73e",
+      "local_change": null
+    },
+    {
+      "path": "os/src/WhatsAppWebhook.php",
+      "baseline_blob_sha": "f3ece842f0810bae6f10553286f2a68f26979ae1",
+      "candidate_blob_sha": "b3348b8006fd9422a73b19abd20e97b4d3967940",
+      "source_commit": "c955270cf393c435bc51356ce9f261eda4ceb2fb",
+      "source_blob_sha": "b3348b8006fd9422a73b19abd20e97b4d3967940",
+      "local_change": null
+    },
+    {
+      "path": "webhook/index.php",
+      "baseline_blob_sha": "687260cde948edaa7f89598b6d75ba8f01865fd6",
+      "candidate_blob_sha": "2f825f6daed1038557c02b00eeaf999b203f161c",
+      "source_commit": "c955270cf393c435bc51356ce9f261eda4ceb2fb",
+      "source_blob_sha": "2f825f6daed1038557c02b00eeaf999b203f161c",
+      "local_change": null
+    },
+    {
+      "path": "whatsapp/meja/guard.php",
+      "baseline_blob_sha": null,
+      "candidate_blob_sha": "5eb489a85b41d7cc6fd94b86fc50e5b297377fd7",
+      "source_commit": "c955270cf393c435bc51356ce9f261eda4ceb2fb",
+      "source_blob_sha": "5eb489a85b41d7cc6fd94b86fc50e5b297377fd7",
+      "local_change": null
+    },
+    {
+      "path": "whatsapp/meja/index.php",
+      "baseline_blob_sha": "6d3375335912292d9d1accf185e2fafb486312ca",
+      "candidate_blob_sha": "bead1c042c9ad5d8c0a9922f698f747f0e28fd2e",
+      "source_commit": "c955270cf393c435bc51356ce9f261eda4ceb2fb",
+      "source_blob_sha": "bead1c042c9ad5d8c0a9922f698f747f0e28fd2e",
+      "local_change": null
+    },
+    {
+      "path": "whatsapp/meja/lib.php",
+      "baseline_blob_sha": "bde1d54d93787d99f92b9098c46f01bdbba64b2f",
+      "candidate_blob_sha": "385f4f1ae2966fdb4e007dc2ecf5e6fed0aa911a",
+      "source_commit": "c955270cf393c435bc51356ce9f261eda4ceb2fb",
+      "source_blob_sha": "385f4f1ae2966fdb4e007dc2ecf5e6fed0aa911a",
+      "local_change": null
+    },
+    {
+      "path": "whatsapp/meja/perbualan/index.php",
+      "baseline_blob_sha": "8dbcdbb01b9ce1ef111f21ef0b37f8a3d6de8b4d",
+      "candidate_blob_sha": "9f8c667b0a016852453e5bd9066c9b4c429a07c0",
+      "source_commit": "c955270cf393c435bc51356ce9f261eda4ceb2fb",
+      "source_blob_sha": "9f8c667b0a016852453e5bd9066c9b4c429a07c0",
+      "local_change": null
+    },
+    {
+      "path": "whatsapp/meja/pesanan/index.php",
+      "baseline_blob_sha": "a9c0cef958984ddc3e1f1039eff19c52436a0164",
+      "candidate_blob_sha": "83bbc3ac674c07bce63cc6165471319a8ed9aa38",
+      "source_commit": "c955270cf393c435bc51356ce9f261eda4ceb2fb",
+      "source_blob_sha": "83bbc3ac674c07bce63cc6165471319a8ed9aa38",
+      "local_change": null
+    },
+    {
+      "path": "whatsapp/sambungan/webhook.php",
+      "baseline_blob_sha": "70cf3e95fbfce6c80f29c6868d3776c69e3730d1",
+      "candidate_blob_sha": "4565d87f42e413a4a17a66145d70fb942ad27860",
+      "source_commit": "c955270cf393c435bc51356ce9f261eda4ceb2fb",
+      "source_blob_sha": "4565d87f42e413a4a17a66145d70fb942ad27860",
+      "local_change": null
+    },
+    {
+      "path": "whatsapp/index.html",
+      "baseline_blob_sha": "41d32911c1e3754d17b33a0a7f5b61117e1156f3",
+      "candidate_blob_sha": "a5b9ae3af1c49b98544a5f5dbe71fac7ffb6b1cf",
+      "source_commit": "d44a8512b2151a8f79ca646735cc0b9e593edede",
+      "source_blob_sha": "a5b9ae3af1c49b98544a5f5dbe71fac7ffb6b1cf",
+      "local_change": null
+    },
+    {
+      "path": "whatsapp/ruang.html",
+      "baseline_blob_sha": "f14a27d2e14a0f3cad8e6249c9c032f68024db49",
+      "candidate_blob_sha": "89cf379ebbabf2576c003613fe8b691a3d3767f3",
+      "source_commit": "d44a8512b2151a8f79ca646735cc0b9e593edede",
+      "source_blob_sha": "3695e87f600d8b3a15f66c80ef4fb2d8a924b111",
+      "local_change": "Cache version for authentication destination fix"
+    },
+    {
+      "path": "whatsapp/ruang.js",
+      "baseline_blob_sha": "be0c0ce870da843de0755d79af288e7ad3cc9792",
+      "candidate_blob_sha": "648375fc88a7f1c57e65c0cd7abb76d3f43d3a0a",
+      "source_commit": "d44a8512b2151a8f79ca646735cc0b9e593edede",
+      "source_blob_sha": "137f007e5754d882198921efd478068f53dbd4ea",
+      "local_change": "Restore owner connection destination after authentication"
+    }
+  ],
+  "private_binding_required": [
+    "legacy_business_id",
+    "legacy_waba_id"
+  ],
+  "schema_note": "No new migration in this candidate. Existing Coexistence requires target schema 0001–0003.",
+  "deployment_note": "Identify actual target and verify existing private binding before any approved release. No server access or deployment occurred in this session.",
+  "outbound_note": "P0 legacy sender remains unconditionally disabled. This candidate does not complete AI auto reply or authorize messages.",
+  "validation": {
+    "newly_executed": "25 authentication-return checks and JavaScript syntax; synthetic VM, no network",
+    "inherited": "P0/onboarding reports remain evidence for their exact original commits; 451 original checks were not rerun or claimed for this assembled candidate"
+  }
+}

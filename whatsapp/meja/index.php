@@ -4,9 +4,8 @@ declare(strict_types=1);
 require dirname(__DIR__, 2) . '/admin/lib.php';
 require __DIR__ . '/lib.php';
 
-ini_set('display_errors', '0');
-mula_sesi('beshare_meja');
-kepala_selamat();
+require __DIR__ . '/guard.php';
+meja_require_access(['bank', 'token', 'skrip']);
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     sahkan_csrf();
@@ -21,12 +20,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 $qr
             );
             kilat('ok', 'Maklumat bank disimpan.');
-        } elseif ($tindakan === 'latih') {
-            latih_meja((string) ($_POST['website_url'] ?? ''));
-            kilat('ok', 'AI dilatih dari pautan itu. Semak skrip di bawah, kemudian simpan jika anda ubah.');
         } elseif ($tindakan === 'token') {
             simpan_token_meja((string) ($_POST['token_meta'] ?? ''));
-            kilat('ok', 'Token disimpan. Auto-reply untuk +60 11-5432 0018 hidup.');
+            kilat('ok', 'Token disimpan. Penghantaran WhatsApp kekal OFF.');
         } elseif ($tindakan === 'skrip') {
             simpan_skrip_meja((string) ($_POST['prompt_text'] ?? ''));
             kilat('ok', 'Skrip disimpan.');
@@ -43,7 +39,6 @@ $meja = baca_meja();
 $storPerbualan = baca_perbualan();
 $kilat = ambil_kilat();
 $csrf = token_csrf();
-$tokenAda = trim((string) ($meja['token_meta'] ?? '')) !== '';
 $laman = trim((string) ($meja['website_url'] ?? ''));
 $bankNama = trim((string) ($meja['bank_name'] ?? ''));
 $bilChat = 0;
@@ -115,7 +110,7 @@ function simpan_qr_jika_ada(): string
     <p class="pill">WhatsApp AI</p>
     <div class="kepala-admin">
       <h1>Dashboard +60 11-5432 0018</h1>
-      <p class="muted">Isi alamat bank, pautan latih AI, dan token Meta. Auto-reply guna nombor ini sahaja.</p>
+      <p class="muted">Urus maklumat bank, token Meta dan skrip perniagaan. Penghantaran WhatsApp dimatikan.</p>
     </div>
     <?php if ($kilat): ?>
       <p class="<?= $kilat['jenis'] === 'ok' ? 'ok' : 'ralat' ?>"><?= e((string) $kilat['teks']) ?></p>
@@ -123,12 +118,7 @@ function simpan_qr_jika_ada(): string
 
     <section class="panel" style="margin-bottom:1.25rem;">
       <h2>Status auto-reply</h2>
-      <?php if ($tokenAda): ?>
-        <p class="good">Hidup untuk +60 11-5432 0018</p>
-      <?php else: ?>
-        <p class="ralat">Belum hidup. Simpan token Meta di bawah.</p>
-      <?php endif; ?>
-      <p class="muted">Phone number ID 1443799975474056. Webhook sudah pada beshareaisolution.com/webhook/.</p>
+      <p class="ralat">Penghantaran WhatsApp OFF. Token tidak mengaktifkan auto-reply.</p>
       <p class="muted">Laman latih: <?= $laman !== '' ? e($laman) : 'Belum' ?>. Bank: <?= $bankNama !== '' ? e($bankNama) : 'Belum' ?>.</p>
       <p class="muted">Chat yang masuk disimpan dalam Peti Masuk. Tekan Refresh Inbox selepas anda hantar mesej baharu.</p>
     </section>
@@ -185,7 +175,7 @@ function simpan_qr_jika_ada(): string
         <label>Pautan laman / landing page
           <input type="url" name="website_url" required placeholder="https://" value="<?= e($laman) ?>">
         </label>
-        <button class="btn" type="submit">Auto-Train AI</button>
+        <button class="btn" type="submit" disabled>Latihan laman belum tersedia</button>
       </form>
     </section>
 

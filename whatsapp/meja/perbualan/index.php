@@ -4,9 +4,8 @@ declare(strict_types=1);
 require dirname(__DIR__, 3) . '/admin/lib.php';
 require dirname(__DIR__) . '/lib.php';
 
-ini_set('display_errors', '0');
-mula_sesi('beshare_meja');
-kepala_selamat();
+require dirname(__DIR__) . '/guard.php';
+meja_require_access(['jeda']);
 
 $tapis = (($_GET['tapis'] ?? '') === 'sah') ? 'sah' : '';
 
@@ -22,26 +21,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         if ($tindakan === 'jeda') {
             set_jeda($telefon, true);
             kilat('ok', 'AI dihentikan untuk nombor ini. Anda boleh balas sendiri.');
-        } elseif ($tindakan === 'sambung') {
-            set_jeda($telefon, false);
-            $token = token_meja();
-            $nota = 'Bot AI kembali aktif! Ada apa-apa yang boleh saya bantu?';
-            if ($token !== '' && hantar_whatsapp(MEJA_PHONE_ID, $token, $telefon, $nota)) {
-                rekod_perbualan($telefon, 'assistant', $nota, 'ai');
-            }
-            kilat('ok', 'AI diaktifkan semula.');
-        } elseif ($tindakan === 'balas') {
-            $mesej = meja_potong(trim((string) ($_POST['mesej'] ?? '')), 1000);
-            if ($mesej === '') {
-                throw new InvalidArgumentException('Mesej kosong.');
-            }
-            $token = token_meja();
-            if ($token === '' || !hantar_whatsapp(MEJA_PHONE_ID, $token, $telefon, $mesej)) {
-                throw new RuntimeException('Mesej tidak dihantar ke WhatsApp.');
-            }
-            rekod_perbualan($telefon, 'assistant', $mesej, 'admin');
-            set_jeda($telefon, true);
-            kilat('ok', 'Mesej admin dihantar dan AI dihentikan untuk nombor ini.');
         }
     } catch (InvalidArgumentException $ralat) {
         kilat('ralat', $ralat->getMessage());
@@ -130,8 +109,8 @@ $jeda = is_array($stor['jeda']) ? $stor['jeda'] : [];
             <input type="hidden" name="telefon" value="<?= e((string) $telefon) ?>">
             <input type="hidden" name="tapis" value="<?= e($tapis) ?>">
             <?php if ($dijeda): ?>
-              <input type="hidden" name="tindakan" value="sambung">
-              <button class="butang-kecil" type="submit">Aktifkan AI Semula</button>
+              <input type="hidden" name="tindakan" value="sambung" disabled>
+              <button class="butang-kecil" type="submit" disabled>Penghantaran OFF</button>
             <?php else: ?>
               <input type="hidden" name="tindakan" value="jeda">
               <button class="butang-kecil" type="submit">Ambil alih</button>
@@ -151,11 +130,11 @@ $jeda = is_array($stor['jeda']) ? $stor['jeda'] : [];
         <div class="kaki-chat">
           <form class="form" method="post" action="/whatsapp/meja/perbualan/">
             <input type="hidden" name="csrf" value="<?= e($csrf) ?>">
-            <input type="hidden" name="tindakan" value="balas">
+            <input type="hidden" name="tindakan" value="balas" disabled>
             <input type="hidden" name="telefon" value="<?= e((string) $telefon) ?>">
             <input type="hidden" name="tapis" value="<?= e($tapis) ?>">
             <input type="text" name="mesej" required placeholder="Taip mesej admin di sini">
-            <button class="btn" type="submit">Hantar</button>
+            <button class="btn" type="submit" disabled>Hantar</button>
           </form>
         </div>
       </section>

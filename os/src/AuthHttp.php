@@ -7,7 +7,7 @@ use PDO;
 
 final class AuthHttp
 {
-    public function __construct(private PDO $pdo, private RateLimit $rates, private ?WhatsAppGateway $whatsapp = null)
+    public function __construct(private PDO $pdo, private RateLimit $rates, private ?WhatsAppGateway $whatsapp = null, private ?AiReplyStore $ai = null)
     {
     }
 
@@ -62,6 +62,19 @@ final class AuthHttp
             ];
         }
         $actor = $this->actor($session);
+        if (in_array($action, ['aiconfig', 'aistop', 'aimode'], true)) {
+            if (!$this->ai instanceof AiReplyStore) {
+                throw new AuthException('Tetapan AI belum tersedia.', 409);
+            }
+            if ($action === 'aiconfig') {
+                $this->ai->save($actor, $body);
+            } elseif ($action === 'aistop') {
+                $this->ai->stop($actor);
+            } else {
+                $this->ai->setMode($actor, $this->text($body, 'conversation_id'), $this->text($body, 'mode'));
+            }
+            return $this->respond($session, false, $this->withInbox($this->actor($session)));
+        }
         if ($action === 'perniagaan') {
             $created = Tenants::provision($this->pdo, $actor['user_id'], $this->text($body, 'name'));
             $session['user_id'] = $created['user_id'];
@@ -210,6 +223,7 @@ final class AuthHttp
      */
     private function payload(array $context): array
     {
+        $ai = $this->ai instanceof AiReplyStore ? $this->ai->view($context) : ['available' => false, 'enabled' => false, 'can_manage' => false];
         $memberships = [];
         foreach (Membership::list($this->pdo, $context['user_id']) as $row) {
             $memberships[] = [
@@ -241,7 +255,8 @@ final class AuthHttp
             'members' => $members,
             'audit' => $audit,
             'connection' => $this->connection($context),
-            'inbox_ready' => $this->whatsapp instanceof WhatsAppGateway,
+            'inbox_ready' => $this->whatsapp instanceof WhatsAppGateway || $ai['available'],
+            'ai' => $ai,
         ];
     }
 
@@ -312,6 +327,9 @@ final class AuthHttp
         $inbox = $this->whatsapp instanceof WhatsAppGateway
             ? $this->whatsapp->inbox($actor)
             : ['conversations' => [], 'contacts' => []];
+        if ($this->ai instanceof AiReplyStore) {
+            $inbox = $this->ai->inbox($actor, $inbox);
+        }
         $payload['conversations'] = $inbox['conversations'];
         $payload['contacts'] = $inbox['contacts'];
         return $payload;
