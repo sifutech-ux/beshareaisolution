@@ -53,7 +53,6 @@ if (!is_string($signature) || !\BesharOs\WhatsAppWebhook::signatureMatches($ment
     http_response_code(403);
     exit('{"ok":false}');
 }
-require_once dirname(__DIR__) . '/whatsapp/meja/lib.php';
 $data = json_decode($mentah, true, 512, JSON_BIGINT_AS_STRING);
 if (!is_array($data) || ($data['object'] ?? '') !== 'whatsapp_business_account' || !is_array($data['entry'] ?? null)) {
     http_response_code(400);
@@ -61,9 +60,20 @@ if (!is_array($data) || ($data['object'] ?? '') !== 'whatsapp_business_account' 
     exit;
 }
 
+$ownerIntake = \BesharOs\OwnerIntakeBridge::deliver($mentah, $signature, $private);
+if ($ownerIntake['status'] === 'rejected' || $ownerIntake['status'] === 'failed') {
+    http_response_code($ownerIntake['status'] === 'rejected' ? 403 : 503);
+    exit('{"ok":false}');
+}
+$ownerIntakeHandled = $ownerIntake['status'] === 'stored' && $ownerIntake['owner_slice'];
+require_once dirname(__DIR__) . '/whatsapp/meja/lib.php';
+
 // Missing binding must be retryable, never silently acknowledge and drop intake.
 foreach ($data['entry'] as $entry) {
     foreach (is_array($entry) && is_array($entry['changes'] ?? null) ? $entry['changes'] : [] as $change) {
+        if (owner_intake_dikendali($entry, $change, $private, $ownerIntakeHandled)) {
+            continue;
+        }
         if (is_array($change) && ($change['field'] ?? '') === 'messages'
             && (preg_match('/\A[1-9][0-9]*\z/', $private['legacy_business_id'] ?? '') !== 1
                 || preg_match('/\A[0-9]{1,32}\z/', $private['legacy_waba_id'] ?? '') !== 1)) {
@@ -81,6 +91,9 @@ foreach ($data['entry'] ?? [] as $entri) {
         continue;
     }
     foreach ($entri['changes'] ?? [] as $perubahan) {
+        if (owner_intake_dikendali($entri, $perubahan, $private, $ownerIntakeHandled)) {
+            continue;
+        }
         if (!is_array($perubahan) || ($perubahan['field'] ?? '') !== 'messages') {
             continue;
         }
@@ -143,6 +156,18 @@ if ($keputusan === 'failed') {
 }
 
 echo '{"ok":true}';
+
+function owner_intake_dikendali(mixed $entry, mixed $change, array $private, bool $handled): bool
+{
+    if (!$handled || !is_array($entry) || !is_array($change) || ($change['field'] ?? '') !== 'messages'
+        || !is_array($change['value'] ?? null) || !is_array($change['value']['metadata'] ?? null)) {
+        return false;
+    }
+    $waba = $entry['id'] ?? null;
+    $phone = $change['value']['metadata']['phone_number_id'] ?? null;
+    return (is_string($waba) || is_int($waba)) && (string) $waba === ($private['owner_whatsapp_waba_id'] ?? '')
+        && (is_string($phone) || is_int($phone)) && (string) $phone === ($private['owner_whatsapp_phone_number_id'] ?? '');
+}
 
 function ada_peristiwa_hayat(string $mentah): bool
 {
