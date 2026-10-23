@@ -83,10 +83,13 @@ WhatsApp message request. An uncertain message result is never automatically res
 
 ## Additive deployment
 
-The tested target is PHP 8.3 with PDO MySQL, OpenSSL, cURL, DOM, and Fileinfo, and MySQL
-8.4. Preserve the existing private configuration and encryption key. Ensure the PHP
-upload/request limits allow a 2 MiB file plus multipart overhead. There is no new
-provider credential or Meta account-registration step for this feature.
+The application uses PHP 8.3 with PDO MySQL, OpenSSL, cURL, DOM, and Fileinfo.
+CI integration fixtures run on MySQL 8.4. Knowledge-centre shared reads use
+`LOCK IN SHARE MODE` for compatibility with both MySQL and MariaDB; verify the
+target database version during release preflight. Preserve the existing private
+configuration and encryption key. Ensure
+the PHP upload/request limits allow a 2 MiB file plus multipart overhead. There is no
+new provider credential or Meta account-registration step for this feature.
 
 Migration `os/migrations/0005_knowledge_centre.up.sql` adds only `knowledge_centres`
 and `knowledge_media`, then records version `0005` in `schema_migrations`. Existing
@@ -111,7 +114,7 @@ php os/bin/prepare-knowledge-centre.php
 
 The expected final status is `installed`. An identical repeated apply is idempotent.
 The installer uses an advisory lock and rejects mismatching checksums or partial
-installations. MySQL DDL commits implicitly: a failure does not automatically undo a
+installations. MySQL/MariaDB DDL commits implicitly: a failure does not automatically undo a
 created table, and the installer never deletes tables to recover. Inspect a partial
 installation against the reviewed migration before any manual repair.
 

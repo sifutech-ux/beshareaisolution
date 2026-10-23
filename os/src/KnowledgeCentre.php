@@ -138,7 +138,7 @@ final class KnowledgeCentre
     public function runtime(int $businessId): array
     {
         if ($businessId < 1 || !$this->available()) { return []; }
-        $statement = $this->pdo->prepare('SELECT * FROM knowledge_centres WHERE business_id=?' . ($this->pdo->inTransaction() ? ' FOR SHARE' : ''));
+        $statement = $this->pdo->prepare('SELECT * FROM knowledge_centres WHERE business_id=?' . ($this->pdo->inTransaction() ? ' LOCK IN SHARE MODE' : ''));
         $statement->execute([$businessId]);
         $row = $statement->fetch();
         if (!is_array($row) || $row['published_revision'] === null) { return []; }
@@ -199,7 +199,7 @@ final class KnowledgeCentre
         if ($businessId < 1 || preg_match(self::ID_PATTERN, $mediaId) !== 1 || !$this->available()) {
             throw new AuthException('Gambar tidak dijumpai.', 404);
         }
-        $statement = $this->pdo->prepare('SELECT * FROM knowledge_media WHERE business_id=? AND id=?' . ($this->pdo->inTransaction() ? ' FOR SHARE' : ''));
+        $statement = $this->pdo->prepare('SELECT * FROM knowledge_media WHERE business_id=? AND id=?' . ($this->pdo->inTransaction() ? ' LOCK IN SHARE MODE' : ''));
         $statement->execute([$businessId, $mediaId]);
         $row = $statement->fetch();
         if (!is_array($row)) { throw new AuthException('Gambar tidak dijumpai.', 404); }
@@ -451,7 +451,7 @@ final class KnowledgeCentre
         if ($document['payment']['qr_media_id'] !== '') { $ids[] = $document['payment']['qr_media_id']; }
         $ids = array_values(array_unique($ids));
         if ($ids === []) { return; }
-        $statement = $this->pdo->prepare('SELECT id FROM knowledge_media WHERE business_id=? AND id IN (' . implode(',', array_fill(0, count($ids), '?')) . ') FOR SHARE');
+        $statement = $this->pdo->prepare('SELECT id FROM knowledge_media WHERE business_id=? AND id IN (' . implode(',', array_fill(0, count($ids), '?')) . ') LOCK IN SHARE MODE');
         $statement->execute(array_merge([$businessId], $ids));
         if (array_diff($ids, $statement->fetchAll(PDO::FETCH_COLUMN)) !== []) {
             throw new AuthException('Gambar mesti dimuat naik dalam perniagaan ini dahulu.', 400);
