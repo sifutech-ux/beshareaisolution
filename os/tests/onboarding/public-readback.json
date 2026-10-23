@@ -1,0 +1,27 @@
+[
+  {
+    "path": "whatsapp/sambungan/awam.php",
+    "status": 200,
+    "public_fields": {
+      "ready": true,
+      "appId": "27767197276313052",
+      "configId": "1028295100269838",
+      "version": "v26.0"
+    },
+    "has_authenticated_user": false
+  },
+  {
+    "path": "whatsapp/akaun/pintu.php?tindakan=sesi",
+    "status": 200,
+    "public_fields": {
+      "ok": true
+    },
+    "has_authenticated_user": false
+  },
+  {
+    "path": "whatsapp/ruang.js",
+    "status": 200,
+    "sha256": "495cf046d90cb4c4072e8fd95a70b336b6c0778ea7c9e2007abeaa89ea5c40c2",
+    "matches_baseline": true
+  }
+]
