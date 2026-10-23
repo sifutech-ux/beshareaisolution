@@ -1,7 +1,7 @@
 name: WhatsApp synthetic foundation
 on:
   pull_request:
-    paths: ['os/mvp/**', 'os/tests/mvp/**', 'deploy/whatsapp-standby/**', '.github/workflows/whatsapp-foundation.yml']
+    paths: ['whatsapp/ruang.js', 'whatsapp/index.html', 'os/bin/check-signup*.mjs', 'os/mvp/**', 'os/tests/mvp/**', 'deploy/whatsapp-standby/**', '.github/workflows/whatsapp-foundation.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,6 +26,7 @@ jobs:
           php os/tests/check-mysql84.php
           php os/bin/check-migration.php
           node os/bin/check-signup-event.mjs
+          node os/bin/check-signup-launch.mjs
       - name: Standby must remain blocked
         run: |
           if python3 deploy/whatsapp-standby/check-gates.py; then

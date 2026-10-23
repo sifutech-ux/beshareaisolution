@@ -1,0 +1,20 @@
+OK anonymous cannot launch or create signup session
+OK staff cannot launch or create signup session
+OK admin cannot launch or create signup session
+OK unready SDK makes no request
+OK SDK throw does not create server session
+OK SDK throw clears pending state and timer
+OK SDK exception details are not exposed
+OK synchronous cancel does not create session
+OK cancel feedback is preserved
+OK login stays in click activation before API request
+OK coexistence options reach SDK unchanged
+OK silent SDK does not claim popup opened
+OK silent SDK has actionable bounded feedback
+OK late callback remains usable after advisory
+OK immediate authorization code survives server-state race
+OK successful callback suppresses popup advisory
+OK server denial clears pending attempt
+OK server denial remains visible
+OK focus transfer does not produce popup-blocked advisory
+PASS 19 launch checks; synthetic SDK and API, no network

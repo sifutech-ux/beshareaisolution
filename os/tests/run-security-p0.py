@@ -205,7 +205,7 @@ with tempfile.TemporaryDirectory(prefix='beshare-p0-', dir='/tmp') as temp:
             extended_env['PHP_INI_SCAN_DIR']=str(lab/'ini')
             (lab/'ini').mkdir()
             shutil.copy(ini,lab/'ini'/'p0.ini')
-            for suite in ['check-auth.php','check-meta.php','check-coexistence.php','check-worker.php','check-lifecycle.php']:
+            for suite in ['check-auth.php','check-meta.php','check-coexistence.php','check-worker.php','check-override.php','check-lifecycle.php']:
                 result=subprocess.run([PHP,str(copied/'os/bin'/suite)],cwd=copied,env=extended_env,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=120)
                 print(suite+': '+str(result.returncode)+'; '+str(sum(line.startswith('OK ') for line in result.stdout.splitlines()))+' checks',flush=True)
                 if result.returncode:

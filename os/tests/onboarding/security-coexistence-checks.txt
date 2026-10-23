@@ -1,0 +1,128 @@
+OK /webhook/ unsigned rejected
+OK unsigned no storage/DB effects
+OK /webhook/ tampered rejected
+OK tampered no storage/DB effects
+OK /webhook/ malformed rejected
+OK malformed no storage/DB effects
+OK /webhook/ wrong-secret rejected
+OK wrong-secret no storage/DB effects
+OK /webhook/ unsigned-invalid-json rejected
+OK unsigned-invalid-json no storage/DB effects
+OK /webhook/ wrong method
+OK /webhook/ signed malformed JSON
+OK /whatsapp/sambungan/webhook.php unsigned rejected
+OK unsigned no storage/DB effects
+OK /whatsapp/sambungan/webhook.php tampered rejected
+OK tampered no storage/DB effects
+OK /whatsapp/sambungan/webhook.php malformed rejected
+OK malformed no storage/DB effects
+OK /whatsapp/sambungan/webhook.php wrong-secret rejected
+OK wrong-secret no storage/DB effects
+OK /whatsapp/sambungan/webhook.php unsigned-invalid-json rejected
+OK unsigned-invalid-json no storage/DB effects
+OK /whatsapp/sambungan/webhook.php wrong method
+OK /whatsapp/sambungan/webhook.php signed malformed JSON
+OK wrong WABA ignored without side effects
+OK wrong phone ignored without side effects
+OK excluded phone ignored without side effects
+OK legacy signed intake
+OK only inbound message recorded
+OK signed replay deduplicated
+OK transport hard OFF
+OK OS signed empty event
+OK OS signed message accepted
+OK OS WABA and phone jointly scope tenant
+OK OS signed message accepted
+OK OS WABA and phone jointly scope tenant
+OK OS signed message accepted
+OK OS WABA and phone jointly scope tenant
+OK OS GET challenge preserved
+OK legacy wrong challenge refused
+OK legacy GET block unchanged
+OK /webhook/ missing secret fails closed
+OK /whatsapp/sambungan/webhook.php missing secret fails closed
+OK missing secret no effects
+OK throwing config fails closed without leak
+OK throwing config fails closed without leak
+OK /whatsapp/meja/ anonymous
+OK denial contains no sensitive form or data
+OK /whatsapp/meja/ b
+OK denial contains no sensitive form or data
+OK /whatsapp/meja/ staff
+OK denial contains no sensitive form or data
+OK /whatsapp/meja/ disabled
+OK denial contains no sensitive form or data
+OK /whatsapp/meja/ a
+OK /whatsapp/meja/ admin
+OK /whatsapp/meja/perbualan/ anonymous
+OK denial contains no sensitive form or data
+OK /whatsapp/meja/perbualan/ b
+OK denial contains no sensitive form or data
+OK /whatsapp/meja/perbualan/ staff
+OK denial contains no sensitive form or data
+OK /whatsapp/meja/perbualan/ disabled
+OK denial contains no sensitive form or data
+OK /whatsapp/meja/perbualan/ a
+OK /whatsapp/meja/perbualan/ admin
+OK /whatsapp/meja/pesanan/ anonymous
+OK denial contains no sensitive form or data
+OK /whatsapp/meja/pesanan/ b
+OK denial contains no sensitive form or data
+OK /whatsapp/meja/pesanan/ staff
+OK denial contains no sensitive form or data
+OK /whatsapp/meja/pesanan/ disabled
+OK denial contains no sensitive form or data
+OK /whatsapp/meja/pesanan/ a
+OK /whatsapp/meja/pesanan/ admin
+OK anonymous bank
+OK cross tenant bank
+OK anonymous token
+OK cross tenant token
+OK anonymous skrip
+OK cross tenant skrip
+OK anonymous latih
+OK cross tenant latih
+OK /whatsapp/meja/ CSRF rejected
+OK /whatsapp/meja/ CSRF rejected
+OK anonymous jeda
+OK cross tenant jeda
+OK anonymous sambung
+OK cross tenant sambung
+OK anonymous balas
+OK cross tenant balas
+OK /whatsapp/meja/perbualan/ CSRF rejected
+OK /whatsapp/meja/perbualan/ CSRF rejected
+OK anonymous bank
+OK cross tenant bank
+OK /whatsapp/meja/pesanan/ CSRF rejected
+OK /whatsapp/meja/pesanan/ CSRF rejected
+OK reject client scope business_id
+OK reject client scope tenant_id
+OK reject client scope phone_number_id
+OK reject client scope waba_id
+OK disallowed action unknown
+OK disallowed action latih
+OK disallowed action balas
+OK disallowed action sambung
+OK all denied actions unchanged
+OK admin authorized write
+OK authorized script saved
+OK owner pause allowed
+OK pause saved
+OK admin allowed bank
+OK admin allowed token
+OK staff forged role cannot POST
+OK staff denial unchanged
+OK throwing DB config no leak
+OK revoked identity rejected next request
+OK legacy missing binding requests retry
+OK missing binding no intake effects
+OK missing tenant binding fails closed
+OK suspended tenant rejected
+PASS 121 checks; synthetic, socket-only DB; outbound disabled
+check-auth.php: 0; 102 checks
+check-meta.php: 0; 64 checks
+check-coexistence.php: 0; 37 checks
+check-worker.php: 0; 33 checks
+check-override.php: 0; 32 checks
+check-lifecycle.php: 0; 13 checks
