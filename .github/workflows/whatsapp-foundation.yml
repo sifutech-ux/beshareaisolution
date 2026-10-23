@@ -1,7 +1,7 @@
 name: WhatsApp synthetic foundation
 on:
   pull_request:
-    paths: ['os/mvp/**', 'os/tests/mvp/**', 'deploy/whatsapp-standby/**', '.github/workflows/whatsapp-foundation.yml']
+    paths: ['os/mvp/**', 'os/demo/**', 'os/tests/demo/**', 'os/tests/mvp/**', 'deploy/whatsapp-standby/**', '.github/workflows/whatsapp-foundation.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,6 +23,9 @@ jobs:
           php -l os/mvp/GeminiFoundation.php
           php -l os/mvp/ForwardLedger.php
           php os/tests/mvp/check.php
+          php -l os/demo/runtime.php
+          php -l os/demo/public/index.php
+          python3 os/tests/demo/check.py
           php os/tests/check-mysql84.php
           php os/bin/check-migration.php
           node os/bin/check-signup-event.mjs
