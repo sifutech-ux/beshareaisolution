@@ -87,7 +87,7 @@ final class BackupProof
             }
         }
         $version = $manifest['server_version'] ?? '';
-        if (!str_contains($version, 'MariaDB')
+        if (!self::supportedVersion($version)
             || preg_match('/^--.*Server version[:\s]+' . preg_quote($version, '/') . '\s*$/mi', $dump) !== 1) {
             throw new \InvalidArgumentException('backup_server_unbound');
         }
@@ -97,6 +97,13 @@ final class BackupProof
         if (self::containsObjectsOrRows($dump)) {
             throw new \InvalidArgumentException('backup_not_empty_structure');
         }
+    }
+
+    public static function supportedVersion(string $version): bool
+    {
+        // Preserve MariaDB support; add only the tested MySQL LTS family.
+        return preg_match('/\A[0-9]+\.[0-9]+\.[0-9]+-MariaDB(?:[-.][A-Za-z0-9_.+-]+)?\z/', $version) === 1
+            || preg_match('/\A8\.4\.[0-9]+(?:-(?:commercial|log|commercial-log))?\z/', $version) === 1;
     }
 
     /** @return list<string> */

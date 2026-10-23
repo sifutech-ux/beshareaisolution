@@ -1,0 +1,34 @@
+{
+  "mysql@sha256:76f0358884cb92d9a086d24e5671c38048d3fef40f2588703d73eb55392d6b69": {
+    "Id": "sha256:76f0358884cb92d9a086d24e5671c38048d3fef40f2588703d73eb55392d6b69",
+    "RepoDigests": [
+      "mysql@sha256:76f0358884cb92d9a086d24e5671c38048d3fef40f2588703d73eb55392d6b69"
+    ],
+    "Architecture": "arm64",
+    "Os": "linux"
+  },
+  "php@sha256:cdb77e306d6bb99db40e513fbe036ecc6c53b575cbcb7e581387845fef26d755": {
+    "Id": "sha256:cdb77e306d6bb99db40e513fbe036ecc6c53b575cbcb7e581387845fef26d755",
+    "RepoDigests": [
+      "php@sha256:cdb77e306d6bb99db40e513fbe036ecc6c53b575cbcb7e581387845fef26d755"
+    ],
+    "Architecture": "arm64",
+    "Os": "linux"
+  },
+  "mariadb:11.8.9": {
+    "Id": "sha256:f16d7a344413e519dff518f27bdb221388f84b0d274c97c4fb5f2cb0dc1b34fa",
+    "RepoDigests": [
+      "mariadb@sha256:f16d7a344413e519dff518f27bdb221388f84b0d274c97c4fb5f2cb0dc1b34fa"
+    ],
+    "Architecture": "arm64",
+    "Os": "linux"
+  },
+  "beshare-mysql84-lab:20261023": {
+    "Id": "sha256:701b58a4c6e3305c4cff95dd77e02ae6caf0676cda3e72442d494918c494d1ae",
+    "RepoDigests": [
+      "beshare-mysql84-lab@sha256:701b58a4c6e3305c4cff95dd77e02ae6caf0676cda3e72442d494918c494d1ae"
+    ],
+    "Architecture": "arm64",
+    "Os": "linux"
+  }
+}

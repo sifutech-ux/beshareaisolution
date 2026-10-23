@@ -1,0 +1,20 @@
+[
+  {
+    "attempt": "partial",
+    "statements_executed": 2,
+    "exit": 5,
+    "stdout": "",
+    "stderr": "partial\n",
+    "ledger_rows": "0",
+    "expected": "partial"
+  },
+  {
+    "attempt": "unrecorded",
+    "statements_executed": 13,
+    "exit": 7,
+    "stdout": "",
+    "stderr": "ddl_complete_version_unrecorded\n",
+    "ledger_rows": "0",
+    "expected": "ddl_complete_version_unrecorded"
+  }
+]

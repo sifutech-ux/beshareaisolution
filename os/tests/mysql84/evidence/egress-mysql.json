@@ -1,0 +1,4 @@
+{
+  "exit": 1,
+  "stderr": "bash: connect: Network is unreachable\nbash: line 1: /dev/tcp/192.0.2.1/443: Network is unreachable\n"
+}

@@ -1,0 +1,95 @@
+{
+  "utc": "2026-10-23T12:58:09.873340+00:00",
+  "containers": [
+    {
+      "name": "beshare-migrator-20261023-r3-unrecorded-app",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-20261023-r3-unrecorded-source",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-20261023-r3-partial-app",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-20261023-r3-partial-source",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-20261023-r3-regression-app",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-maria-20261023-r1-regression-app",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-20261023-r3-regression-source",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-maria-20261023-r1-regression-source",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-maria-20261023-r1-app",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-maria-20261023-r1-source",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-20261023-r3-recovery-app",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-20261023-r3-restore",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-20261023-r3-app",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-20261023-r3-source",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-20261023-r2-app",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-20261023-r2-source",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-20261023-r1-app",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "beshare-migrator-20261023-r1-source",
+      "running": false,
+      "status": "exited"
+    }
+  ]
+}

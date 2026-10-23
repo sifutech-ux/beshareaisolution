@@ -1,0 +1,51 @@
+{
+    "audit_logs": {
+        "count": 0,
+        "rows_sha256": "35786c7117b4e38d0f169239752ce71158266ae2f6e4aa230fbbb87bd699c0e3",
+        "ddl_sha256": "7083f56cda10eb8743a222b4eb4454c3559f087821bba6b68e3abb62dcad3524",
+        "canonical_ddl_sha256": "7083f56cda10eb8743a222b4eb4454c3559f087821bba6b68e3abb62dcad3524"
+    },
+    "business_users": {
+        "count": 0,
+        "rows_sha256": "35786c7117b4e38d0f169239752ce71158266ae2f6e4aa230fbbb87bd699c0e3",
+        "ddl_sha256": "7e6d9fbeb90db25fd391b6ca633f7c703efbd53627a3fff8f889930c1f467600",
+        "canonical_ddl_sha256": "7e6d9fbeb90db25fd391b6ca633f7c703efbd53627a3fff8f889930c1f467600"
+    },
+    "businesses": {
+        "count": 0,
+        "rows_sha256": "35786c7117b4e38d0f169239752ce71158266ae2f6e4aa230fbbb87bd699c0e3",
+        "ddl_sha256": "6c962677f34d33f75833326c7e318f1d214b0968aaa9af2813328675e6734332",
+        "canonical_ddl_sha256": "6b20c81c186fec00bdf8e587a60baad09f741913c9e82ed07fafe6e783afb544"
+    },
+    "onboarding_sessions": {
+        "count": 0,
+        "rows_sha256": "35786c7117b4e38d0f169239752ce71158266ae2f6e4aa230fbbb87bd699c0e3",
+        "ddl_sha256": "2a15e1e7a85f1a8ef5673ee636e40cc3f209f459bfc1e9dca076eddb6e2afa8b",
+        "canonical_ddl_sha256": "6ced9ee9d35939bfc2054bbf0bc570f57223d08476878330402e244cab70bce2"
+    },
+    "schema_migrations": {
+        "count": 1,
+        "rows_sha256": "487021ad689afdd0509cb367077d874f989de91e9300b0f54169243af0d9a53b",
+        "ddl_sha256": "31456fe7534ba6f1fc6ff66b554b44c0f2df58bab0a2e1982c39a7a3d58d3ee6",
+        "canonical_ddl_sha256": "31456fe7534ba6f1fc6ff66b554b44c0f2df58bab0a2e1982c39a7a3d58d3ee6"
+    },
+    "users": {
+        "count": 1,
+        "rows_sha256": "cae2ef8d76543fe617c72030d34fbe1828798b4ad2180419b9737dbc1f4ec7f1",
+        "ddl_sha256": "80ce2f09ba1b2251cfa13fd9e41635e264853c23a71e55caba423e7ed0d59309",
+        "canonical_ddl_sha256": "a7d01b99e5212347f80a9480ee1e8738c1d420f38cebd8d272781bcc4d64a137"
+    },
+    "webhook_events": {
+        "count": 0,
+        "rows_sha256": "35786c7117b4e38d0f169239752ce71158266ae2f6e4aa230fbbb87bd699c0e3",
+        "ddl_sha256": "d68eecdc4fbe2d30203c9edb287f768818dc1b60a03ac204c164ce6342cca8dc",
+        "canonical_ddl_sha256": "9866b7b1f8411fd16287d1b43450917d67c72a4b9f2cee9893ad186011ee01ee"
+    },
+    "whatsapp_connections": {
+        "count": 0,
+        "rows_sha256": "35786c7117b4e38d0f169239752ce71158266ae2f6e4aa230fbbb87bd699c0e3",
+        "ddl_sha256": "55025bd2b6b25df21625b3d304e535f2917380c6cc36f527e1515469261a0b11",
+        "canonical_ddl_sha256": "ac8846e3ca2e3d65d07858c1347acce584932d391d4a21122fe580a799acb3e5"
+    },
+    "_triggers_sha256": "91770fa6d6dfc8ff35f59980841e8aea5c15076eb2ec48da2d4825fa365c1fc7"
+}

@@ -1,0 +1,5 @@
+GRANT USAGE ON *.* TO `migration`@`localhost`
+GRANT SELECT, INSERT, CREATE, REFERENCES, INDEX, ALTER, SHOW VIEW, EVENT, TRIGGER ON `u879723783_beshare_os`.* TO `migration`@`localhost`
+GRANT USAGE ON *.* TO `app`@`localhost`
+GRANT SELECT ON `u879723783_beshare_os`.* TO `app`@`localhost`
+GRANT INSERT, UPDATE, DELETE ON `u879723783_beshare_os`.`users` TO `app`@`localhost`

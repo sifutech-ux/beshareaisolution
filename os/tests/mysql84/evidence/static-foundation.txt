@@ -1,0 +1,98 @@
+OK up sql has 13 statements
+OK up sql has 8 tables and 5 triggers
+OK semicolons inside triggers stay in the statement
+OK fixture trigger with internal semicolons is one statement
+OK semicolon inside a trigger string stays in one statement
+OK sql_unsupported
+OK sql_unsupported
+OK sql_unsupported
+OK sql_unterminated_statement
+OK sql_unbalanced
+OK sql_unterminated_string
+OK up statements are tables and triggers only
+OK up tables match contract
+OK up triggers match contract
+OK down tables match drop order
+OK down triggers match contract
+OK down statements are drops only
+OK up has no global change
+OK down has no global change
+OK up statements do not write rows
+OK runner has no global change
+OK runner does not load down script
+OK runner locks before preflight
+OK runner records the version after exec
+OK export checksum is repeated before ddl
+OK backup proof is repeated before ddl
+OK backup proof is not the checksum gate
+OK wrong definitions stop the runner
+OK complete catalog is inspected before version insert
+OK runner has no drop statement
+OK recovery policy does not execute sql
+OK processed payload must be purged
+OK active and suspended block owner membership changes
+OK owner membership move checks both businesses
+OK owner id changes only while provisioning
+OK no embedded password assignment
+OK strict mode is appended once
+OK strict mode is not duplicated
+OK strict token is exact
+OK spaced sql mode is normalized
+OK session literal stays narrow
+OK migration definition has 8 tables and 5 triggers
+OK generated owner guard is part of the definition
+OK webhook foreign key is part of the definition
+OK payload check is part of the definition
+OK owner index is part of the definition
+OK trigger definition keeps both business ids
+OK empty catalog
+OK complete without version
+OK applied catalog
+OK checksum mismatch stops
+OK partial catalog stops
+OK unknown table stops
+OK routine stops
+OK version without full catalog stops
+OK names alone are not a complete migration
+OK right names and wrong column type are not complete
+OK right names and wrong check are not complete
+OK right names and wrong foreign key are not complete
+OK right names and wrong generated column are not complete
+OK right names and missing index are not complete
+OK right names and wrong trigger body are not applied
+OK catalog rows match the migration definition
+OK catalog rows with the right table name and wrong type do not match
+OK recovery blocked when structure differs
+OK recovery blocked when migration checksum differs
+OK recovery blocked for a definition mismatch
+OK matching structure remains a manual review
+OK current owner may open provisioning without changing owner
+OK opening provisioning cannot also change owner
+OK staff cannot open provisioning
+OK admin cannot reassign the owner
+OK owner reassignment stays inside provisioning
+OK active business rejects owner reassignment
+OK request business id is ignored
+OK suspend does not change the owner
+OK export outside repository is accepted
+OK checksum match does not prove database identity
+OK export inside repository is rejected
+OK export inside public_html is rejected
+OK empty dump with bound manifest proves the database
+OK dump that creates an object is not an empty backup
+OK conditional comment cannot hide a create
+OK non-empty inventory is not the preflight backup
+OK another database name is rejected before checksum can approve it
+OK check rows stay on their own table
+OK default integer display widths match the migration text
+OK an explicit narrower bigint stays different
+OK MariaDB JSON alias matches a JSON column
+OK longtext without the JSON check stays longtext
+OK redundant CHECK groups match the server text
+OK CHECK parentheses that change precedence stay different
+OK an automatic foreign-key index matches the migration
+OK a missing foreign-key index does not match
+OK captured catalog is MariaDB 11.8.9
+OK Foundation 0001 matches the captured MariaDB 11.8.9 catalog
+OK captured catalog without a version row is complete but unrecorded
+STATIC_OK

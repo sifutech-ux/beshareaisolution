@@ -1,0 +1,21 @@
+OK MySQL 8.4.13 catalog equals original migration
+OK supported 8.4.13
+OK supported 8.4.0
+OK supported 8.4.13-commercial
+OK supported 11.8.9-MariaDB
+OK supported 11.8.9-MariaDB-log
+OK unsupported ""
+OK unsupported "8.0.40"
+OK unsupported "9.0.0"
+OK unsupported "fake-MariaDB"
+OK unsupported "8.4.13-unknown"
+OK unsupported "8.4.13\n"
+OK bound dump 8.4.13
+OK wrong version bound 8.4.13
+OK bound dump 11.8.9-MariaDB-log
+OK wrong version bound 11.8.9-MariaDB-log
+OK NOT ENFORCED rejected
+OK changed CHECK literal rejected
+OK changed generated literal rejected
+OK missing trigger rejected
+PASS 20 checks
