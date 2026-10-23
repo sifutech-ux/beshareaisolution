@@ -1,0 +1,12 @@
+{
+  "security_review": {"status":"pending","evidence":"PR #63 c955270; PR #65 e179dc3 remain drafts"},
+  "ledger_review": {"status":"pending","evidence":"Fresh-only local runner supplied; fingerprint manifest requires independent review"},
+  "target_architecture": {"status":"pending","evidence":"Local arm64 differs from unverified target"},
+  "runtime_digest": {"status":"pending","evidence":"Pinned base; built runtime digest not yet approved for VPS"},
+  "host_capacity_listeners": {"status":"pending","evidence":"Hostinger sampled metrics; SSH denied, full host inventory unavailable"},
+  "least_privilege": {"status":"pending","evidence":"Target identity grants and trigger definer lifecycle require verification"},
+  "backup_custody": {"status":"pending","evidence":"Named custodian and off-VPS recovery path not confirmed"},
+  "restore_drill": {"status":"pending","evidence":"Prior synthetic restore passed; target architecture and complete chain restore pending"},
+  "preservation_inventory": {"status":"pending","evidence":"Existing DB preserved; owner-approved inventory still required"},
+  "owner_start_approval": {"status":"pending","evidence":"Separate owner approval required after all technical gates pass"}
+}

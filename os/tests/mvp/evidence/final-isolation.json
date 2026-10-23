@@ -1,0 +1,128 @@
+[
+  {
+    "name": "beshare-forward-20261023-apply-recovery-app",
+    "running": false,
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "destination": "/sockets/restore"
+      }
+    ]
+  },
+  {
+    "name": "beshare-forward-20261023-apply-restore",
+    "running": false,
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "destination": "/var/lib/mysql"
+      },
+      {
+        "type": "volume",
+        "destination": "/var/run/mysqld"
+      }
+    ]
+  },
+  {
+    "name": "beshare-forward-20261023-partial-app",
+    "running": false,
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "destination": "/sockets/source"
+      }
+    ]
+  },
+  {
+    "name": "beshare-forward-20261023-partial-source",
+    "running": false,
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "destination": "/var/lib/mysql"
+      },
+      {
+        "type": "volume",
+        "destination": "/var/run/mysqld"
+      }
+    ]
+  },
+  {
+    "name": "beshare-forward-20261023-apply-app",
+    "running": false,
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "destination": "/sockets/source"
+      }
+    ]
+  },
+  {
+    "name": "beshare-forward-20261023-apply-source",
+    "running": false,
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "destination": "/var/run/mysqld"
+      },
+      {
+        "type": "volume",
+        "destination": "/var/lib/mysql"
+      }
+    ]
+  },
+  {
+    "name": "beshare-forward-20261023-reference-app",
+    "running": false,
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "destination": "/sockets/source"
+      }
+    ]
+  },
+  {
+    "name": "beshare-forward-20261023-reference-source",
+    "running": false,
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "destination": "/var/run/mysqld"
+      },
+      {
+        "type": "volume",
+        "destination": "/var/lib/mysql"
+      }
+    ]
+  },
+  {
+    "name": "beshare-mvp-check-20261023",
+    "running": false,
+    "network": "none",
+    "ports": {},
+    "mounts": []
+  },
+  {
+    "name": "beshare-mvp-final-20261023",
+    "running": false,
+    "network": "none",
+    "ports": {},
+    "mounts": []
+  }
+]

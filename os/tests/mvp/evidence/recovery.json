@@ -1,0 +1,15 @@
+{
+  "pass": true,
+  "source_stopped_during_restore": true,
+  "fresh_volume": true,
+  "ledger_included": true,
+  "canonical_schema_triggers_rows_equal": true,
+  "persistence_equal": true,
+  "missing_wrong_key_tamper_rejected": true,
+  "corrupt_checksum_rejected": true,
+  "dump_sha256": "dca20aaa8265ea58ad8635619a27499cb25cc0a913b6318d7b022f6efb17034a",
+  "encrypted_sha256": "f23457a619c42c2c06d30ba5ba1ca16e228c65bd0a0b8824284b524afbb71baf",
+  "bytes": 31954,
+  "total_seconds": 8.310377208981663,
+  "production_RPO_RTO_proven": false
+}

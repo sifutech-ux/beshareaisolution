@@ -1,0 +1,5 @@
+{
+  "exit": 0,
+  "stdout": "0002 applied\n0002 already_applied\n0003 applied\n0003 already_applied\n[{\"version\":\"0001\",\"checksum\":\"506862ea92234627c2fbe8bed636689b61063dbadb1b4155e15c63c804894b2c\"},{\"version\":\"0002\",\"checksum\":\"a6804229f6edf9f515fe0b29b16d6e378f1df84e3753b30809672513782aaa64\"},{\"version\":\"0003\",\"checksum\":\"2881083056c097537a133da0c78ea7b10f249c0241d309abc359e6b18d4312c0\"}]",
+  "stderr": ""
+}

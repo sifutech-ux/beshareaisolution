@@ -1,0 +1,34 @@
+name: WhatsApp synthetic foundation
+on:
+  pull_request:
+    paths: ['os/mvp/**', 'os/tests/mvp/**', 'deploy/whatsapp-standby/**', '.github/workflows/whatsapp-foundation.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-foundation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Fetch exact source without persisted credentials
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          git init .
+          git remote add origin https://github.com/sifutech-ux/beshareaisolution.git
+          git fetch --depth=1 origin "$SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+      - name: PHP syntax and synthetic behavior
+        run: |
+          php -l os/mvp/GeminiFoundation.php
+          php -l os/mvp/ForwardLedger.php
+          php os/tests/mvp/check.php
+          php os/tests/check-mysql84.php
+          php os/bin/check-migration.php
+          node os/bin/check-signup-event.mjs
+      - name: Standby must remain blocked
+        run: |
+          if python3 deploy/whatsapp-standby/check-gates.py; then
+            echo 'Unexpected standby authorization'
+            exit 1
+          fi

@@ -1,0 +1,21 @@
+{
+  "compose-version.txt": "4729daa1edc167dedd8b1caa225a9207ef414c8c387e3ff50b45d1730ce9c302",
+  "empty.sha256": "b21f1335435f7ab7cbcc0fd29a73d474261446edf1410432a5a0455224d485ae",
+  "final-isolation.json": "99ecac5110baa423c9d228d4ffd331786debcc1a7ef84f6e2d0a9b954a0f5383",
+  "fingerprint-before.json": "09b2a13be644748f67f2af30522f3dfe64f1f5265ff57a25a4fb7f0306aaf4c8",
+  "fingerprint-restored.json": "41a66180b8da6e236b315b310b23f5f5d3644e79899c08ae7f73b5950430e3dc",
+  "foundation-static.txt": "03af5f5618579528535ba35e1a46a21ce0911bffdc30579681bd7620c9cff53e",
+  "foundation.json": "1513c3c1c5db8d41a621465ce3c7b35cf3a558da34e76d28f0847a3d3390324f",
+  "gates.json": "7c0c521725c2d19107cb46ef4f4242745bc4f1de48d79515d93efd2cb7a3c11c",
+  "ledger-apply.json": "6a232bfcb4601cdfa6d2bcb031966505ca4f0d3dfc2d2f1b300ccb8c6ab530bb",
+  "ledger-negative.json": "fc82e638e712841731a16a433fd975dff13a52159f8024c23cd12382233cd216",
+  "ledger-partial.json": "7a3693d33a5921bc1d7c0617c9507c09ee1489e1b4a4b7e5db3a9e2647d8cca3",
+  "mvp-container.json": "bd16cc706e66bb44bbf49277f60ab132cfa0dec279413cdd366b084561bd71b6",
+  "mvp-local.json": "d67e93747eb858b4fbe894e77b7665167469aeb9af09cfafa84294f5d2bee83a",
+  "mysql-static.txt": "b99b72ea3906c3154b01344a348699e7b294ae2e92b01047992949671f1dfa14",
+  "mysql84-ledger-manifest.json": "5e1da382825940e8db7b2ab9523f2cf9c65ecf51950ccbf3af6d3fb70c0d5c9e",
+  "recovery.json": "64804b886c8d824293bfa2a83e1063a5338cca201444899c20a687d178f9b960",
+  "runtime-image.txt": "2c88fac4ec257872796150a40dd8519112c70ad836d09355fc45fc164864d238",
+  "shutdown.json": "75465e04dfd08928fd53cfae0d9cdaad73ed4441fce3941bc8bb5b34c2520ce2",
+  "signup.json": "ba245ad5a25ef6462aa3710fcd539582a74c2a31e427f82c993e06cab621df3d"
+}
