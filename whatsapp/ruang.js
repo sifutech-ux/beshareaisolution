@@ -493,7 +493,8 @@ function profile(state, current) {
     <p>Tag: ${esc(current.tag)}<br>Ejen: ${esc(current.assignee)}<br>Tetingkap: ${current.window === "open" ? "dibuka" : "tamat"}</p>
     <p class="muted">${esc(current.note || "Tiada nota.")}</p>
     <p class="muted">Status penghantaran dipadankan dengan id mesej, bukan nombor telefon.</p>
-    <button class="btn btn--ghost" type="button" data-act="assign-me">Tugaskan kepada saya</button>`;
+    <button class="btn btn--ghost" type="button" disabled aria-describedby="assignment-unavailable">Tugaskan kepada saya</button>
+    <p id="assignment-unavailable" class="muted">Penugasan ejen belum tersedia.</p>`;
 }
 
 function contacts(state) {
@@ -1544,6 +1545,14 @@ function sendSignupEvent(fields) {
 }
 
 async function boot() {
+  try {
+    const storedUi = JSON.parse(sessionStorage.getItem(UI_KEY) || "null");
+    if (storedUi && typeof storedUi === "object" && !Array.isArray(storedUi)) {
+      sessionStorage.setItem(UI_KEY, JSON.stringify({ ...storedUi, notice: "", modal: "" }));
+    }
+  } catch {
+    /* Teruskan jika storan pelayar tidak tersedia. */
+  }
   const returned = consumeRedirectResult();
   if (returned.code) rememberSignupCode(returned.code);
   const root = document.getElementById("app");

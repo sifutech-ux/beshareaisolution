@@ -168,13 +168,16 @@ final class AiReplyStore
         $rows = $query->fetchAll();
         if ($rows === []) { return $legacyInbox; }
         $settings = $this->settings((int) $actor['business_id']);
+        $allowlist = json_decode((string) ($settings['allowlist_json'] ?? '[]'), true, 8);
+        if (!is_array($allowlist) || !array_is_list($allowlist) || count($allowlist) > 10) { $allowlist = []; }
         $conversations = [];
         $contacts = [];
         $aliases = [];
         foreach ($rows as $row) {
             $id = 'ai-' . $row['id'];
             $aliases['wa-' . $row['phone_number_id'] . '-' . $row['recipient']] = $id;
-            $enabled = $this->deploymentReady() && $settings !== null && (int) $settings['enabled'] === 1
+            $allowlisted = in_array($row['recipient'], $allowlist, true);
+            $enabled = $allowlisted && $this->deploymentReady() && $settings !== null && (int) $settings['enabled'] === 1
                 && (int) $settings['connection_id'] === (int) $row['connection_id'] && $actor['status'] === 'active'
                 && $row['disconnected_at'] === null && $row['token_state'] === 'verified'
                 && $row['webhook_state'] === 'subscribed' && $row['registration_state'] === 'registered'
@@ -185,7 +188,9 @@ final class AiReplyStore
                 'mode' => $row['mode'] === 'human' ? 'human_takeover' : ($enabled ? 'ai_active' : 'ai_paused'),
                 'window' => $last > 0 && $last <= time() && time() - $last < 86400 ? 'open' : 'closed',
                 'messages' => [], 'tag' => 'Ujian pemilik', 'assignee' => '', 'unread' => false,
-                'note' => 'Sejarah disimpan pada pelayan. Kawalan ambil alih terpakai kepada balasan AI.',
+                'note' => $allowlisted
+                    ? 'Sejarah disimpan pada pelayan. Kawalan ambil alih terpakai kepada balasan AI.'
+                    : 'Nombor ini belum dimasukkan dalam senarai nombor ujian. Semak Pengetahuan.',
                 'can_control' => true,
             ];
         }
