@@ -1,0 +1,27 @@
+name: WhatsApp connection return
+on:
+  pull_request:
+    paths:
+      - 'whatsapp/ruang.js'
+      - 'whatsapp/ruang.html'
+      - 'os/bin/check-auth-return.mjs'
+      - '.github/workflows/whatsapp-connection-return.yml'
+permissions:
+  contents: read
+jobs:
+  connection-return:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Fetch proposed source without persisted credentials
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git init .
+          git remote add origin https://github.com/sifutech-ux/beshareaisolution.git
+          git fetch --depth=1 origin "$SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+      - name: Validate only the new connection-return behavior
+        run: |
+          node --check whatsapp/ruang.js
+          node os/bin/check-auth-return.mjs

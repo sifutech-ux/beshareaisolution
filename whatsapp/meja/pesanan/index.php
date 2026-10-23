@@ -4,8 +4,8 @@ declare(strict_types=1);
 require dirname(__DIR__, 3) . '/admin/lib.php';
 require dirname(__DIR__) . '/lib.php';
 
-ini_set('display_errors', '0');
-kepala_selamat();
+require dirname(__DIR__) . '/guard.php';
+meja_require_access([]);
 
 $senarai = array_reverse(baca_perbualan()['pesanan']);
 ?>

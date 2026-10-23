@@ -1,0 +1,33 @@
+Command: node os/bin/check-auth-return.mjs
+Runtime: Node v24.19.0
+Exit code: 0
+
+OK anonymous connection link opens login and retains the destination in this tab
+OK owner login returns to the real connection screen
+OK successful login consumes the saved destination
+OK returning to connection requires a fresh click before Meta starts
+OK refreshing the login page preserves the intended connection destination
+OK successful owner registration also returns to connection
+OK registration consumes the destination without launching Meta
+OK failed login retains the destination for retry
+OK a successful retry restores the destination
+OK staff cannot use saved connection navigation to bypass the owner gate
+OK admin cannot use saved connection navigation to bypass the owner gate
+OK unexpected-role cannot use saved connection navigation to bypass the owner gate
+OK invalid saved target is discarded: https://outside.invalid/
+OK invalid saved target is discarded: //outside.invalid/
+OK invalid saved target is discarded: javascript:alert(1)
+OK invalid saved target is discarded: pengendali
+OK invalid saved target is discarded: SAMBUNGAN
+OK invalid saved target is discarded: #sambungan
+OK another protected link clears an older connection destination
+OK logout clears pending return state and opens login
+OK login after logout follows the ordinary dashboard route
+OK denied browser storage still permits an owner return during this page visit
+OK logout clears the memory fallback when browser storage is denied
+OK fresh page without usable persisted state safely falls back to dashboard
+OK a separate tab without the pending destination retains ordinary login behavior
+PASS 25 auth-return checks; real workspace script in a synthetic VM, no network
+
+Additional validation: node --check whatsapp/ruang.js exited 0.
+The prior 451 suites were not rerun.

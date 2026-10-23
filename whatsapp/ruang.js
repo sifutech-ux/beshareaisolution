@@ -1,4 +1,6 @@
 const UI_KEY = "beshare-os-ui";
+const AUTH_RETURN_KEY = "beshare-os-auth-return";
+let authReturn = null;
 let live = null;
 let csrf = "";
 let ready = false;
@@ -18,6 +20,29 @@ const NAV = [
   ["audit", "Audit", "audit"],
   ["pengendali", "Pengendali", "operator"]
 ];
+
+function setAuthReturn(hash) {
+  authReturn = hash === "sambungan" ? "sambungan" : "";
+  try {
+    if (authReturn) sessionStorage.setItem(AUTH_RETURN_KEY, authReturn);
+    else sessionStorage.removeItem(AUTH_RETURN_KEY);
+  } catch {
+    /* Kekalkan destinasi dalam tab ini jika storan pelayar tidak tersedia. */
+  }
+}
+
+function consumeAuthReturn(state) {
+  if (authReturn === null) {
+    try {
+      authReturn = sessionStorage.getItem(AUTH_RETURN_KEY) === "sambungan" ? "sambungan" : "";
+    } catch {
+      authReturn = "";
+    }
+  }
+  const target = authReturn;
+  setAuthReturn("");
+  return target === "sambungan" && state && role(state) === "owner" ? "sambungan" : "papan";
+}
 
 function blankUi() {
   return {
@@ -280,6 +305,7 @@ function route() {
   const root = document.getElementById("app");
   const open = ["daftar", "masuk", "lupa", "sahkan"];
   if (!open.includes(hash) && !state) {
+    setAuthReturn(hash);
     location.hash = "masuk";
     return;
   }
@@ -597,8 +623,8 @@ function connection(state) {
     <ol class="record-steps">
       <li>Log masuk ke workspace.</li>
       <li>Buka halaman ini dan baca empat keadaan di bawah.</li>
-      <li>Tekan Buka tetingkap Meta. Facebook meminta kebenaran whatsapp_business_management.</li>
-      <li>Cipta satu templat mesej dalam aplikasi atau dalam WhatsApp Manager.</li>
+      <li>Untuk nombor sedia ada dalam WhatsApp Business App, pilih Sambung WhatsApp Business App. Buka tetingkap Meta ialah aliran biasa.</li>
+      <li>Semak hasil sambungan selepas aliran Meta. Token tersimpan sahaja belum mengesahkan nombor boleh digunakan.</li>
     </ol>
     <h2>Empat keadaan</h2>
     <p class="muted">Keadaan ini datang dari pelayan. Token yang tersimpan belum bermaksud nombor sudah boleh menghantar mesej. Pendaftaran nombor tidak dijalankan dari skrin ini.</p>
@@ -725,6 +751,7 @@ function onClick(event) {
       signupState = "";
       signupQueue = null;
       clearSignupRecord();
+      setAuthReturn("");
       inboxLoad = "";
       location.hash = "masuk";
       route();
@@ -883,7 +910,7 @@ function onSubmit(event) {
           return;
         }
         applyLive(result);
-        location.hash = "papan";
+        location.hash = consumeAuthReturn(load());
         route();
       });
       return;
@@ -894,7 +921,7 @@ function onSubmit(event) {
         return;
       }
       applyLive(result);
-      location.hash = "papan";
+      location.hash = consumeAuthReturn(load());
       route();
     });
     return;
@@ -1197,6 +1224,7 @@ function openCoexistenceSignup() {
 
 const SIGNUP_RECORD = "beshare-os-signup";
 let signupReturnTimer = 0;
+let signupLaunchTimer = 0;
 
 function readSignupRecord() {
   try {
@@ -1320,36 +1348,55 @@ function beginSignup(options) {
       : "Tetingkap Meta tidak dibuka. App ID dan Configuration ID belum dipasang pada pelayan.");
     return;
   }
+  window.clearTimeout(signupLaunchTimer);
   const pending = { code: "", finish: false };
   signupQueue = pending;
   writeSignupRecord({ state: "", code: "", events: [], at: Date.now(), codeSent: false, finish: false, reported: false, hidden: false });
-  window.FB.login((response) => {
-    if (signupQueue !== pending) return;
-    const code = signupCode(response && response.authResponse ? response.authResponse.code : "");
-    pending.status = metaStatus(response);
-    if (code) {
-      pending.code = code;
-      rememberSignupCode(code);
-      flushSignup();
-      return;
-    }
-    if (document.visibilityState === "hidden") return;
-    pending.reported = true;
-    const record = readSignupRecord();
-    if (record) {
-      record.reported = true;
-      writeSignupRecord(record);
-    }
-    signupFailure(pending.status
-      ? "Tetingkap Meta ditutup sebelum kod kebenaran diterima. Keadaan: " + pending.status + ". Sambungan tidak disimpan."
-      : "Tetingkap Meta ditutup sebelum kod kebenaran diterima. Sambungan tidak disimpan.");
-  }, options);
-  const started = callApi("sambung", {});
   const hint = document.getElementById("signup-hint");
-  if (hint) hint.textContent = "Tetingkap Meta dibuka. Biarkan workspace ini terbuka sehingga kod diterima.";
+  if (hint) hint.textContent = "Meminta tetingkap Meta. Jika tiada tetingkap muncul, benarkan pop-up atau buka workspace dalam pelayar biasa.";
+  signupLaunchTimer = window.setTimeout(() => {
+    if (signupQueue !== pending || pending.code || pending.reported) return;
+    const record = readSignupRecord();
+    if (record && (record.codeSent || record.finish || record.hidden)) return;
+    showSignupNote("Belum menerima respons Meta. Jika tetingkap tidak muncul, benarkan pop-up atau buka workspace dalam pelayar biasa, kemudian cuba lagi. Sambungan belum disahkan.");
+  }, 15000);
+  try {
+    window.FB.login((response) => {
+      if (signupQueue !== pending) return;
+      window.clearTimeout(signupLaunchTimer);
+      const code = signupCode(response && response.authResponse ? response.authResponse.code : "");
+      pending.status = metaStatus(response);
+      if (code) {
+        pending.code = code;
+        rememberSignupCode(code);
+        flushSignup();
+        return;
+      }
+      if (document.visibilityState === "hidden") return;
+      pending.reported = true;
+      const record = readSignupRecord();
+      if (record) {
+        record.reported = true;
+        writeSignupRecord(record);
+      }
+      signupFailure(pending.status
+        ? "Tetingkap Meta ditutup sebelum kod kebenaran diterima. Keadaan: " + pending.status + ". Sambungan tidak disimpan."
+        : "Tetingkap Meta ditutup sebelum kod kebenaran diterima. Sambungan tidak disimpan.");
+    }, options);
+  } catch {
+    window.clearTimeout(signupLaunchTimer);
+    signupQueue = null;
+    signupState = "";
+    clearSignupRecord();
+    signupFailure("Tetingkap Meta tidak dapat dimulakan. Benarkan pop-up atau cuba pelayar biasa. Sambungan tidak disimpan.");
+    return;
+  }
+  if (pending.reported && !pending.code) return;
+  const started = callApi("sambung", {});
   started.then((data) => {
     if (signupQueue !== pending) return;
     if (!data || data.ok !== true || !/^[0-9a-f]{64}$/.test(data.state || "")) {
+      window.clearTimeout(signupLaunchTimer);
       signupQueue = null;
       signupState = "";
       clearSignupRecord();
