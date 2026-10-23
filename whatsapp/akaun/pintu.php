@@ -5,6 +5,7 @@ use BesharOs\AuthException;
 use BesharOs\AuthHttp;
 use BesharOs\AiReplyStore;
 use BesharOs\Db;
+use BesharOs\KnowledgeCentre;
 use BesharOs\MetaGraph;
 use BesharOs\PrivateConfig;
 use BesharOs\RateLimit;
@@ -81,7 +82,8 @@ try {
         }
     }
     $ai = $seal instanceof TokenSeal && is_array($private) ? new AiReplyStore($pdo, $seal, $private) : null;
-    $http = new AuthHttp($pdo, new RateLimit(RateLimit::resolveDirectory()), $gateway, $ai);
+    $knowledge = $seal instanceof TokenSeal ? new KnowledgeCentre($pdo, $seal) : null;
+    $http = new AuthHttp($pdo, new RateLimit(RateLimit::resolveDirectory()), $gateway, $ai, $knowledge);
     $result = $http->handle($method, $action, $_SESSION, $body, $headers, $remote, $host, session_id());
     if ($result['regenerate']) {
         session_regenerate_id(true);

@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace BesharOs;
 
 /**
- * One bounded text-send attempt. The caller owns authorization, consent,
+ * One bounded text or image-send attempt. The caller owns authorization, consent,
  * customer-service-window checks, durable reservation, and reconciliation.
  */
 final class WhatsAppTextSender
@@ -36,8 +36,12 @@ final class WhatsAppTextSender
         string $phoneId,
         string $recipient,
         string $text,
-        ?string $replyToMessageId = null
+        ?string $replyToMessageId = null,
+        ?array $media = null
     ): array {
+        if ($media !== null) {
+            return $this->sendImage($token, $phoneId, $recipient, $text, $replyToMessageId, $media);
+        }
         $recipient = $this->recipient($recipient);
         if ($recipient === null || preg_match('/\A[0-9]{5,32}\z/', $phoneId) !== 1
             || preg_match('/\A[A-Za-z0-9._~+\/|:=-]{16,4096}\z/', $token) !== 1
@@ -61,7 +65,57 @@ final class WhatsAppTextSender
         } catch (\Throwable) {
             return $this->failed(false, 'invalid_input');
         }
+        return $this->postMessage($token, $phoneId, $recipient, $body);
+    }
 
+    /** Uploads the exact private source image, then makes at most one message request. */
+    private function sendImage(string $token, string $phoneId, string $recipient, string $caption, ?string $replyTo, array $media): array
+    {
+        $recipient = $this->recipient($recipient);
+        if ($recipient === null || preg_match('/\A[0-9]{5,32}\z/', $phoneId) !== 1
+            || preg_match('/\A[A-Za-z0-9._~+\/|:=-]{16,4096}\z/', $token) !== 1
+            || !is_string($media['bytes'] ?? null) || strlen($media['bytes']) < 1 || strlen($media['bytes']) > 2097152
+            || !in_array($media['mime'] ?? null, ['image/jpeg', 'image/png'], true)
+            || trim($caption) === '' || strlen($caption) > self::MESSAGE_BYTES || preg_match('//u', $caption) !== 1
+            || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $caption) === 1
+            || preg_match_all('/./us', $caption) > 1024
+            || ($replyTo !== null && !$this->messageId($replyTo))) { return $this->failed(false, 'invalid_image'); }
+        set_error_handler(static fn (): bool => true);
+        try { $info = getimagesizefromstring($media['bytes']); }
+        finally { restore_error_handler(); error_clear_last(); }
+        if (!is_array($info) || ($info['mime'] ?? null) !== $media['mime']) {
+            return $this->failed(false, 'invalid_image');
+        }
+        try {
+            $upload = ($this->http)('POST',
+                'https://graph.facebook.com/' . $this->graphVersion . '/' . $phoneId . '/media',
+                ['authorization' => 'Bearer ' . $token],
+                ['messaging_product' => 'whatsapp', 'type' => $media['mime'],
+                 'file' => ['bytes' => $media['bytes'], 'mime' => $media['mime'],
+                    'filename' => $media['mime'] === 'image/png' ? 'image.png' : 'image.jpg']]);
+            if (!is_array($upload) || !is_int($upload['status'] ?? null) || $upload['status'] < 200 || $upload['status'] >= 300
+                || !is_string($upload['body'] ?? null) || strlen($upload['body']) > self::RESPONSE_BYTES) {
+                return $this->failed(false, 'image_upload_failed');
+            }
+            $uploaded = json_decode($upload['body'], true, 16, JSON_THROW_ON_ERROR | JSON_BIGINT_AS_STRING);
+            if (!is_array($uploaded) || array_key_exists('error', $uploaded) || !is_string($uploaded['id'] ?? null)
+                || preg_match('/\A[0-9]{5,32}\z/', $uploaded['id']) !== 1) {
+                return $this->failed(false, 'image_upload_failed');
+            }
+            $request = ['messaging_product' => 'whatsapp', 'recipient_type' => 'individual', 'to' => $recipient,
+                'type' => 'image', 'image' => ['id' => $uploaded['id'], 'caption' => trim($caption)]];
+            if ($replyTo !== null) { $request['context'] = ['message_id' => $replyTo]; }
+            $body = json_encode($request, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            // Even an uncertain upload cannot have sent a customer-facing message.
+            return $this->failed(false, 'image_upload_failed');
+        }
+        // Media IDs are deliberately not reused across connections or after expiry.
+        return $this->postMessage($token, $phoneId, $recipient, $body);
+    }
+
+    private function postMessage(string $token, string $phoneId, string $recipient, string $body): array
+    {
         try {
             $result = ($this->http)(
                 'POST',
@@ -137,17 +191,26 @@ final class WhatsAppTextSender
     }
 
     /** @param array<string,string> $headers @return array{status:int,body:string} */
-    private function request(string $method, string $url, array $headers, string $body): array
+    private function request(string $method, string $url, array $headers, string|array $body): array
     {
         $prefix = 'https://graph.facebook.com/' . $this->graphVersion . '/';
         if ($method !== 'POST' || !str_starts_with($url, $prefix)
-            || preg_match('/\A[0-9]{5,32}\/messages\z/', substr($url, strlen($prefix))) !== 1
+            || preg_match('/\A[0-9]{5,32}\/(messages|media)\z/', substr($url, strlen($prefix))) !== 1
             || !function_exists('curl_init')) {
             throw new \RuntimeException('sender_transport');
         }
         $lines = ['Accept: application/json'];
         foreach ($headers as $name => $value) {
             $lines[] = $name . ': ' . $value;
+        }
+        if (is_array($body)) {
+            if (!str_ends_with($url, '/media') || !class_exists('CURLStringFile')) {
+                throw new \RuntimeException('sender_transport');
+            }
+            $body = ['messaging_product' => 'whatsapp', 'type' => $body['type'],
+                'file' => new \CURLStringFile($body['file']['bytes'], $body['file']['filename'], $body['file']['mime'])];
+        } elseif (!str_ends_with($url, '/messages')) {
+            throw new \RuntimeException('sender_transport');
         }
         $response = '';
         $ch = null;

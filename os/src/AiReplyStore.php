@@ -84,6 +84,9 @@ final class AiReplyStore
             if (($old === null ? 0 : (int) $old['knowledge_revision']) !== $revision) {
                 throw new AuthException('Tetapan telah berubah. Muat semula sebelum menyimpan.', 409);
             }
+            if (class_exists(KnowledgeCentre::class)) {
+                (new KnowledgeCentre($this->pdo, $this->seal))->assertLegacyKnowledge((int) $actor['business_id'], $knowledge);
+            }
             $now = gmdate('Y-m-d H:i:s');
             $values = [
                 $connectionId, $enabled ? 1 : 0, bin2hex($sealed['ciphertext']), bin2hex($sealed['nonce']),
@@ -209,11 +212,17 @@ final class AiReplyStore
             if ($row['direction'] === 'in' && is_string($body['name'] ?? null) && trim($body['name']) !== '') {
                 $conversations[$id]['name'] = $body['name'];
             }
-            $conversations[$id]['messages'][] = [
+            $message = [
                 'from' => $row['direction'] === 'in' ? 'customer' : 'ai',
                 'text' => is_string($body['text'] ?? null) ? $body['text'] : '[Mesej bukan teks]',
                 'wamid' => $row['wamid'] ?? '', 'status' => $row['status'], 'at' => $row['message_at'],
             ];
+            if ($row['direction'] === 'out' && ($body['type'] ?? null) === 'image'
+                && is_string($body['media_id'] ?? null) && preg_match('/\A[a-f0-9]{32}\z/', $body['media_id']) === 1) {
+                $message['type'] = 'image';
+                $message['media_url'] = '/whatsapp/akaun/knowledge-media.php?id=' . rawurlencode($body['media_id']);
+            }
+            $conversations[$id]['messages'][] = $message;
         }
         foreach ($legacyInbox['conversations'] ?? [] as $row) {
             $id = $aliases[$row['id']] ?? null;

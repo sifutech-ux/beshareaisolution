@@ -31,6 +31,8 @@ require __DIR__ . '/PhoneOverride.php';
 require __DIR__ . '/CoexistenceWorker.php';
 require __DIR__ . '/CoexistenceArchive.php';
 require __DIR__ . '/WhatsAppGateway.php';
+require_once __DIR__ . '/KnowledgeCentre.php';
+require_once __DIR__ . '/KnowledgeSource.php';
 require_once __DIR__ . '/AiReplyStore.php';
 require_once __DIR__ . '/AiReplyWorker.php';
 require __DIR__ . '/AuthHttp.php';

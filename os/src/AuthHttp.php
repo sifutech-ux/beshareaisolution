@@ -7,7 +7,7 @@ use PDO;
 
 final class AuthHttp
 {
-    public function __construct(private PDO $pdo, private RateLimit $rates, private ?WhatsAppGateway $whatsapp = null, private ?AiReplyStore $ai = null)
+    public function __construct(private PDO $pdo, private RateLimit $rates, private ?WhatsAppGateway $whatsapp = null, private ?AiReplyStore $ai = null, private ?KnowledgeCentre $knowledge = null)
     {
     }
 
@@ -62,6 +62,21 @@ final class AuthHttp
             ];
         }
         $actor = $this->actor($session);
+        if (in_array($action, ['knowsave', 'knowpublish', 'knowimport'], true)) {
+            if (!$this->knowledge instanceof KnowledgeCentre) { throw new AuthException('Pusat Pengetahuan belum tersedia.', 409); }
+            $this->knowledge->assertRequestScope($actor, $body['expected_business_public_id'] ?? null);
+            if ($action === 'knowsave') { $this->knowledge->saveDraft($actor, $body); }
+            elseif ($action === 'knowpublish') { $this->knowledge->publish($actor, $body); }
+            else {
+                $this->knowledge->assertCanManage($actor);
+                $key = 'knowimport|' . $actor['business_id'] . '|' . $actor['user_id'];
+                if ($this->rates->tooMany($key)) { throw new AuthException('Terlalu banyak import. Cuba lagi kemudian.', 429); }
+                $this->rates->hit($key);
+                $source = (new KnowledgeSource())->import($this->text($body, 'url'));
+                return $this->respond($session, false, ['ok' => true, 'source' => $source]);
+            }
+            return $this->respond($session, false, $this->withInbox($actor));
+        }
         if (in_array($action, ['aiconfig', 'aistop', 'aimode'], true)) {
             if (!$this->ai instanceof AiReplyStore) {
                 throw new AuthException('Tetapan AI belum tersedia.', 409);
@@ -239,7 +254,7 @@ final class AuthHttp
             $members = Tenants::members($this->pdo, $context);
             $audit = Tenants::audit($this->pdo, $context);
         }
-        return [
+        $payload = [
             'ok' => true,
             'user' => [
                 'name' => $context['name'],
@@ -258,6 +273,11 @@ final class AuthHttp
             'inbox_ready' => $this->whatsapp instanceof WhatsAppGateway || $ai['available'],
             'ai' => $ai,
         ];
+        if ($context['role'] === 'owner' && $context['user_id'] === $context['owner_user_id']) {
+            $payload['knowledge_centre'] = $this->knowledge instanceof KnowledgeCentre
+                ? $this->knowledge->view($context) : ['available' => false, 'can_manage' => false];
+        }
+        return $payload;
     }
 
     /**
