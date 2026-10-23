@@ -74,10 +74,13 @@ final class GeminiTransport
                     'propertyOrdering' => ['reply', 'handoff'],
                 ],
             ];
-            // Keep PR #67's no-thinking setting for the configured Flash model.
-            // Other models' thought parts are still rejected below.
+            // Preserve the existing 2.5 request for projects eligible to use it.
             if (in_array($this->model, ['gemini-2.5-flash', 'gemini-2.5-flash-lite'], true)) {
                 $generation['thinkingConfig'] = ['thinkingBudget' => 0, 'includeThoughts' => false];
+            } elseif ($this->model === 'gemini-3.5-flash-lite') {
+                // This stable replacement uses thinking levels and omits legacy sampling fields.
+                unset($generation['candidateCount'], $generation['temperature']);
+                $generation['thinkingConfig'] = ['thinkingLevel' => 'MINIMAL', 'includeThoughts' => false];
             }
             $request = [
                 'systemInstruction' => ['parts' => [['text' =>

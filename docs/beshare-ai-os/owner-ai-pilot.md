@@ -98,6 +98,36 @@ must be a regular non-symlink file, canonical absolute path, outside the reposit
 `public_html`, owned by the CLI effective user with mode `0600`. Never pass credentials
 on the command line, in a PR, or through chat.
 
+## Gemini model selection
+
+For this pilot, use the explicit stable model name `gemini-3.5-flash-lite` when the
+project is eligible. The adapter uses `thinkingLevel: MINIMAL`, disables thought
+summaries, and omits the legacy `candidateCount` and `temperature` fields for this
+model. The request remains JSON-constrained with a 512-token output bound and no tools.
+It does not automatically change models or retry generation after a failure.
+
+The existing `gemini-2.5-flash` and `gemini-2.5-flash-lite` request profiles remain
+available for projects that can already use them. Google currently restricts 2.5 access
+to previous active users while continuing to serve those models. A successful
+authenticated `models.get` or `models.list` response is not proof that the same project
+can generate with the model: `generateContent` may still reject model eligibility or
+quota. Before enabling the pilot, verify one bounded synthetic question through the
+deployed adapter with the existing server-held key. Confirm a completed, valid JSON
+answer; retain only the model name and sanitized outcome, never the key or provider
+body. This provider check does not send a WhatsApp message.
+
+The strict response parser is shared by both model profiles. Truncated responses,
+thought output, malformed JSON and a model-requested handoff all become human handoff.
+The output limit includes thinking tokens, so a `MAX_TOKENS` outcome must be inspected
+before changing that bound; it is not a reason to retry the same inbound job.
+
+Official references, checked 23 October 2026:
+
+- [Gemini 3.5 Flash-Lite model and structured-output support](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite)
+- [Model access and deprecation guidance](https://ai.google.dev/gemini-api/docs/deprecations)
+- [3.5 Flash-Lite migration and parameter changes](https://ai.google.dev/gemini-api/docs/generate-content/whats-new-gemini-3.6)
+- [Thinking levels and output limits](https://ai.google.dev/gemini-api/docs/generate-content/thinking)
+
 ## Controlled setup order
 
 Run commands from the application checkout on the existing host. Prepare the normal

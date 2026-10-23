@@ -108,6 +108,55 @@ $request = json_decode($calls[0][3], true, 32, JSON_THROW_ON_ERROR);
 replyTransportCheck(($request['generationConfig']['responseMimeType'] ?? '') === 'application/json'
     && ($request['generationConfig']['thinkingConfig']['includeThoughts'] ?? null) === false
     && !isset($request['tools']), 'Gemini constrained response');
+replyTransportCheck(($request['generationConfig']['candidateCount'] ?? null) === 1
+    && ($request['generationConfig']['temperature'] ?? null) === 0.2
+    && ($request['generationConfig']['maxOutputTokens'] ?? null) === 512
+    && ($request['generationConfig']['thinkingConfig']['thinkingBudget'] ?? null) === 0
+    && !array_key_exists('thinkingLevel', $request['generationConfig']['thinkingConfig']),
+    'Gemini 2.5 Flash configuration preserved');
+
+// The new stable model has a different request profile and the same strict response contract.
+$flashLiteCalls = [];
+$flashLiteResponse = replyTransportGeminiAnswer(['reply' => 'Waktu operasi ialah 9 pagi hingga 5 petang.', 'handoff' => false]);
+$flashLiteResponse['candidates'][0]['content']['parts'][0]['thoughtSignature'] = 'synthetic_signature';
+$flashLite = new GeminiTransport($apiKey, 'gemini-3.5-flash-lite',
+    function ($method, $url, $headers, $body) use (&$flashLiteCalls, &$flashLiteResponse): array {
+        $flashLiteCalls[] = [$method, $url, $headers, $body];
+        return replyTransportJson(200, $flashLiteResponse);
+    });
+$flashLiteAnswer = $flashLite->reply('Waktu operasi: 9 pagi hingga 5 petang.', 'Pukul berapa buka?');
+replyTransportCheck($flashLiteAnswer === ['reply' => 'Waktu operasi ialah 9 pagi hingga 5 petang.', 'handoff' => false]
+    && count($flashLiteCalls) === 1, 'Gemini 3.5 Flash-Lite accepts final JSON with signature metadata');
+replyTransportCheck($flashLiteCalls[0][0] === 'POST'
+    && $flashLiteCalls[0][1] === 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent'
+    && $flashLiteCalls[0][2]['x-goog-api-key'] === $apiKey
+    && !str_contains($flashLiteCalls[0][1], $apiKey)
+    && !str_contains($flashLiteCalls[0][3], $apiKey), 'Gemini 3.5 Flash-Lite fixed endpoint and header-only key');
+$flashLiteRequest = json_decode($flashLiteCalls[0][3], true, 32, JSON_THROW_ON_ERROR);
+$flashLiteGeneration = $flashLiteRequest['generationConfig'];
+replyTransportCheck(!array_key_exists('candidateCount', $flashLiteGeneration)
+    && !array_key_exists('temperature', $flashLiteGeneration)
+    && $flashLiteGeneration['thinkingConfig'] === ['thinkingLevel' => 'MINIMAL', 'includeThoughts' => false],
+    'Gemini 3.5 Flash-Lite omits legacy parameters and selects minimal thinking');
+replyTransportCheck($flashLiteGeneration['maxOutputTokens'] === 512
+    && $flashLiteGeneration['responseMimeType'] === 'application/json'
+    && $flashLiteGeneration['responseSchema'] === $request['generationConfig']['responseSchema']
+    && !isset($flashLiteRequest['tools']), 'Gemini 3.5 Flash-Lite preserves bounded JSON and no tools');
+$flashLiteInvalid = [];
+$flashLiteInvalid['human_handoff'] = replyTransportGeminiAnswer(['reply' => 'Discard this text.', 'handoff' => true]);
+$flashLiteInvalid['wrong_type'] = replyTransportGeminiAnswer(['reply' => 'Answer', 'handoff' => 'false']);
+$flashLiteInvalid['extra_field'] = replyTransportGeminiAnswer(['reply' => 'Answer', 'handoff' => false, 'reasoning' => 'Discard']);
+$flashLiteInvalid['truncated'] = replyTransportGeminiAnswer(['reply' => 'Partial', 'handoff' => false]);
+$flashLiteInvalid['truncated']['candidates'][0]['finishReason'] = 'MAX_TOKENS';
+$flashLiteInvalid['thought'] = replyTransportGeminiAnswer(['reply' => 'Discard thought text.', 'handoff' => false]);
+$flashLiteInvalid['thought']['candidates'][0]['content']['parts'][0]['thought'] = true;
+foreach ($flashLiteInvalid as $case => $response) {
+    $flashLiteResponse = $response;
+    $beforeFlashLite = count($flashLiteCalls);
+    replyTransportCheck($flashLite->reply('Approved facts.', 'Question') === $handoff
+        && count($flashLiteCalls) === $beforeFlashLite + 1,
+        'Gemini 3.5 Flash-Lite fails closed without retry: ' . $case);
+}
 
 $history = [];
 for ($i = 0; $i < 20; $i++) {
