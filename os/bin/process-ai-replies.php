@@ -5,6 +5,7 @@ use BesharOs\AiReplyWorker;
 use BesharOs\AiReplySchema;
 use BesharOs\Db;
 use BesharOs\GeminiTransport;
+use BesharOs\KnowledgeCentre;
 use BesharOs\PrivateConfig;
 use BesharOs\TokenSeal;
 use BesharOs\WhatsAppTextSender;
@@ -64,7 +65,9 @@ try {
         $pdo,
         $seal,
         [$generator, 'reply'],
-        [$sender, 'send']
+        [$sender, 'send'],
+        null,
+        new KnowledgeCentre($pdo, $seal)
     );
     $result = $worker->run($businessId, $limit);
     // Only aggregate counters leave the server. Tokens, prompts and message bodies never do.

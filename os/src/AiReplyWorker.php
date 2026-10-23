@@ -7,6 +7,8 @@ use Closure;
 use PDO;
 use Throwable;
 
+require_once __DIR__ . '/KnowledgeReply.php';
+
 /**
  * A single-attempt owner pilot worker over the already authenticated OS queue.
  *
@@ -21,13 +23,15 @@ final class AiReplyWorker
     private Closure $send;
     private Closure $now;
     private const LEASE_SECONDS = 180;
+    private const SEND_MARGIN_SECONDS = 60;
 
     public function __construct(
         private PDO $pdo,
         private TokenSeal $seal,
         callable $generate,
         callable $send,
-        ?callable $now = null
+        ?callable $now = null,
+        private ?KnowledgeCentre $knowledgeCentre = null
     ) {
         $this->generate = Closure::fromCallable($generate);
         $this->send = Closure::fromCallable($send);
@@ -76,24 +80,21 @@ final class AiReplyWorker
                 }
                 $counts['archived']++;
                 try {
-                    $result = ($this->generate)($claim['knowledge'], $claim['body']['text'], $claim['history']);
+                    $result = ($this->generate)($claim['knowledge'], $claim['body']['text'], $claim['history'],
+                        KnowledgeReply::catalog($claim['runtime']));
+                    $plan = is_array($result) ? KnowledgeReply::plan($claim['runtime'], $result) : null;
                 } catch (Throwable) {
                     $this->stop($businessId, (int) $id, 'generation_failed');
                     $counts['handoff']++;
                     continue;
                 }
-                if (!is_array($result) || !is_bool($result['handoff'] ?? null)
-                    || ($result['handoff'] ?? true) === true
-                    || !is_string($result['reply'] ?? null)
-                    || trim($result['reply']) === '' || strlen($result['reply']) > 4000
-                    || preg_match('//u', $result['reply']) !== 1) {
+                if ($plan === null) {
                     $this->stop($businessId, (int) $id, 'human_review');
                     $counts['handoff']++;
                     continue;
                 }
                 $counts['generated']++;
-                $reply = trim($result['reply']);
-                if (!$this->saveGenerated($businessId, (int) $id, $reply, (string) $claim['body']['wamid'])) {
+                if (!$this->saveGenerated($businessId, (int) $id, $plan, (string) $claim['body']['wamid'])) {
                     $counts['handoff']++;
                     continue;
                 }
@@ -101,7 +102,7 @@ final class AiReplyWorker
                     $counts['handoff']++;
                     continue;
                 }
-                $outcome = $this->dispatch($businessId, (int) $id, $claim['body'], $reply);
+                $outcome = $this->dispatch($businessId, (int) $id, $claim['body'], $plan);
                 $counts[$outcome]++;
             }
         } finally {
@@ -220,6 +221,7 @@ final class AiReplyWorker
             $reason = $this->gate($context, $body, null);
             $knowledge = '';
             $history = [];
+            $runtime = [];
             if ($reason === null && $body['type'] !== 'text') {
                 $reason = 'unsupported_message';
             }
@@ -237,6 +239,8 @@ final class AiReplyWorker
                         throw new \RuntimeException('invalid_knowledge');
                     }
                     $history = $this->history($businessId, $conversationId, $eventId);
+                    $runtime = $this->knowledgeCentre?->runtime($businessId) ?? [];
+                    $this->assertRuntimeHash($runtime, $context['settings']);
                 } catch (Throwable) {
                     $reason = 'knowledge_or_history_unreadable';
                 }
@@ -282,19 +286,19 @@ final class AiReplyWorker
                  locked_until = ?, next_retry_at = NULL WHERE id = ? AND business_id = ?",
                 [$this->date($now + self::LEASE_SECONDS), $eventId, $businessId]
             );
-            return ['kind' => 'generate', 'body' => $body, 'knowledge' => $knowledge, 'history' => $history];
+            return ['kind' => 'generate', 'body' => $body, 'knowledge' => $knowledge, 'history' => $history, 'runtime' => $runtime];
         });
     }
 
-    private function saveGenerated(int $businessId, int $eventId, string $reply, string $replyTo): bool
+    private function saveGenerated(int $businessId, int $eventId, array $plan, string $replyTo): bool
     {
-        return $this->transaction(function () use ($businessId, $eventId, $reply, $replyTo): bool {
+        return $this->transaction(function () use ($businessId, $eventId, $plan, $replyTo): bool {
             $job = $this->job($businessId, $eventId);
             if ($job === null || $job['status'] !== 'generating' || (int) $job['generation_attempts'] !== 1) {
                 return false;
             }
             $date = $this->date($this->clock());
-            $body = json_encode(['text' => $reply, 'reply_to' => $replyTo], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            $body = json_encode(array_merge($plan, ['reply_to' => $replyTo]), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
             $archive = $this->seal->seal($body, 200000);
             $this->execute(
                 "INSERT INTO ai_messages
@@ -341,11 +345,11 @@ final class AiReplyWorker
         });
     }
 
-    private function dispatch(int $businessId, int $eventId, array $body, string $reply): string
+    private function dispatch(int $businessId, int $eventId, array $body, array $plan): string
     {
         // Sending was durably claimed in the previous transaction. Keep control rows locked
         // during the bounded transport call so pause/disable cannot commit between check and send.
-        return $this->transaction(function () use ($businessId, $eventId, $body, $reply): string {
+        return $this->transaction(function () use ($businessId, $eventId, $body, $plan): string {
             $job = $this->job($businessId, $eventId);
             if ($job === null || $job['status'] !== 'sending' || (int) $job['send_attempts'] !== 1) {
                 return 'skipped';
@@ -356,6 +360,22 @@ final class AiReplyWorker
                 $this->terminal($job, 'handoff', $reason, true);
                 return 'handoff';
             }
+            $media = null;
+            try {
+                $runtime = $this->knowledgeCentre?->runtime($businessId) ?? [];
+                $this->assertRuntimeHash($runtime, $context['settings']);
+                if (!KnowledgeReply::stillApproved($runtime, $plan)) {
+                    $this->terminal($job, 'handoff', 'content_unapproved', true);
+                    return 'handoff';
+                }
+                if ($plan['type'] === 'image') {
+                    if ($this->knowledgeCentre === null) { throw new \RuntimeException('media_unavailable'); }
+                    $media = $this->knowledgeCentre->mediaForWorker($businessId, $plan['media_id']);
+                }
+            } catch (Throwable) {
+                $this->terminal($job, 'handoff', 'media_unreadable', true);
+                return 'handoff';
+            }
             try {
                 $token = $this->open($context['connection'], 'token');
             } catch (Throwable) {
@@ -364,12 +384,12 @@ final class AiReplyWorker
             }
             try {
                 $result = ($this->send)(
-                    $token, $context['connection']['phone_number_id'], $body['from'], $reply, $body['wamid']
+                    $token, $context['connection']['phone_number_id'], $body['from'], $plan['text'], $body['wamid'], $media
                 );
             } catch (Throwable) {
                 $result = ['sent' => false, 'ambiguous' => true];
             } finally {
-                unset($token);
+                unset($token, $media);
             }
             $sent = is_array($result) && ($result['sent'] ?? false) === true
                 && ($result['ambiguous'] ?? true) === false
@@ -510,7 +530,7 @@ final class AiReplyWorker
         }
         if ($c['token_state'] !== 'verified' || $c['disconnected_at'] !== null
             || $c['webhook_state'] !== 'subscribed' || $c['registration_state'] !== 'registered'
-            || ($c['token_expires_at'] !== null && $this->timeOf($c['token_expires_at']) <= $now + 30)) {
+            || ($c['token_expires_at'] !== null && $this->timeOf($c['token_expires_at']) <= $now + self::SEND_MARGIN_SECONDS)) {
             return 'inactive_connection';
         }
         if ($v['mode'] !== 'ai') {
@@ -538,8 +558,8 @@ final class AiReplyWorker
         if ($original < 1 || $original > $now) {
             return 'invalid_timestamp';
         }
-        // Keep the bounded HTTP attempt inside the original inbound 24-hour window.
-        if ($original + 86400 <= $now + 30) {
+        // Reserve both bounded image upload and message dispatch inside the original window.
+        if ($original + 86400 <= $now + self::SEND_MARGIN_SECONDS) {
             return 'expired_window';
         }
         $activated = $this->timeOf($s['activation_at']);
@@ -565,9 +585,19 @@ final class AiReplyWorker
             if (!is_array($body) || !is_string($body['text'] ?? null)) {
                 throw new \RuntimeException('history_unreadable');
             }
-            $history[] = ['role' => $row['direction'] === 'in' ? 'user' : 'assistant', 'text' => $body['text']];
+            $text = $row['direction'] === 'out' && in_array($body['payment'] ?? 'none', ['bank', 'qr'], true)
+                ? 'Maklumat pembayaran yang diluluskan telah dihantar.' : $body['text'];
+            $history[] = ['role' => $row['direction'] === 'in' ? 'user' : 'assistant', 'text' => $text];
         }
         return $history;
+    }
+
+    private function assertRuntimeHash(array $runtime, array $settings): void
+    {
+        if ($runtime !== [] && (!is_string($runtime['_compiled_hash'] ?? null)
+            || !hash_equals((string) $settings['knowledge_hash'], $runtime['_compiled_hash']))) {
+            throw new \RuntimeException('published_knowledge_mismatch');
+        }
     }
 
     private function deliveryStatus(int $businessId, int $connectionId, array $body): void

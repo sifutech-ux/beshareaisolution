@@ -5,6 +5,8 @@ let live = null;
 let csrf = "";
 let ready = false;
 let paintedHash = "";
+// Business drafts, including payment details, stay in memory until explicitly saved.
+let knowledgeEditor = null;
 
 const NAV = [
   ["papan", "Papan", "workspace"],
@@ -120,6 +122,7 @@ function load() {
     conversations: Array.isArray(live.conversations) ? live.conversations : [],
     connection: serverConnection(),
     ai: live.ai && typeof live.ai === "object" ? live.ai : { available: false, enabled: false },
+    knowledgeCentre: live.knowledge_centre && typeof live.knowledge_centre === "object" ? live.knowledge_centre : { available: false, can_manage: false },
     inboxReady: live.inbox_ready === true,
     rules: [],
     invoices: [],
@@ -169,8 +172,11 @@ function applyLive(data) {
   if (data && typeof data.csrf === "string") csrf = data.csrf;
   if (!data || data.ok !== true || !data.user || !data.business) {
     live = null;
+    knowledgeEditor = null;
     return;
   }
+  if (knowledgeEditor && (knowledgeEditor.scope !== knowledgeScope(data)
+      || !data.knowledge_centre || data.knowledge_centre.can_manage !== true)) knowledgeEditor = null;
   live = data;
 }
 
@@ -408,7 +414,7 @@ function shell(state, hash, body) {
         <button class="btn btn--ghost" type="button" data-act="logout">Keluar</button>
       </div>
     </aside>
-    <section>
+    <section${hash === "peti" || hash === "pengetahuan" ? ' class="workspace-bounded"' : ""}>
       <p class="demo-banner">${state.ai.available ? "Peti masuk dan tetapan AI disimpan pada pelayan. Ujian AI hanya membalas nombor yang ditetapkan dalam Pengetahuan. Peraturan automasi, analitik dan bil belum disambung." : state.inboxReady ? "Akaun, pasukan, dan keadaan sambungan datang dari pelayan. Peti masuk hanya memaparkan mesej webhook yang disahkan. Pengetahuan, automasi, analitik, dan bil belum disambung." : "Akaun dan pasukan datang dari pelayan. Sambungan Meta belum dikonfigurasi pada pelayan ini. Peti masuk, pengetahuan, automasi, analitik, dan bil belum disambung."}</p>
       ${state.notice ? `<p class="error">${esc(state.notice)}</p>` : ""}
       ${body}
@@ -464,7 +470,7 @@ function talk(state, current) {
   if (!current) return `<p class="muted">Pilih perbualan.</p><p><button class="btn btn--ghost" type="button" data-act="pane" data-value="list">Senarai</button></p>`;
   const who = { customer: "Pelanggan", ai: "AI", staff: "Staf" };
   const messages = current.messages.map((item) =>
-    `<div class="msg ${item.from === "staff" ? "msg--staff" : ""}"><strong>${esc(who[item.from] || item.from)}</strong><p>${esc(item.text)}</p><small class="muted">${esc(item.wamid)} · ${esc(item.status || "")}</small></div>`
+    `<div class="msg ${item.from === "staff" ? "msg--staff" : ""}"><strong>${esc(who[item.from] || item.from)}</strong>${knowledgeMediaUrl(item.media_url) ? `<a class="msg-image" href="${esc(knowledgeMediaUrl(item.media_url))}" target="_blank" rel="noopener"><img src="${esc(knowledgeMediaUrl(item.media_url))}" alt="Gambar yang dihantar dalam perbualan" loading="lazy"></a>` : ""}<p>${esc(item.text)}</p><small class="muted">${esc(item.wamid)} · ${esc(item.status || "")}</small></div>`
   ).join("");
   const back = `<div class="phone-bar"><button class="btn btn--ghost" type="button" data-act="pane" data-value="list">Senarai</button><strong>${esc(current.name)}</strong><button class="btn btn--ghost" type="button" data-act="pane" data-value="profile">Profil</button></div>`;
   if (current.mode === "resolved") {
@@ -522,6 +528,7 @@ function contacts(state) {
 }
 
 function knowledge(state) {
+  if (state.knowledgeCentre.available) return knowledgeCentre(state);
   if (state.ai.available) return aiSettings(state);
   const rows = state.knowledge.map((item) =>
     `<tr><td>${esc(item.section)}</td><td>${esc(item.title)}</td><td>${esc(item.body)}</td><td>${item.enabled ? "Hidup" : "Mati"}</td>
@@ -548,31 +555,618 @@ function knowledge(state) {
   </article>`;
 }
 
-function aiSettings(state) {
+function knowledgeScope(state) {
+  return state && state.business && state.user ? state.business.public_id + ":" + state.user.email : "";
+}
+
+function knowledgeDocument(value, fallback = "") {
+  const doc = value && typeof value === "object" ? value : { facts: fallback };
+  const text = (value) => typeof value === "string" ? value : "";
+  const payment = doc.payment && typeof doc.payment === "object" ? doc.payment : {};
+  return {
+    facts: text(doc.facts),
+    sources: (Array.isArray(doc.sources) ? doc.sources : []).map((item) => ({
+      id: text(item.id), kind: ["website", "landing", "facebook", "ads"].includes(item.kind) ? item.kind : "website",
+      url: text(item.url), title: text(item.title), text: text(item.text), enabled: item.enabled === true
+    })),
+    assets: (Array.isArray(doc.assets) ? doc.assets : []).map((item) => ({
+      id: text(item.id), category: ["product", "combo", "reference"].includes(item.category) ? item.category : "product",
+      title: text(item.title), facts: text(item.facts), caption: text(item.caption),
+      when_to_send: text(item.when_to_send), media_id: text(item.media_id), enabled: item.enabled === true
+    })),
+    payment: {
+      enabled: payment.enabled === true, bank_name: text(payment.bank_name), account_name: text(payment.account_name),
+      account_number: text(payment.account_number), instructions: text(payment.instructions), qr_media_id: text(payment.qr_media_id)
+    }
+  };
+}
+
+function knowledgeMediaUrl(value) {
+  if (typeof value !== "string" || value === "") return "";
+  try {
+    const base = location.origin + location.pathname;
+    const expected = new URL("akaun/knowledge-media.php", base);
+    const url = new URL(value, base);
+    if (url.origin !== expected.origin || url.pathname !== expected.pathname || url.username || url.password
+        || !/^[a-f0-9]{32}$/.test(url.searchParams.get("id") || "")) return "";
+    return url.href;
+  } catch {
+    return "";
+  }
+}
+
+function knowledgeEditorFor(state) {
+  const centre = state && state.knowledgeCentre;
+  if (!centre || centre.available !== true || centre.can_manage !== true) return null;
+  const scope = knowledgeScope(state);
+  const revision = Number.isInteger(centre.revision) ? centre.revision : 0;
+  if (!knowledgeEditor || knowledgeEditor.scope !== scope) {
+    const doc = knowledgeDocument(centre.draft, state.ai.knowledge || "");
+    knowledgeEditor = {
+      scope, businessPublicId: state.business.public_id, document: doc, saved: JSON.stringify(doc), revision, dirty: false, busy: "", conflict: false,
+      media: new Map(), open: new Set(), review: false, notice: "", noticeKind: "info", controls: null,
+      publishedRevision: centre.published_revision || 0, publishedAt: centre.published_at || ""
+    };
+  }
+  const editor = knowledgeEditor;
+  if (revision > editor.revision) {
+    if (!editor.dirty && !editor.busy) {
+      editor.document = knowledgeDocument(centre.draft);
+      editor.saved = JSON.stringify(editor.document);
+      editor.revision = revision;
+      editor.review = false;
+      editor.conflict = false;
+    } else {
+      editor.conflict = true;
+    }
+  }
+  if ((centre.published_revision || 0) >= editor.publishedRevision) {
+    editor.publishedRevision = centre.published_revision || 0;
+    editor.publishedAt = centre.published_at || "";
+  }
+  for (const media of Array.isArray(centre.media) ? centre.media : []) {
+    if (media && /^[a-f0-9]{32}$/.test(media.id || "") && knowledgeMediaUrl(media.preview_url)) editor.media.set(media.id, media);
+  }
+  return editor;
+}
+
+function knowledgeId() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function knowledgeCompiledBytes(doc) {
+  // Match the approved server compiler; bank coordinates are not part of model facts.
+  const trim = (value) => value.replace(/^[ \t\n\r\0\x0b]+|[ \t\n\r\0\x0b]+$/g, "");
+  const parts = [];
+  if (trim(doc.facts)) parts.push(trim(doc.facts));
+  for (const source of doc.sources) {
+    if (source.enabled) parts.push("Sumber disahkan: " + trim(source.title) + "\nPautan: " + trim(source.url) + "\n" + trim(source.text));
+  }
+  for (const asset of doc.assets) {
+    if (asset.enabled) parts.push("Gambar diluluskan: " + trim(asset.title) + (trim(asset.facts) ? "\n" + trim(asset.facts) : "") + "\nBila sesuai dihantar: " + trim(asset.when_to_send));
+  }
+  if (doc.payment.enabled) parts.push("Maklumat pembayaran yang diluluskan tersedia. Gunakan butiran pembayaran berstruktur apabila pelanggan meminta cara membayar.");
+  return new TextEncoder().encode(trim(parts.join("\n\n"))).length;
+}
+
+function knowledgeAttrs(group, id, field) {
+  return `data-kc-group="${group}" data-kc-id="${esc(id)}" data-kc-field="${field}"`;
+}
+
+function knowledgeMediaPreview(editor, id, title, qr = false) {
+  const media = editor.media.get(id);
+  const url = media && knowledgeMediaUrl(media.preview_url);
+  if (!url) return `<div class="kc-image-empty">${qr ? "Belum ada gambar QR dipilih." : "Belum ada gambar dipilih."}</div>`;
+  return `<figure class="kc-image-wrap ${qr ? "kc-qr" : ""}"><a href="${esc(url)}" target="_blank" rel="noopener"><img class="kc-image" src="${esc(url)}" alt="${esc(title || (qr ? "Kod QR bayaran" : "Gambar produk"))}" loading="lazy" decoding="async"></a><figcaption>${esc(media.mime === "image/png" ? "PNG" : "JPEG")} · ${Math.ceil(Number(media.size || 0) / 1024)} KB</figcaption></figure>`;
+}
+
+function knowledgeMediaPicker(editor, group, id, field, current, title) {
+  const qr = group === "payment";
+  return `<div class="kc-media-picker">
+    <div data-kc-preview="${esc(id || "payment")}">${knowledgeMediaPreview(editor, current, title, qr)}</div>
+    <div>
+      <label class="field">${qr ? "Pilih gambar QR yang telah dimuat naik" : "Pilih gambar yang telah dimuat naik"}
+        <select ${knowledgeAttrs(group, id, field)}><option value="">Tiada gambar</option>${Array.from(editor.media.values()).map((media, index) => `<option value="${esc(media.id)}" ${media.id === current ? "selected" : ""}>Gambar ${index + 1} · ${media.mime === "image/png" ? "PNG" : "JPEG"} · ${Math.ceil(Number(media.size || 0) / 1024)} KB</option>`).join("")}</select>
+      </label>
+      <label class="field kc-upload">${qr ? "Muat naik gambar QR" : "Muat naik gambar baharu"}
+        <input type="file" accept="image/jpeg,image/png" data-kc-upload="${esc(id)}" data-kc-upload-group="${group}">
+      </label>
+      <p class="muted kc-hint">JPG atau PNG, maksimum 2 MB. Gambar hanya boleh digunakan AI selepas anda menerbitkan draf.</p>
+    </div>
+  </div>`;
+}
+
+function knowledgeSourceCard(editor, item, index) {
+  const attr = (field) => knowledgeAttrs("source", item.id, field);
+  const kinds = [["website", "Laman web"], ["landing", "Landing page"], ["facebook", "Facebook Page"], ["ads", "Iklan"]];
+  return `<details class="kc-card" data-kc-record="${esc(item.id)}" ${editor.open.has(item.id) ? "open" : ""}>
+    <summary><span><strong>${esc(item.title || `Sumber ${index + 1}`)}</strong><small>${esc(kinds.find(([key]) => key === item.kind)?.[1] || "Pautan")} · ${item.enabled ? "Disertakan dalam draf" : "Tidak disertakan"}</small></span></summary>
+    <div class="kc-card-body">
+      <div class="kc-grid">
+        <label class="field">Jenis sumber<select ${attr("kind")}>${kinds.map(([key, label]) => `<option value="${key}" ${item.kind === key ? "selected" : ""}>${label}</option>`).join("")}</select></label>
+        <label class="field">Tajuk sumber<input ${attr("title")} value="${esc(item.title)}" maxlength="160" placeholder="Contoh: Halaman produk utama"></label>
+      </div>
+      <label class="field">Pautan sumber<input ${attr("url")} type="url" inputmode="url" value="${esc(item.url)}" maxlength="2048" placeholder="https://…"></label>
+      <p><button class="btn btn--ghost" type="button" data-act="kc-import" data-value="${esc(item.id)}">Baca pautan</button></p>
+      <p class="muted kc-hint">Semak kandungan yang dibaca sebelum digunakan. Jika Facebook Page atau iklan tidak dapat dibaca, tampal teksnya di bawah.</p>
+      <label class="field">Teks sumber yang telah disemak<textarea ${attr("text")} rows="5" maxlength="8000" placeholder="Tampal teks daripada laman, halaman produk atau iklan anda.">${esc(item.text)}</textarea></label>
+      <div class="kc-card-actions">
+        <label class="kc-check"><input ${attr("enabled")} type="checkbox" ${item.enabled ? "checked" : ""}> <span>Sertakan sumber ini apabila diterbitkan</span></label>
+        <button class="btn btn--ghost kc-remove" type="button" data-act="kc-remove-source" data-value="${esc(item.id)}">Buang sumber</button>
+      </div>
+    </div>
+  </details>`;
+}
+
+function knowledgeAssetCard(editor, item, index) {
+  const attr = (field) => knowledgeAttrs("asset", item.id, field);
+  const categories = [["product", "Produk"], ["combo", "Kombo"], ["reference", "Maklumat penting"]];
+  return `<details class="kc-card" data-kc-record="${esc(item.id)}" ${editor.open.has(item.id) ? "open" : ""}>
+    <summary><span><strong>${esc(item.title || `Gambar ${index + 1}`)}</strong><small>${esc(categories.find(([key]) => key === item.category)?.[1] || "Produk")} · ${item.enabled ? "Boleh dipilih selepas diterbitkan" : "Belum dibenarkan untuk AI"}</small></span></summary>
+    <div class="kc-card-body">
+      ${knowledgeMediaPicker(editor, "asset", item.id, "media_id", item.media_id, item.title)}
+      <div class="kc-grid">
+        <label class="field">Kategori<select ${attr("category")}>${categories.map(([key, label]) => `<option value="${key}" ${item.category === key ? "selected" : ""}>${label}</option>`).join("")}</select></label>
+        <label class="field">Tajuk gambar<input ${attr("title")} value="${esc(item.title)}" maxlength="160" placeholder="Contoh: Kombo Starter"></label>
+      </div>
+      <label class="field">Fakta produk atau kombo<textarea ${attr("facts")} rows="3" maxlength="2000" placeholder="Kandungan, harga yang disahkan, pilihan dan maklumat penting.">${esc(item.facts)}</textarea></label>
+      <label class="field">Kapsyen kepada pelanggan<textarea ${attr("caption")} rows="2" maxlength="1000" placeholder="Teks ringkas yang boleh dihantar bersama gambar.">${esc(item.caption)}</textarea></label>
+      <label class="field">Bila AI boleh menghantar gambar ini<textarea ${attr("when_to_send")} rows="2" maxlength="400" placeholder="Contoh: Apabila pelanggan meminta gambar atau kandungan Kombo Starter.">${esc(item.when_to_send)}</textarea></label>
+      <div class="kc-card-actions">
+        <label class="kc-check"><input ${attr("enabled")} type="checkbox" ${item.enabled ? "checked" : ""}> <span>Benarkan AI memilih gambar ini selepas diterbitkan</span></label>
+        <button class="btn btn--ghost kc-remove" type="button" data-act="kc-remove-asset" data-value="${esc(item.id)}">Buang rekod gambar</button>
+      </div>
+    </div>
+  </details>`;
+}
+
+function knowledgePaymentPreview(editor) {
+  const payment = editor.document.payment;
+  return `<div class="kc-payment-preview">
+    <dl><div><dt>Bank</dt><dd>${esc(payment.bank_name || "—")}</dd></div>
+    <div><dt>Nama pemegang akaun</dt><dd>${esc(payment.account_name || "—")}</dd></div>
+    <div><dt>Nombor akaun</dt><dd>${esc(payment.account_number || "—")}</dd></div></dl>
+    ${payment.instructions ? `<p class="kc-preserve">${esc(payment.instructions)}</p>` : ""}
+    ${knowledgeMediaPreview(editor, payment.qr_media_id, "Kod QR bayaran", true)}
+  </div>`;
+}
+
+function knowledgeReview(editor, state) {
+  const doc = editor.document;
+  const sources = doc.sources.filter((item) => item.enabled);
+  const assets = doc.assets.filter((item) => item.enabled);
+  return `<section class="kc-review kc-section" id="kc-review" aria-labelledby="kc-review-title">
+    <h2 id="kc-review-title">Semak sebelum diterbitkan</h2>
+    <p>Anda akan menggantikan pengetahuan aktif dengan draf versi ${editor.revision}. Hanya maklumat dan gambar yang disertakan di bawah boleh digunakan AI.</p>
+    ${!state.ai.revision ? '<p class="kc-notice">Untuk penerbitan pertama, pilih nombor perniagaan dalam bahagian Ujian & kawalan AI. Balasan AI kekal dimatikan sehingga anda menyimpan tetapan ujian.</p>' : ""}
+    <h3>Fakta perniagaan</h3><div class="kc-preview-text">${esc(doc.facts || "Tiada fakta utama.")}</div>
+    ${sources.length ? `<h3>Sumber yang disertakan</h3>${sources.map((item) => `<details class="kc-card"><summary>${esc(item.title)}</summary><div class="kc-card-body"><p class="muted kc-preserve">${esc(item.url)}</p><div class="kc-preview-text">${esc(item.text)}</div></div></details>`).join("")}` : '<p class="muted">Tiada pautan sumber disertakan.</p>'}
+    ${assets.length ? `<h3>Gambar yang dibenarkan</h3><div class="kc-review-media">${assets.map((item) => `<article class="kc-mini-card">${knowledgeMediaPreview(editor, item.media_id, item.title)}<h4>${esc(item.title)}</h4><p class="kc-preserve">${esc(item.facts)}</p><p class="kc-preserve"><strong>Kapsyen:</strong> ${esc(item.caption || "Tiada kapsyen")}</p><p class="kc-preserve"><strong>Bila dihantar:</strong> ${esc(item.when_to_send)}</p></article>`).join("")}</div>` : '<p class="muted">Tiada gambar produk dibenarkan untuk AI.</p>'}
+    <h3>Maklumat bayaran</h3>
+    ${doc.payment.enabled ? knowledgePaymentPreview(editor) : '<p class="muted">Maklumat bayaran tidak disertakan.</p>'}
+    <p class="muted kc-hint">Had gabungan fakta untuk penerbitan ialah 8,000 bait. Jika terlalu panjang, ringkaskan sumber atau nyahpilih maklumat yang tidak diperlukan.</p>
+    <form id="knowledge-publish">
+      <fieldset class="kc-fields" ${editor.busy ? "disabled" : ""}>
+        <label class="kc-check"><input type="checkbox" name="approved" required> <span>Saya telah menyemak dan mengesahkan fakta, sumber dan gambar yang disertakan.</span></label>
+        ${doc.payment.enabled ? '<label class="kc-check"><input type="checkbox" name="payment_confirmed" required> <span>Saya telah menyemak bank, nama pemegang akaun, nombor akaun, arahan dan kod QR (jika ada) yang dipaparkan.</span></label>' : ""}
+        <p class="kc-actions"><button class="btn" type="submit">Sahkan & terbitkan pengetahuan</button><button class="btn btn--ghost" type="button" data-act="kc-close-review">Kembali menyunting</button></p>
+      </fieldset>
+    </form>
+    <p class="muted kc-hint">Penerbitan mengemas kini pengetahuan. Pengaktifan dan nombor ujian dikawal secara berasingan di bawah.</p>
+  </section>`;
+}
+
+function knowledgeCentre(state) {
+  const editor = knowledgeEditorFor(state);
+  if (!editor) return '<article class="panel"><h1>Pusat Pengetahuan Perniagaan</h1><p class="muted">Pemilik perniagaan mengurus fakta, gambar dan maklumat bayaran yang boleh digunakan AI.</p></article>';
+  const doc = editor.document;
+  const payment = doc.payment;
+  const attr = (field) => knowledgeAttrs("payment", "", field);
+  const note = editor.busy || editor.notice;
+  const compiledBytes = knowledgeCompiledBytes(doc);
+  return `<article class="panel knowledge-centre" aria-busy="${editor.busy ? "true" : "false"}">
+    <header class="kc-heading"><p class="kc-eyebrow">Pengetahuan perniagaan anda</p><h1>Pusat Pengetahuan Perniagaan</h1>
+      <p class="muted">Sediakan fakta, gambar dan maklumat bayaran untuk membantu AI menjawab pelanggan. Simpan draf, semak kandungannya, kemudian terbitkan apabila semuanya betul.</p>
+      <div class="kc-status-row"><span class="kc-status" id="kc-save-state">${editor.dirty ? "Perubahan belum disimpan" : editor.revision ? `Draf disimpan · Versi ${editor.revision}` : "Draf baharu"}</span><span class="muted">${editor.publishedRevision ? `Versi aktif ${esc(editor.publishedRevision)}${editor.publishedAt ? " · " + esc(editor.publishedAt) : ""}` : "Belum diterbitkan"}</span></div>
+    </header>
+    <nav class="kc-nav" aria-label="Bahagian pusat pengetahuan">${[["kc-facts", "01", "Fakta & pautan"], ["kc-assets", "02", "Gambar produk"], ["kc-payment", "03", "Bayaran"], ["kc-test", "04", "Ujian AI"]].map(([id, number, label]) => `<button type="button" data-act="kc-jump" data-value="${id}"><span>${number}</span>${label}</button>`).join("")}</nav>
+    <p id="kc-feedback" class="kc-notice ${!editor.busy && editor.noticeKind === "error" ? "kc-notice--error" : ""}" role="${editor.noticeKind === "error" ? "alert" : "status"}" ${note ? "" : "hidden"}>${esc(note)}</p>
+    ${editor.conflict ? '<div class="kc-notice kc-notice--error" role="alert"><p>Draf pelayan telah berubah dalam sesi lain. Perubahan anda masih berada dalam borang ini. Salin perubahan yang diperlukan sebelum memuat semula draf.</p><button class="btn btn--ghost" type="button" data-act="kc-reload">Buang perubahan & muat semula draf</button></div>' : ""}
+    <form id="knowledge-draft" autocomplete="off">
+      <fieldset class="kc-fields" ${editor.busy ? "disabled" : ""}>
+        <section class="kc-section" id="kc-facts"><h2><span class="kc-number">01</span> Fakta & pautan sumber</h2>
+          <p class="muted">Mulakan dengan maklumat yang paling kerap ditanya: produk, harga, penghantaran, waktu operasi dan bantuan pelanggan.</p>
+          <label class="field">Fakta perniagaan<textarea ${knowledgeAttrs("document", "", "facts")} rows="8" maxlength="8000" placeholder="Tulis fakta yang telah disahkan untuk perniagaan anda.">${esc(doc.facts)}</textarea></label>
+          <div class="kc-section-heading"><h3>Pautan sumber <span class="muted">${doc.sources.length} / 8</span></h3><button class="btn btn--ghost" type="button" data-act="kc-add-source" ${doc.sources.length >= 8 ? "disabled" : ""}>Tambah pautan</button></div>
+          <p class="muted kc-hint">Laman web, landing page, iklan atau Facebook Page. Kandungan yang dibaca menjadi draf untuk anda semak.</p>
+          ${doc.sources.map((item, index) => knowledgeSourceCard(editor, item, index)).join("") || '<div class="kc-empty">Belum ada pautan sumber. Tambah pautan atau terus tulis fakta perniagaan di atas.</div>'}
+        </section>
+        <section class="kc-section" id="kc-assets"><div class="kc-section-heading"><h2><span class="kc-number">02</span> Gambar produk & kombo</h2><button class="btn btn--ghost" type="button" data-act="kc-add-asset" ${doc.assets.length >= 20 ? "disabled" : ""}>Tambah gambar</button></div>
+          <p class="muted">Sediakan gambar produk, kombo atau maklumat penting bersama kapsyen dan keadaan yang sesuai untuk menghantarnya. ${doc.assets.length} / 20 rekod.</p>
+          ${doc.assets.map((item, index) => knowledgeAssetCard(editor, item, index)).join("") || '<div class="kc-empty">Belum ada gambar produk. Setiap gambar boleh diberikan tajuk, fakta, kapsyen dan syarat penggunaannya.</div>'}
+        </section>
+        <section class="kc-section" id="kc-payment"><h2><span class="kc-number">03</span> Maklumat bayaran</h2>
+          <p class="muted">Semak butiran penerima dan gambar QR sebelum membenarkan AI memberikannya kepada pelanggan. Maklumat ini tidak mengesahkan bahawa bayaran telah diterima.</p>
+          <label class="kc-check"><input ${attr("enabled")} type="checkbox" ${payment.enabled ? "checked" : ""}> <span>Benarkan AI berkongsi maklumat bayaran selepas diterbitkan</span></label>
+          <div class="kc-grid kc-payment-fields">
+            <label class="field">Nama bank<input ${attr("bank_name")} value="${esc(payment.bank_name)}" maxlength="100" autocomplete="off" placeholder="Contoh: Nama bank perniagaan"></label>
+            <label class="field">Nama pemegang akaun<input ${attr("account_name")} value="${esc(payment.account_name)}" maxlength="160" autocomplete="off"></label>
+          </div>
+          <label class="field">Nombor akaun<input ${attr("account_number")} type="text" inputmode="numeric" value="${esc(payment.account_number)}" maxlength="64" autocomplete="off"></label>
+          <label class="field">Arahan bayaran / rujukan<textarea ${attr("instructions")} rows="3" maxlength="400" placeholder="Contoh: Gunakan nombor pesanan sebagai rujukan.">${esc(payment.instructions)}</textarea></label>
+          ${knowledgeMediaPicker(editor, "payment", "", "qr_media_id", payment.qr_media_id, "Kod QR bayaran")}
+          <details class="kc-card" open><summary>Pratonton maklumat bayaran</summary><div class="kc-card-body" id="kc-payment-preview">${knowledgePaymentPreview(editor)}</div></details>
+        </section>
+        <div class="kc-capacity"><p id="kc-capacity-label" class="${compiledBytes > 8000 ? "kc-limit-error" : "muted"}">Ruang fakta: ${compiledBytes.toLocaleString("en-US")} / 8,000 bait.</p><progress id="kc-capacity-meter" max="8000" value="${Math.min(compiledBytes, 8000)}" aria-labelledby="kc-capacity-label"></progress><p class="muted kc-hint">Gabungan fakta utama, teks sumber dan keterangan gambar mesti muat sebelum diterbitkan. ${compiledBytes > 8000 ? "Draf masih boleh disimpan. Ringkaskan teks atau nyahpilih sumber yang tidak diperlukan." : "Pautan dan tajuk sumber turut menggunakan ruang ini."}</p></div>
+        <div class="kc-save-bar"><div><strong>Draf dahulu, terbitkan selepas semakan.</strong><p class="muted kc-hint">Perubahan belum disimpan akan hilang jika halaman ditutup. Draf yang disimpan belum digunakan AI.</p></div>
+          <div class="kc-actions"><button class="btn" type="submit" data-kc-save ${editor.conflict || (!editor.dirty && editor.revision > 0) ? "disabled" : ""}>Simpan draf</button><button class="btn btn--ghost" type="button" data-act="kc-review" data-kc-review ${editor.dirty || editor.conflict || editor.revision < 1 ? "disabled" : ""}>Semak & terbitkan</button></div>
+        </div>
+      </fieldset>
+    </form>
+    ${editor.review && !editor.dirty ? knowledgeReview(editor, state) : ""}
+    ${aiSettings(state, true)}
+  </article>`;
+}
+
+function aiSettings(state, embedded = false) {
   const ai = state.ai;
-  if (!ai.can_manage) return `<article class="panel"><h1>Pengetahuan AI</h1><p>Pemilik perniagaan mengurus fakta dan pengaktifan AI. Mod semasa: ${ai.enabled && ai.deployment_ready ? "ujian aktif" : "dimatikan"}.</p></article>`;
+  const centre = state.knowledgeCentre.available === true;
+  const editor = centre ? knowledgeEditorFor(state) : null;
+  const controls = editor && editor.controls ? editor.controls : {
+    connection: ai.connection_id, revision: ai.revision || 0, allowlist: (ai.allowlist || []).join("\n"),
+    daily_limit: ai.daily_limit || 20, enabled: ai.enabled && ai.deployment_ready, approved: false
+  };
+  const tag = embedded ? "section" : "article";
+  const heading = embedded ? "h2" : "h1";
+  if (!ai.can_manage) return `<${tag} class="${embedded ? "kc-section" : "panel"}"><${heading}>Ujian & kawalan AI</${heading}><p>Pemilik perniagaan mengurus fakta dan pengaktifan AI. Mod semasa: ${ai.enabled && ai.deployment_ready ? "ujian aktif" : "dimatikan"}.</p></${tag}>`;
   const connections = Array.isArray(ai.connections) ? ai.connections : [];
-  return `<article class="panel">
-    <h1>Pengetahuan dan ujian AI</h1>
-    <p>AI menjawab menggunakan fakta yang anda sahkan di sini. Soalan yang memerlukan tindakan atau maklumat tambahan diserahkan kepada manusia.</p>
+  return `<${tag} class="${embedded ? "kc-section" : "panel"}" ${embedded ? 'id="kc-test"' : ""}>
+    <${heading}>${embedded ? '<span class="kc-number">04</span> Ujian & kawalan AI' : "Pengetahuan dan ujian AI"}</${heading}>
+    <p>AI menjawab menggunakan pengetahuan yang anda sahkan. Soalan yang memerlukan tindakan atau maklumat tambahan diserahkan kepada manusia.</p>
     <p><strong>${ai.enabled && ai.deployment_ready ? "Ujian AI aktif" : "Ujian AI dimatikan"}</strong> · Penggunaan hari ini: ${esc(ai.quota_used || 0)} / ${esc(ai.daily_limit || 20)} cubaan jawapan.</p>
     ${!ai.deployment_ready ? '<p class="muted">Pengaktifan AI pada pelayan belum tersedia. Anda boleh menyimpan fakta dan nombor ujian dahulu.</p>' : ""}
     ${ai.enabled ? '<p><button class="btn btn--ghost" type="button" data-act="ai-stop">Hentikan AI</button></p>' : ""}
     ${connections.length ? `<form id="ai-settings">
       <p class="error" id="form-error" hidden></p>
-      <input name="revision" type="hidden" value="${esc(ai.revision || 0)}">
-      <label class="field">Nombor perniagaan<select name="connection" required>${connections.map((c) => `<option value="${esc(c.id)}" ${Number(c.id) === Number(ai.connection_id) ? "selected" : ""}>${esc(c.display_phone || "Nombor belum disahkan")}</option>`).join("")}</select></label>
-      <label class="field">Fakta yang boleh digunakan AI<textarea name="knowledge" rows="10" required maxlength="8000" placeholder="Nyatakan perkhidmatan, harga yang disahkan, waktu operasi dan cara mendapatkan bantuan.">${esc(ai.knowledge || "")}</textarea></label>
-      <label class="field">Nombor telefon untuk ujian<textarea name="allowlist" rows="3" required placeholder="Satu nombor pada setiap baris, bermula dengan kod negara.">${esc((ai.allowlist || []).join("\n"))}</textarea></label>
+      <fieldset class="kc-fields" ${editor && editor.busy ? "disabled" : ""}>
+      <input name="revision" type="hidden" value="${esc(controls.revision)}">
+      <label class="field">Nombor perniagaan<select name="connection" ${centre ? 'data-kc-control="connection"' : ""} required>${centre && !ai.revision ? `<option value="" ${!controls.connection ? "selected" : ""}>Pilih nombor perniagaan</option>` : ""}${connections.map((c) => `<option value="${esc(c.id)}" ${Number(c.id) === Number(controls.connection) ? "selected" : ""}>${esc(c.display_phone || "Nombor belum disahkan")}</option>`).join("")}</select></label>
+      ${centre ? `<p class="muted">Tetapan ini menggunakan versi pengetahuan yang telah diterbitkan. Draf yang belum diterbitkan tidak mengubah balasan AI.</p>${!ai.knowledge ? '<p class="kc-notice">Terbitkan pengetahuan perniagaan sebelum mengaktifkan ujian AI.</p>' : ""}` : `<label class="field">Fakta yang boleh digunakan AI<textarea name="knowledge" rows="10" required maxlength="8000" placeholder="Nyatakan perkhidmatan, harga yang disahkan, waktu operasi dan cara mendapatkan bantuan.">${esc(ai.knowledge || "")}</textarea></label>`}
+      <label class="field">Nombor telefon untuk ujian<textarea name="allowlist" ${centre ? 'data-kc-control="allowlist"' : ""} rows="3" required placeholder="Satu nombor pada setiap baris, bermula dengan kod negara.">${esc(controls.allowlist)}</textarea></label>
       <p class="muted">Gunakan nombor telefon lain yang anda kawal untuk menghantar mesej kepada nombor perniagaan. Maksimum 10 nombor ujian.</p>
-      <label class="field">Had cubaan jawapan sehari<input name="daily_limit" type="number" min="1" max="1000" required value="${esc(ai.daily_limit || 20)}"></label>
-      <label><input name="approved" type="checkbox" required> Saya sahkan fakta ini sesuai digunakan dalam balasan kepada nombor ujian.</label>
-      <p><label><input name="enabled" type="checkbox" ${ai.enabled && ai.deployment_ready ? "checked" : ""} ${ai.deployment_ready ? "" : "disabled"}> Aktifkan balasan untuk mesej baharu daripada nombor ujian.</label></p>
-      <button class="btn" type="submit">Simpan fakta dan tetapan</button>
+      <label class="field">Had cubaan jawapan sehari<input name="daily_limit" ${centre ? 'data-kc-control="daily_limit"' : ""} type="number" min="1" max="1000" required value="${esc(controls.daily_limit)}"></label>
+      <label class="kc-check"><input name="approved" ${centre ? 'data-kc-control="approved"' : ""} type="checkbox" ${controls.approved ? "checked" : ""} required> <span>Saya sahkan pengetahuan aktif sesuai digunakan dalam balasan kepada nombor ujian.</span></label>
+      <p><label class="kc-check"><input name="enabled" ${centre ? 'data-kc-control="enabled"' : ""} type="checkbox" ${controls.enabled ? "checked" : ""} ${ai.deployment_ready ? "" : "disabled"}> <span>Aktifkan balasan untuk mesej baharu daripada nombor ujian.</span></label></p>
+      <button class="btn" type="submit">${centre ? "Simpan tetapan ujian" : "Simpan fakta dan tetapan"}</button>
+      </fieldset>
     </form>` : '<p>Sambungkan nombor perniagaan pada pelayan dahulu. Tetapan AI boleh disimpan selepas sambungan itu tersedia.</p>'}
     <p class="muted">Selepas menyimpan, hantar mesej baharu daripada nombor ujian. Lihat jawapan dan status penghantaran dalam Peti masuk. Perbualan yang diambil alih boleh dipulangkan kepada AI dari situ.</p>
     <p><a class="btn btn--ghost" href="#peti">Buka peti masuk</a></p>
-  </article>`;
+  </${tag}>`;
+}
+
+function knowledgeNotice(editor, message, kind = "info") {
+  editor.notice = message;
+  editor.noticeKind = kind;
+}
+
+function knowledgeCurrent(editor) {
+  return knowledgeEditor === editor && live && knowledgeScope(live) === editor.scope
+    && live.knowledge_centre && live.knowledge_centre.can_manage === true;
+}
+
+function knowledgeChrome(editor) {
+  const status = document.getElementById("kc-save-state");
+  if (status) status.textContent = editor.dirty ? "Perubahan belum disimpan" : editor.revision ? `Draf disimpan · Versi ${editor.revision}` : "Draf baharu";
+  const feedback = document.getElementById("kc-feedback");
+  if (feedback) {
+    feedback.textContent = editor.busy || editor.notice;
+    feedback.hidden = !feedback.textContent;
+    feedback.className = "kc-notice" + (!editor.busy && editor.noticeKind === "error" ? " kc-notice--error" : "");
+    feedback.setAttribute("role", editor.noticeKind === "error" ? "alert" : "status");
+  }
+  for (const button of document.querySelectorAll("[data-kc-save]")) button.disabled = Boolean(editor.busy || editor.conflict || (!editor.dirty && editor.revision > 0));
+  for (const button of document.querySelectorAll("[data-kc-review]")) button.disabled = Boolean(editor.busy || editor.dirty || editor.conflict || editor.revision < 1);
+  const review = document.getElementById("kc-review");
+  if (review && !editor.review) review.hidden = true;
+  const bytes = knowledgeCompiledBytes(editor.document);
+  const capacity = document.getElementById("kc-capacity-label");
+  if (capacity) {
+    capacity.textContent = `Ruang fakta: ${bytes.toLocaleString("en-US")} / 8,000 bait.`;
+    capacity.className = bytes > 8000 ? "kc-limit-error" : "muted";
+  }
+  const meter = document.getElementById("kc-capacity-meter");
+  if (meter) meter.value = Math.min(bytes, 8000);
+}
+
+function knowledgeChanged(editor) {
+  editor.dirty = JSON.stringify(editor.document) !== editor.saved;
+  editor.review = false;
+  knowledgeNotice(editor, "");
+  knowledgeChrome(editor);
+}
+
+function knowledgeInput(target) {
+  if (!target || typeof target.getAttribute !== "function") return false;
+  const field = target.getAttribute("data-kc-field");
+  const control = target.getAttribute("data-kc-control");
+  if (!field && !control) return false;
+  const state = load();
+  const editor = knowledgeEditorFor(state);
+  if (!editor || editor.busy) return true;
+  const value = target.type === "checkbox" ? target.checked : target.value;
+  if (control) {
+    if (!["connection", "allowlist", "daily_limit", "enabled", "approved"].includes(control)) return true;
+    if (!editor.controls) editor.controls = {
+      connection: state.ai.connection_id, revision: state.ai.revision || 0,
+      allowlist: (state.ai.allowlist || []).join("\n"), daily_limit: state.ai.daily_limit || 20,
+      enabled: state.ai.enabled && state.ai.deployment_ready, approved: false
+    };
+    editor.controls[control] = value;
+    return true;
+  }
+  const group = target.getAttribute("data-kc-group");
+  const id = target.getAttribute("data-kc-id");
+  const fields = {
+    document: ["facts"], source: ["kind", "url", "title", "text", "enabled"],
+    asset: ["category", "title", "facts", "caption", "when_to_send", "media_id", "enabled"],
+    payment: ["enabled", "bank_name", "account_name", "account_number", "instructions", "qr_media_id"]
+  };
+  if (!fields[group] || !fields[group].includes(field)) return true;
+  const record = group === "document" ? editor.document : group === "payment" ? editor.document.payment
+    : (group === "source" ? editor.document.sources : editor.document.assets).find((item) => item.id === id);
+  if (!record || record[field] === value) return true;
+  record[field] = value;
+  knowledgeChanged(editor);
+  if (group === "payment") {
+    const preview = document.getElementById("kc-payment-preview");
+    if (preview) preview.innerHTML = knowledgePaymentPreview(editor);
+  }
+  if (field === "media_id" || field === "qr_media_id") {
+    const preview = document.querySelector(`[data-kc-preview="${group === "payment" ? "payment" : id}"]`);
+    if (preview) preview.innerHTML = knowledgeMediaPreview(editor, value, record.title || "Kod QR bayaran", group === "payment");
+  }
+  return true;
+}
+
+function knowledgeValidation(doc, publishing = false) {
+  const bytes = (value) => new TextEncoder().encode(value).length;
+  if (doc.sources.length > 8 || doc.assets.length > 20) return "Maksimum 8 pautan sumber dan 20 rekod gambar.";
+  const bounded = (text, limit, label) => bytes(text) > limit ? `${label} terlalu panjang. Ringkaskan kepada paling banyak ${limit.toLocaleString("en-US")} bait.` : "";
+  let error = bounded(doc.facts, 8000, "Fakta perniagaan");
+  if (error) return error;
+  for (const source of doc.sources) {
+    for (const [key, limit, label] of [["url", 2048, "Pautan sumber"], ["title", 160, "Tajuk sumber"], ["text", 8000, "Teks sumber"]]) {
+      error = bounded(source[key], limit, label);
+      if (error) return error;
+    }
+    if (source.url) {
+      try {
+        const url = new URL(source.url);
+        if (url.protocol !== "https:" || url.username || url.password) return "Gunakan pautan HTTPS awam tanpa maklumat log masuk.";
+      } catch {
+        return "Pautan sumber tidak sah. Gunakan alamat penuh bermula dengan https://.";
+      }
+    }
+    if (publishing && source.enabled && (!source.url.trim() || !source.title.trim() || !source.text.trim())) return "Lengkapkan pautan, tajuk dan teks bagi setiap sumber yang disertakan.";
+  }
+  for (const asset of doc.assets) {
+    for (const [key, limit, label] of [["title", 160, "Tajuk gambar"], ["facts", 2000, "Fakta produk"], ["caption", 1000, "Kapsyen"], ["when_to_send", 400, "Syarat penghantaran gambar"]]) {
+      error = bounded(asset[key], limit, label);
+      if (error) return error;
+    }
+    if (publishing && asset.enabled && (!asset.title.trim() || !asset.media_id || !asset.when_to_send.trim())) return "Lengkapkan tajuk, gambar dan syarat penghantaran bagi setiap gambar yang dibenarkan.";
+  }
+  for (const [key, limit, label] of [["bank_name", 100, "Nama bank"], ["account_name", 160, "Nama pemegang akaun"], ["account_number", 64, "Nombor akaun"], ["instructions", 400, "Arahan bayaran"]]) {
+    error = bounded(doc.payment[key], limit, label);
+    if (error) return error;
+  }
+  if (publishing && doc.payment.enabled && (!doc.payment.bank_name.trim() || !doc.payment.account_name.trim() || !doc.payment.account_number.trim())) return "Lengkapkan bank, nama pemegang akaun dan nombor akaun sebelum menerbitkan maklumat bayaran.";
+  if (publishing) {
+    const compiledBytes = knowledgeCompiledBytes(doc);
+    if (compiledBytes === 0) return "Masukkan fakta atau sertakan sumber yang telah disemak sebelum menerbitkan.";
+    if (compiledBytes > 8000) return `Gabungan fakta yang disertakan menggunakan ${compiledBytes.toLocaleString("en-US")} / 8,000 bait. Ringkaskan teks sumber, fakta produk atau nyahpilih sumber yang tidak diperlukan. Draf anda dikekalkan.`;
+  }
+  if (bytes(JSON.stringify(doc)) > 60000) return "Draf terlalu besar. Ringkaskan kandungan atau buang sumber yang tidak diperlukan sebelum menyimpan.";
+  return "";
+}
+
+function knowledgeAccept(editor, result, submitted, publication = false) {
+  const centre = result && result.knowledge_centre;
+  if (!knowledgeCurrent(editor) || knowledgeScope(result) !== editor.scope || !centre || centre.can_manage !== true
+      || !Number.isInteger(centre.revision) || !centre.draft) return false;
+  const unchanged = JSON.stringify(editor.document) === submitted;
+  applyLive(result);
+  const doc = knowledgeDocument(centre.draft);
+  editor.saved = JSON.stringify(doc);
+  if (unchanged) editor.document = doc;
+  editor.revision = centre.revision;
+  editor.dirty = JSON.stringify(editor.document) !== editor.saved;
+  editor.conflict = false;
+  editor.review = false;
+  editor.publishedRevision = centre.published_revision || 0;
+  editor.publishedAt = centre.published_at || "";
+  if (publication && editor.controls && result.ai) editor.controls.revision = result.ai.revision || 0;
+  knowledgeEditorFor(load());
+  return true;
+}
+
+async function saveKnowledgeDraft() {
+  const editor = knowledgeEditorFor(load());
+  if (!editor || editor.busy) return;
+  const error = editor.conflict ? "Draf pelayan telah berubah. Muat semula draf sebelum menyimpan." : knowledgeValidation(editor.document);
+  if (error) { knowledgeNotice(editor, error, "error"); route(); return; }
+  const submitted = JSON.stringify(editor.document);
+  editor.busy = "Menyimpan draf…";
+  route();
+  const result = await callApi("knowsave", { expected_business_public_id: editor.businessPublicId, expected_revision: editor.revision, document: JSON.parse(submitted) });
+  if (!knowledgeCurrent(editor)) return;
+  editor.busy = "";
+  if (result.ok && knowledgeAccept(editor, result, submitted)) knowledgeNotice(editor, editor.dirty ? "Draf disimpan. Masih ada perubahan baharu yang belum disimpan." : "Draf disimpan. Semak dan terbitkan apabila anda bersedia.");
+  else knowledgeNotice(editor, result.error || "Draf tidak dapat disimpan. Perubahan anda masih berada dalam borang.", "error");
+  route();
+}
+
+async function publishKnowledge(data) {
+  const state = load();
+  const editor = knowledgeEditorFor(state);
+  if (!editor || editor.busy) return;
+  const error = editor.dirty || editor.conflict || editor.revision < 1 ? "Simpan draf terkini sebelum menerbitkan." : knowledgeValidation(editor.document, true);
+  if (error || !editor.review || data.get("approved") !== "on" || (editor.document.payment.enabled && data.get("payment_confirmed") !== "on")) {
+    knowledgeNotice(editor, error || "Semak pratonton dan tandakan pengesahan sebelum menerbitkan.", "error");
+    route();
+    return;
+  }
+  const payload = { expected_business_public_id: editor.businessPublicId, expected_revision: editor.revision, approved: true, payment_confirmed: data.get("payment_confirmed") === "on" };
+  if (!state.ai.revision) {
+    const connectionId = Number(editor.controls ? editor.controls.connection : state.ai.connection_id);
+    if (!Number.isSafeInteger(connectionId) || connectionId < 1 || !(state.ai.connections || []).some((item) => Number(item.id) === connectionId)) {
+      knowledgeNotice(editor, "Pilih nombor perniagaan dalam bahagian Ujian & kawalan AI dahulu. Jika tiada pilihan, sambungkan nombor WhatsApp perniagaan.", "error");
+      route();
+      return;
+    }
+    payload.connection_id = connectionId;
+  }
+  const submitted = JSON.stringify(editor.document);
+  editor.busy = "Menerbitkan pengetahuan yang disahkan…";
+  route();
+  const result = await callApi("knowpublish", payload);
+  if (!knowledgeCurrent(editor)) return;
+  editor.busy = "";
+  if (result.ok && knowledgeAccept(editor, result, submitted, true)) {
+    knowledgeNotice(editor, "Pengetahuan diterbitkan. AI akan menggunakan versi yang disahkan mengikut tetapan ujian.");
+  } else {
+    knowledgeNotice(editor, result.error || "Status penerbitan belum dapat disahkan. Muat semula untuk menyemak versi aktif.", "error");
+    editor.review = true;
+  }
+  route();
+}
+
+async function importKnowledgeSource(editor, id) {
+  const source = editor.document.sources.find((item) => item.id === id);
+  if (!source || editor.busy) return;
+  let valid = false;
+  try { const url = new URL(source.url); valid = url.protocol === "https:" && !url.username && !url.password; } catch {}
+  if (!valid) { knowledgeNotice(editor, "Masukkan pautan HTTPS awam sebelum membaca sumber.", "error"); route(); return; }
+  editor.busy = "Membaca pautan sebagai draf…";
+  route();
+  const result = await callApi("knowimport", { expected_business_public_id: editor.businessPublicId, url: source.url });
+  if (!knowledgeCurrent(editor)) return;
+  editor.busy = "";
+  const imported = result.source || result.imported;
+  const target = editor.document.sources.find((item) => item.id === id);
+  if (result.ok && target && imported && typeof imported.url === "string" && typeof imported.title === "string" && typeof imported.text === "string") {
+    target.url = imported.url;
+    target.title = imported.title;
+    target.text = imported.text;
+    editor.open.add(id);
+    knowledgeChanged(editor);
+    knowledgeNotice(editor, "Pautan dibaca sebagai draf. Semak teks, pilih untuk disertakan, kemudian simpan draf. Pengetahuan aktif belum berubah.");
+  } else {
+    knowledgeNotice(editor, (result.error || "Pautan tidak dapat dibaca.") + " Anda boleh tampal teks sumber secara manual.", "error");
+  }
+  route();
+}
+
+async function uploadKnowledgeMedia(target) {
+  const editor = knowledgeEditorFor(load());
+  if (!editor || editor.busy) return;
+  const file = target.files && target.files[0];
+  if (!file) return;
+  if (!["image/jpeg", "image/png"].includes(file.type) || file.size < 1 || file.size > 2 * 1024 * 1024) {
+    target.value = "";
+    knowledgeNotice(editor, "Pilih gambar JPG atau PNG yang tidak melebihi 2 MB.", "error");
+    knowledgeChrome(editor);
+    return;
+  }
+  const group = target.getAttribute("data-kc-upload-group");
+  const id = target.getAttribute("data-kc-upload");
+  if (group !== "payment" && !editor.document.assets.some((item) => item.id === id)) return;
+  const body = new FormData();
+  body.append("expected_business_public_id", editor.businessPublicId);
+  body.append("file", file);
+  editor.busy = "Memuat naik gambar…";
+  route();
+  let result = { ok: false, error: "Gambar tidak dapat dimuat naik. Cuba semula." };
+  try {
+    const response = await fetch("akaun/knowledge-media.php", {
+      method: "POST", credentials: "same-origin", cache: "no-store",
+      headers: { Accept: "application/json", "X-CSRF-Token": csrf }, body
+    });
+    const parsed = await response.json();
+    if (parsed && typeof parsed === "object") result = parsed;
+    if (!response.ok) result.ok = false;
+  } catch {}
+  if (!knowledgeCurrent(editor)) return;
+  if (typeof result.csrf === "string") csrf = result.csrf;
+  editor.busy = "";
+  const media = result.media;
+  if (result.ok && media && /^[a-f0-9]{32}$/.test(media.id || "") && ["image/jpeg", "image/png"].includes(media.mime) && knowledgeMediaUrl(media.preview_url)) {
+    editor.media.set(media.id, media);
+    if (group === "payment") editor.document.payment.qr_media_id = media.id;
+    else {
+      const asset = editor.document.assets.find((item) => item.id === id);
+      if (asset) asset.media_id = media.id;
+    }
+    knowledgeChanged(editor);
+    knowledgeNotice(editor, "Gambar dimuat naik ke draf. Semak dan simpan draf sebelum menerbitkannya.");
+  } else {
+    knowledgeNotice(editor, result.error || "Pelayan tidak memulangkan gambar yang sah. Cuba semula.", "error");
+  }
+  route();
+}
+
+async function reloadKnowledgeDraft(editor) {
+  editor.busy = "Memuat semula draf pelayan…";
+  route();
+  const result = await callApi("sesi");
+  if (!knowledgeCurrent(editor)) return;
+  editor.busy = "";
+  if (result.ok && knowledgeScope(result) === editor.scope && result.knowledge_centre && result.knowledge_centre.can_manage) {
+    applyLive(result);
+    knowledgeEditor = null;
+    const refreshed = knowledgeEditorFor(load());
+    if (refreshed) knowledgeNotice(refreshed, "Draf terkini dimuat semula daripada pelayan.");
+  } else knowledgeNotice(editor, result.error || "Draf tidak dapat dimuat semula. Perubahan anda dikekalkan.", "error");
+  route();
+}
+
+function knowledgeClick(action, value) {
+  const editor = knowledgeEditorFor(load());
+  if (!editor) return;
+  if (action === "kc-jump") {
+    if (["kc-facts", "kc-assets", "kc-payment", "kc-test"].includes(value)) document.getElementById(value)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  if (editor.busy) return;
+  if (action === "kc-import") return importKnowledgeSource(editor, value);
+  if (action === "kc-reload") return reloadKnowledgeDraft(editor);
+  if (action === "kc-review") {
+    const error = editor.dirty || editor.conflict || editor.revision < 1 ? "Simpan draf terkini sebelum membuat semakan penerbitan." : knowledgeValidation(editor.document, true);
+    if (error) knowledgeNotice(editor, error, "error");
+    else { editor.review = true; knowledgeNotice(editor, "Semak maklumat di bawah sebelum mengesahkan penerbitan."); }
+    route();
+    if (!error) document.getElementById("kc-review")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  if (action === "kc-close-review") { editor.review = false; route(); return; }
+  if (action === "kc-add-source" && editor.document.sources.length < 8) {
+    const id = knowledgeId();
+    editor.document.sources.push({ id, kind: "website", url: "", title: "", text: "", enabled: false });
+    editor.open.add(id);
+  } else if (action === "kc-add-asset" && editor.document.assets.length < 20) {
+    const id = knowledgeId();
+    editor.document.assets.push({ id, category: "product", title: "", facts: "", caption: "", when_to_send: "", media_id: "", enabled: false });
+    editor.open.add(id);
+  } else if (action === "kc-remove-source") {
+    editor.document.sources = editor.document.sources.filter((item) => item.id !== value);
+  } else if (action === "kc-remove-asset") {
+    editor.document.assets = editor.document.assets.filter((item) => item.id !== value);
+  } else return;
+  knowledgeChanged(editor);
+  route();
 }
 
 function automation(state) {
@@ -802,12 +1396,16 @@ function onClick(event) {
     return;
   }
   if (!state) return;
+  if (act.startsWith("kc-")) return knowledgeClick(act, value);
   if (act === "ai-stop" || act === "refresh-inbox") {
     button.disabled = true;
     callApi(act === "ai-stop" ? "aistop" : "peti", act === "ai-stop" ? {} : undefined).then((result) => {
       state.notice = result.ok ? (act === "ai-stop" ? "AI dihentikan." : "") : result.error || "Permintaan gagal.";
       save(state);
-      if (result.ok) applyLive(result);
+      if (result.ok) {
+        if (act === "ai-stop" && knowledgeEditor) knowledgeEditor.controls = null;
+        applyLive(result);
+      }
       route();
     });
     return;
@@ -920,6 +1518,8 @@ function onClick(event) {
 }
 
 function onChange(event) {
+  if (event.target && typeof event.target.getAttribute === "function" && event.target.getAttribute("data-kc-upload-group")) return uploadKnowledgeMedia(event.target);
+  if (knowledgeInput(event.target)) return;
   const select = event.target.closest("select[data-act='pilih']");
   if (!select) return;
   callApi("pilih", { public_id: select.value }).then((data) => {
@@ -981,22 +1581,42 @@ function onSubmit(event) {
   }
   const state = load();
   if (!state) return;
+  if (formId === "knowledge-draft") return saveKnowledgeDraft();
+  if (formId === "knowledge-publish") return publishKnowledge(data);
   if (formId === "ai-settings") {
+    const editor = state.knowledgeCentre.available ? knowledgeEditorFor(state) : null;
+    if (editor && editor.busy) return;
     const submit = form.querySelector('button[type="submit"]');
     if (submit) submit.disabled = true;
+    if (editor) {
+      editor.busy = "Menyimpan tetapan ujian…";
+      route();
+    }
     callApi("aiconfig", {
       connection_id: Number(data.get("connection")), expected_revision: Number(data.get("revision")),
-      knowledge: String(data.get("knowledge") || ""),
+      knowledge: state.knowledgeCentre.available ? String(state.ai.knowledge || "") : String(data.get("knowledge") || ""),
       allowlist: String(data.get("allowlist") || "").split(/[\n,]+/).map((s) => s.trim()).filter(Boolean),
       daily_limit: Number(data.get("daily_limit")), approved: data.get("approved") === "on", enabled: data.get("enabled") === "on"
     }).then((result) => {
+      if (editor && !knowledgeCurrent(editor)) return;
+      if (editor) editor.busy = "";
       if (!result.ok) {
+        if (editor) {
+          knowledgeNotice(editor, result.error || "Tetapan AI tidak dapat disimpan.", "error");
+          route();
+          return;
+        }
         if (submit) submit.disabled = false;
         showError(result.error || "Tetapan AI tidak dapat disimpan.");
         return;
       }
-      state.notice = "Fakta dan tetapan AI disimpan pada pelayan.";
-      save(state);
+      if (editor) {
+        editor.controls = null;
+        knowledgeNotice(editor, "Tetapan ujian disimpan. Perubahan draf pengetahuan anda dikekalkan.");
+      } else {
+        state.notice = "Fakta dan tetapan AI disimpan pada pelayan.";
+        save(state);
+      }
       applyLive(result);
       route();
     });
@@ -1080,6 +1700,7 @@ function onSubmit(event) {
 }
 
 function onInput(event) {
+  if (knowledgeInput(event.target)) return;
   const state = load();
   if (!state) return;
   if (event.target.name === "q") {
@@ -1584,4 +2205,15 @@ app.addEventListener("click", onClick);
 app.addEventListener("change", onChange);
 app.addEventListener("submit", onSubmit);
 app.addEventListener("input", onInput);
+app.addEventListener("toggle", (event) => {
+  const id = event.target && typeof event.target.getAttribute === "function" ? event.target.getAttribute("data-kc-record") : "";
+  if (!id || !knowledgeEditor) return;
+  if (event.target.open) knowledgeEditor.open.add(id);
+  else knowledgeEditor.open.delete(id);
+}, true);
+window.addEventListener("beforeunload", (event) => {
+  if (!knowledgeEditor || !knowledgeEditor.dirty) return;
+  event.preventDefault();
+  event.returnValue = "";
+});
 window.addEventListener("hashchange", route);
