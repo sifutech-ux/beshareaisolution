@@ -40,6 +40,52 @@ function replyTransportSendAnswer(string $recipient = '60123456789'): array
     ];
 }
 
+// Key validation accepts literal periods without trimming or widening header-safe bounds.
+$keyTransportCalls = 0;
+$keyTransport = static function () use (&$keyTransportCalls): array {
+    $keyTransportCalls++;
+    return [];
+};
+$dottedKey = str_repeat('A', 26) . '.' . str_repeat('b', 26);
+foreach ([
+    'synthetic_google_key_never_log_123',
+    $dottedKey,
+    str_repeat('a', 7) . '.' . str_repeat('b', 8),
+    str_repeat('a', 127) . '.' . str_repeat('b', 128),
+] as $validKey) {
+    $adapter = new GeminiTransport($validKey, 'gemini-2.5-flash', $keyTransport);
+    replyTransportCheck($adapter instanceof GeminiTransport, 'Valid bounded Gemini key accepted');
+}
+foreach ([
+    'empty' => '',
+    'short' => str_repeat('a', 7) . '.' . str_repeat('b', 7),
+    'long' => str_repeat('a', 128) . '.' . str_repeat('b', 128),
+    'leading_space' => ' ' . $dottedKey,
+    'trailing_space' => $dottedKey . ' ',
+    'embedded_space' => $dottedKey . ' key',
+    'tab' => $dottedKey . "\t",
+    'newline' => $dottedKey . "\n",
+    'header_injection' => $dottedKey . "\r\nInjected: true",
+    'nul' => $dottedKey . "\x00",
+    'control' => $dottedKey . "\x1f",
+    'delete' => $dottedKey . "\x7f",
+    'slash' => $dottedKey . '/',
+    'plus' => $dottedKey . '+',
+    'equals' => $dottedKey . '=',
+    'colon' => $dottedKey . ':',
+    'quote' => $dottedKey . '"',
+    'non_ascii' => $dottedKey . "\xc3\xa9",
+] as $case => $invalidKey) {
+    $denied = false;
+    try {
+        new GeminiTransport($invalidKey, 'gemini-2.5-flash', $keyTransport);
+    } catch (RuntimeException $error) {
+        $denied = $error->getMessage() === 'provider_configuration';
+    }
+    replyTransportCheck($denied, 'Invalid Gemini key rejected: ' . $case);
+}
+replyTransportCheck($keyTransportCalls === 0, 'Key constructors make no provider call');
+
 $apiKey = 'synthetic_google_key_never_log_123';
 $token = 'synthetic_meta_token_never_log_123';
 $phoneId = '1443799975474056';

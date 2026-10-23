@@ -28,7 +28,8 @@ final class GeminiTransport
         private string $model,
         ?callable $http = null
     ) {
-        if (preg_match('/\A[A-Za-z0-9_-]{16,256}\z/', $apiKey) !== 1
+        // Accept dotted keys while keeping the complete header value bounded and ASCII-only.
+        if (preg_match('/\A[A-Za-z0-9_.-]{16,256}\z/', $apiKey) !== 1
             || strlen($model) > 100
             || preg_match('/\Agemini-[a-z0-9]+(?:[.-][a-z0-9]+)*\z/', $model) !== 1) {
             throw new \RuntimeException('provider_configuration');
