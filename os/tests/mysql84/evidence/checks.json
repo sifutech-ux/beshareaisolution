@@ -1,0 +1,62 @@
+[
+  {
+    "check": "idempotent actual ledger",
+    "pass": true
+  },
+  {
+    "check": "one real checksum row",
+    "pass": true
+  },
+  {
+    "check": "app DDL denied",
+    "pass": true
+  },
+  {
+    "check": "app ledger insert denied",
+    "pass": true
+  },
+  {
+    "check": "app ledger update denied",
+    "pass": true
+  },
+  {
+    "check": "app trigger denied",
+    "pass": true
+  },
+  {
+    "check": "checksum drift denied",
+    "pass": true
+  },
+  {
+    "check": "disabled CHECK denied",
+    "pass": true
+  },
+  {
+    "check": "column drift denied",
+    "pass": true
+  },
+  {
+    "check": "generated expression drift denied",
+    "pass": true
+  },
+  {
+    "check": "post-negative integrity",
+    "pass": true
+  },
+  {
+    "check": "different server rejected",
+    "pass": true
+  },
+  {
+    "check": "different database rejected",
+    "pass": true
+  },
+  {
+    "check": "wrong checksum rejected",
+    "pass": true
+  },
+  {
+    "check": "concurrent migration denied",
+    "pass": true
+  }
+]

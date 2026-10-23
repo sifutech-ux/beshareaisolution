@@ -87,7 +87,7 @@ final class SchemaDefinition
                 'collation' => $explicit ? $collation : null,
                 'default' => self::defaultValue($row['column_default'] ?? null),
                 'auto_increment' => str_contains(strtolower((string) ($row['extra'] ?? '')), 'auto_increment'),
-                'generated' => $generated === '' ? null : self::normalize($generated),
+                'generated' => $generated === '' ? null : self::normalizeGenerated(self::catalogCheck($generated)),
             ];
         }
         $indexGroups = [];
@@ -137,13 +137,16 @@ final class SchemaDefinition
             }
         }
         foreach ($checks as $row) {
+            if (isset($row['enforced']) && strtoupper((string) $row['enforced']) !== 'YES') {
+                throw new \InvalidArgumentException('check_not_enforced');
+            }
             $table = (string) $row['table_name'];
             if (!isset($built[$table])) {
                 throw new \InvalidArgumentException('definition_unreadable');
             }
             $built[$table]['checks'][] = [
                 'name' => (string) $row['constraint_name'],
-                'clause' => self::normalizeCheck((string) $row['check_clause']),
+                'clause' => self::normalizeCheck(self::catalogCheck((string) $row['check_clause'])),
             ];
         }
         foreach (array_keys($built) as $name) {
@@ -260,7 +263,7 @@ final class SchemaDefinition
             if ($paren === false) {
                 throw new \InvalidArgumentException('sql_definition_unreadable');
             }
-            $generated = self::normalize(self::insideParens($rest, $paren));
+            $generated = self::normalizeGenerated(self::insideParens($rest, $paren));
             $rest = trim(substr($rest, 0, $marker[0][1]));
         }
         $charset = null;
@@ -514,6 +517,29 @@ final class SchemaDefinition
     {
         $sql = self::normalize($sql);
         return self::canonicalBoolean($sql) ?? $sql;
+    }
+
+    private static function normalizeGenerated(string $sql): string
+    {
+        $sql = self::normalize($sql);
+        if (preg_match('/\Acase when\s*(.+?)\s*then ([a-z_][a-z0-9_]*) else null end\z/', $sql, $m) === 1) {
+            $condition = self::canonicalBoolean($m[1]);
+            if ($condition !== null) {
+                return 'case when ' . $condition . ' then ' . $m[2] . ' else null end';
+            }
+        }
+        return $sql;
+    }
+
+    private static function catalogCheck(string $sql): string
+    {
+        // MySQL 8.4 CHECK_CONSTRAINTS escapes its charset-introduced ASCII
+        // enum literals. Decode only this representation, never arbitrary SQL.
+        return preg_replace_callback(
+            "/_utf8mb4\\\\'([a-z_]+)\\\\'/",
+            static fn (array $m): string => "'" . $m[1] . "'",
+            $sql
+        ) ?? $sql;
     }
 
     private static function canonicalBoolean(string $sql): ?string

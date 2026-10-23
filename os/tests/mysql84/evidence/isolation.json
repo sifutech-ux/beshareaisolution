@@ -1,0 +1,317 @@
+[
+  {
+    "name": "beshare-migrator-20261023-r3-unrecorded-app",
+    "image": "sha256:701b58a4c6e3305c4cff95dd77e02ae6caf0676cda3e72442d494918c494d1ae",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-unrecorded-source-socket",
+        "destination": "/sockets/source"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  },
+  {
+    "name": "beshare-migrator-20261023-r3-unrecorded-source",
+    "image": "sha256:76f0358884cb92d9a086d24e5671c38048d3fef40f2588703d73eb55392d6b69",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-unrecorded-source-data",
+        "destination": "/var/lib/mysql"
+      },
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-unrecorded-source-socket",
+        "destination": "/var/run/mysqld"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  },
+  {
+    "name": "beshare-migrator-20261023-r3-partial-app",
+    "image": "sha256:701b58a4c6e3305c4cff95dd77e02ae6caf0676cda3e72442d494918c494d1ae",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-partial-source-socket",
+        "destination": "/sockets/source"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  },
+  {
+    "name": "beshare-migrator-20261023-r3-partial-source",
+    "image": "sha256:76f0358884cb92d9a086d24e5671c38048d3fef40f2588703d73eb55392d6b69",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-partial-source-data",
+        "destination": "/var/lib/mysql"
+      },
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-partial-source-socket",
+        "destination": "/var/run/mysqld"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  },
+  {
+    "name": "beshare-migrator-20261023-r3-regression-app",
+    "image": "sha256:701b58a4c6e3305c4cff95dd77e02ae6caf0676cda3e72442d494918c494d1ae",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-regression-source-socket",
+        "destination": "/sockets/source"
+      }
+    ],
+    "memory": 0,
+    "cpus": 0
+  },
+  {
+    "name": "beshare-migrator-maria-20261023-r1-regression-app",
+    "image": "sha256:701b58a4c6e3305c4cff95dd77e02ae6caf0676cda3e72442d494918c494d1ae",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-maria-20261023-r1-regression-source-socket",
+        "destination": "/sockets/source"
+      }
+    ],
+    "memory": 0,
+    "cpus": 0
+  },
+  {
+    "name": "beshare-migrator-20261023-r3-regression-source",
+    "image": "sha256:76f0358884cb92d9a086d24e5671c38048d3fef40f2588703d73eb55392d6b69",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-regression-source-data",
+        "destination": "/var/lib/mysql"
+      },
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-regression-source-socket",
+        "destination": "/var/run/mysqld"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  },
+  {
+    "name": "beshare-migrator-maria-20261023-r1-regression-source",
+    "image": "sha256:f16d7a344413e519dff518f27bdb221388f84b0d274c97c4fb5f2cb0dc1b34fa",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-maria-20261023-r1-regression-source-data",
+        "destination": "/var/lib/mysql"
+      },
+      {
+        "type": "volume",
+        "name": "beshare-migrator-maria-20261023-r1-regression-source-socket",
+        "destination": "/var/run/mysqld"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  },
+  {
+    "name": "beshare-migrator-maria-20261023-r1-app",
+    "image": "sha256:701b58a4c6e3305c4cff95dd77e02ae6caf0676cda3e72442d494918c494d1ae",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-maria-20261023-r1-source-socket",
+        "destination": "/sockets/source"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  },
+  {
+    "name": "beshare-migrator-maria-20261023-r1-source",
+    "image": "sha256:f16d7a344413e519dff518f27bdb221388f84b0d274c97c4fb5f2cb0dc1b34fa",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-maria-20261023-r1-source-data",
+        "destination": "/var/lib/mysql"
+      },
+      {
+        "type": "volume",
+        "name": "beshare-migrator-maria-20261023-r1-source-socket",
+        "destination": "/var/run/mysqld"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  },
+  {
+    "name": "beshare-migrator-20261023-r3-recovery-app",
+    "image": "sha256:701b58a4c6e3305c4cff95dd77e02ae6caf0676cda3e72442d494918c494d1ae",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-restore-socket",
+        "destination": "/sockets/restore"
+      }
+    ],
+    "memory": 0,
+    "cpus": 0
+  },
+  {
+    "name": "beshare-migrator-20261023-r3-restore",
+    "image": "sha256:76f0358884cb92d9a086d24e5671c38048d3fef40f2588703d73eb55392d6b69",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-restore-data",
+        "destination": "/var/lib/mysql"
+      },
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-restore-socket",
+        "destination": "/var/run/mysqld"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  },
+  {
+    "name": "beshare-migrator-20261023-r3-app",
+    "image": "sha256:701b58a4c6e3305c4cff95dd77e02ae6caf0676cda3e72442d494918c494d1ae",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-source-socket",
+        "destination": "/sockets/source"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  },
+  {
+    "name": "beshare-migrator-20261023-r3-source",
+    "image": "sha256:76f0358884cb92d9a086d24e5671c38048d3fef40f2588703d73eb55392d6b69",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-source-data",
+        "destination": "/var/lib/mysql"
+      },
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r3-source-socket",
+        "destination": "/var/run/mysqld"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  },
+  {
+    "name": "beshare-migrator-20261023-r2-app",
+    "image": "sha256:701b58a4c6e3305c4cff95dd77e02ae6caf0676cda3e72442d494918c494d1ae",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r2-source-socket",
+        "destination": "/sockets/source"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  },
+  {
+    "name": "beshare-migrator-20261023-r2-source",
+    "image": "sha256:76f0358884cb92d9a086d24e5671c38048d3fef40f2588703d73eb55392d6b69",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r2-source-data",
+        "destination": "/var/lib/mysql"
+      },
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r2-source-socket",
+        "destination": "/var/run/mysqld"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  },
+  {
+    "name": "beshare-migrator-20261023-r1-app",
+    "image": "sha256:701b58a4c6e3305c4cff95dd77e02ae6caf0676cda3e72442d494918c494d1ae",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r1-source-socket",
+        "destination": "/sockets/source"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  },
+  {
+    "name": "beshare-migrator-20261023-r1-source",
+    "image": "sha256:76f0358884cb92d9a086d24e5671c38048d3fef40f2588703d73eb55392d6b69",
+    "network": "none",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r1-source-data",
+        "destination": "/var/lib/mysql"
+      },
+      {
+        "type": "volume",
+        "name": "beshare-migrator-20261023-r1-source-socket",
+        "destination": "/var/run/mysqld"
+      }
+    ],
+    "memory": 805306368,
+    "cpus": 1000000000
+  }
+]
