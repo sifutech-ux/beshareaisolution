@@ -8,6 +8,7 @@ use PDO;
 require_once __DIR__ . '/PlatformAccess.php';
 require_once __DIR__ . '/AiReplyPolicy.php';
 require_once __DIR__ . '/AiProductionSchema.php';
+require_once __DIR__ . '/WhatsAppDeliveryError.php';
 
 /** Tenant-bound settings, owner-approved audiences and encrypted conversation history. */
 final class AiReplyStore
@@ -253,7 +254,9 @@ final class AiReplyStore
             ];
         }
         $ids = array_column($rows, 'id');
-        $messages = $this->pdo->prepare('SELECT * FROM ai_messages WHERE business_id=? AND conversation_id IN (' . implode(',', array_fill(0, count($ids), '?')) . ') ORDER BY id DESC LIMIT 2000');
+        $messages = $this->pdo->prepare('SELECT m.*,j.last_error AS delivery_error FROM ai_messages m
+            LEFT JOIN ai_reply_jobs j ON j.business_id=m.business_id AND j.connection_id=m.connection_id AND j.reply_message_id=m.id
+            WHERE m.business_id=? AND m.conversation_id IN (' . implode(',', array_fill(0, count($ids), '?')) . ') ORDER BY m.id DESC LIMIT 2000');
         $messages->execute(array_merge([$actor['business_id']], $ids));
         foreach (array_reverse($messages->fetchAll()) as $row) {
             $id = 'ai-' . $row['conversation_id'];
@@ -272,6 +275,9 @@ final class AiReplyStore
                 'text' => is_string($body['text'] ?? null) ? $body['text'] : '[Mesej bukan teks]',
                 'wamid' => $row['wamid'] ?? '', 'status' => $row['status'], 'at' => $row['message_at'],
             ];
+            if ($row['direction'] === 'out' && $row['status'] === 'failed') {
+                $message += WhatsAppDeliveryError::inbox($row['delivery_error'] ?? null);
+            }
             if ($row['direction'] === 'out' && ($body['type'] ?? null) === 'image'
                 && is_string($body['media_id'] ?? null) && preg_match('/\A[a-f0-9]{32}\z/', $body['media_id']) === 1) {
                 $message['type'] = 'image';

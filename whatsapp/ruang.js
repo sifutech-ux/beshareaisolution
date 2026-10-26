@@ -438,7 +438,7 @@ function board(state) {
     </div>
     <div class="os-kpis">
       <article class="state os-kpi"><strong>${count.incoming}</strong><span>${state.inboxReady ? "Perbualan daripada webhook yang disahkan." : "Perbualan masuk. Belum disambung ke pelayan."}</span></article>
-      <article class="state os-kpi"><strong>${count.aiReplied}</strong><span>Perbualan yang ada balasan AI.</span></article>
+      <article class="state os-kpi"><strong>${count.aiReplied}</strong><span>Perbualan dengan balasan AI diterima Meta. Semak status sampai dalam Peti masuk.</span></article>
       <article class="state os-kpi"><strong>${count.human}</strong><span>Sedang dipegang manusia.</span></article>
       <article class="state os-kpi"><strong>${count.unanswered}</strong><span>Mesej terakhir daripada pelanggan, belum selesai.</span></article>
     </div>
@@ -470,12 +470,50 @@ function inbox(state) {
   </article>`;
 }
 
+function messageDelivery(status) {
+  const states = {
+    generated: { label: "Balasan disediakan", tone: "pending", help: "Belum dihantar ke WhatsApp." },
+    sending: { label: "Sedang menghantar", tone: "pending", help: "Keputusan penghantaran belum diterima." },
+    sent: { label: "Menunggu pengesahan sampai", tone: "pending", help: "Meta telah menerima mesej. Penghantaran kepada pelanggan belum disahkan." },
+    delivered: { label: "Sudah sampai", tone: "success", help: "Penerimaan mesej disahkan oleh WhatsApp." },
+    read: { label: "Sudah dibaca", tone: "success", help: "" },
+    failed: { label: "Gagal dihantar", tone: "failed", help: "Balasan ini tidak berjaya dihantar kepada pelanggan." },
+    unknown: { label: "Status belum pasti", tone: "pending", help: "Belum ada pengesahan sama ada mesej ini berjaya dihantar." },
+    handoff: { label: "Diserahkan kepada manusia", tone: "neutral", help: "Balasan ini tidak dihantar. Perbualan diserahkan kepada manusia." }
+  };
+  return Object.hasOwn(states, status) ? states[status] : states.unknown;
+}
+
+function messageTime(item) {
+  const raw = typeof item.at === "string" ? item.at.trim() : "";
+  const value = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw) ? raw.replace(" ", "T") + "Z" : raw;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return "";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  const label = date.toLocaleString("ms-MY", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kuala_Lumpur" });
+  return `<small class="msg-time">${item.from === "ai" ? "Dijana" : "Masa mesej"}: <time datetime="${esc(date.toISOString())}">${esc(label)} MYT</time></small>`;
+}
+
+function messageBubble(item) {
+  const who = { customer: "Pelanggan", ai: "AI", staff: "Staf" };
+  const delivery = item.from === "ai" || item.from === "staff" ? messageDelivery(item.status) : null;
+  const failed = delivery?.tone === "failed";
+  const code = failed && Number.isSafeInteger(item.error_code) && item.error_code > 0 ? item.error_code : null;
+  const subcode = code !== null && Number.isSafeInteger(item.error_subcode) && item.error_subcode >= 0 ? item.error_subcode : null;
+  const media = knowledgeMediaUrl(item.media_url);
+  return `<div class="msg${item.from === "staff" ? " msg--staff" : ""}${failed ? " msg--failed" : ""}">
+    <div class="msg-heading"><strong>${esc(who[item.from] || item.from)}</strong>${delivery ? `<span class="msg-status msg-status--${delivery.tone}">${esc(delivery.label)}</span>` : ""}</div>
+    ${media ? `<a class="msg-image" href="${esc(media)}" target="_blank" rel="noopener"><img src="${esc(media)}" alt="Gambar dalam balasan" loading="lazy"></a>` : ""}
+    <p>${esc(item.text)}</p>
+    ${delivery?.help ? `<p class="msg-delivery-help">${esc(delivery.help)}</p>` : ""}
+    ${code !== null ? `<small class="msg-error-code">Kod Meta: ${code}${subcode !== null ? " · Subkod: " + subcode : ""}</small>` : ""}
+    ${messageTime(item)}
+  </div>`;
+}
+
 function talk(state, current) {
   if (!current) return `<p class="muted">Pilih perbualan.</p><p><button class="btn btn--ghost" type="button" data-act="pane" data-value="list">Senarai</button></p>`;
-  const who = { customer: "Pelanggan", ai: "AI", staff: "Staf" };
-  const messages = current.messages.map((item) =>
-    `<div class="msg ${item.from === "staff" ? "msg--staff" : ""}"><strong>${esc(who[item.from] || item.from)}</strong>${knowledgeMediaUrl(item.media_url) ? `<a class="msg-image" href="${esc(knowledgeMediaUrl(item.media_url))}" target="_blank" rel="noopener"><img src="${esc(knowledgeMediaUrl(item.media_url))}" alt="Gambar yang dihantar dalam perbualan" loading="lazy"></a>` : ""}<p>${esc(item.text)}</p><small class="muted">${esc(item.wamid)} · ${esc(item.status || "")}</small></div>`
-  ).join("");
+  const messages = current.messages.map(messageBubble).join("");
   const back = `<div class="phone-bar"><button class="btn btn--ghost" type="button" data-act="pane" data-value="list">Senarai</button><strong>${esc(current.name)}</strong><button class="btn btn--ghost" type="button" data-act="pane" data-value="profile">Profil</button></div>`;
   if (current.mode === "resolved") {
     return `${back}<p>Mod: <strong>${esc(label(current.mode))}</strong></p><div class="msgs">${messages}</div>
@@ -1262,10 +1300,10 @@ function analytics(state) {
   const count = metrics(state);
   const cards = [
     [String(count.incoming), "Perbualan masuk", "Belum disambung ke pelayan."],
-    [String(count.aiReplied), "Dibalas AI", "Belum disambung ke pelayan."],
+    [String(count.aiReplied), "Balasan AI diterima Meta", "Semak status sampai dalam Peti masuk."],
     [String(count.human), "Dipegang manusia", "Belum disambung ke pelayan."],
     [String(count.unanswered), "Belum dibalas", "Belum disambung ke pelayan."],
-    [count.sent + " dihantar · " + count.failed + " gagal", "Hasil penghantaran", "Belum disambung ke pelayan."],
+    [count.sent + " diterima Meta · " + count.failed + " gagal", "Hasil penghantaran", "Diterima Meta belum semestinya sampai kepada pelanggan."],
     [count.handover + "%", "Kadar serahan", "Belum disambung ke pelayan."]
   ];
   return `<article class="panel">

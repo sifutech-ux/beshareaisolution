@@ -266,6 +266,8 @@ foreach ($uncertain as $response) {
     $result = $adapter->send($token, $phoneId, $recipient, 'Reply');
     replyTransportCheck($result['sent'] === false && $result['ambiguous'] === true
         && $result['message_id'] === null && $attempts === 1, 'Uncertain send cannot be accepted or retried');
+    replyTransportCheck(($result['error_code'] ?? null) === null && ($result['error_subcode'] ?? null) === null,
+        'Uncertain response does not expose a definitive rejection code');
     replyTransportCheck(!str_contains(json_encode($result, JSON_THROW_ON_ERROR), $token), 'Provider error cannot expose token');
 }
 $attempts = 0;
@@ -279,6 +281,78 @@ replyTransportCheck(!$result['sent'] && $result['ambiguous'] && $attempts === 1
 $adapter = new WhatsAppTextSender('v23.0', fn () => replyTransportJson(401, $graphError));
 $result = $adapter->send($token, $phoneId, $recipient, 'Reply');
 replyTransportCheck(!$result['sent'] && !$result['ambiguous'] && $result['error'] === 'rejected', 'Complete client rejection is deterministic');
+
+// Only bounded numeric diagnostics may escape a complete client-error response.
+// Raw provider prose can contain credentials or customer data and must stay private.
+$privateErrorText = ['META_PRIVATE_MESSAGE', 'META_PRIVATE_TYPE', 'META_PRIVATE_TITLE', 'META_PRIVATE_DETAILS', $token];
+$diagnosticError = static fn (mixed $code, mixed $subcode): array => ['error' => [
+    'code' => $code, 'error_subcode' => $subcode,
+    'message' => 'META_PRIVATE_MESSAGE ' . $token,
+    'type' => 'META_PRIVATE_TYPE', 'title' => 'META_PRIVATE_TITLE',
+    'error_data' => ['details' => 'META_PRIVATE_DETAILS ' . $token],
+]];
+foreach ([
+    [131026, 2494010, 131026, 2494010],
+    ['131026', '2494010', 131026, 2494010],
+    [1, 0, 1, 0],
+    [2147483647, 2147483647, 2147483647, 2147483647],
+    ['2147483647', '0', 2147483647, 0],
+    [190, null, 190, null],
+] as [$code, $subcode, $expectedCode, $expectedSubcode]) {
+    $attempts = 0;
+    $adapter = new WhatsAppTextSender('v23.0', static function () use (&$attempts, $diagnosticError, $code, $subcode): array {
+        $attempts++;
+        return replyTransportJson(400, $diagnosticError($code, $subcode));
+    });
+    $result = $adapter->send($token, $phoneId, $recipient, 'Reply');
+    replyTransportCheck($result['sent'] === false && $result['ambiguous'] === false && $result['message_id'] === null
+        && $result['error'] === 'rejected' && $attempts === 1, 'Numeric diagnostics preserve one deterministic rejection');
+    replyTransportCheck(($result['error_code'] ?? null) === $expectedCode
+        && ($result['error_subcode'] ?? null) === $expectedSubcode, 'Client rejection retains bounded integer code and subcode');
+    replyTransportCheck(array_diff(array_keys($result), ['sent', 'message_id', 'ambiguous', 'error', 'error_code', 'error_subcode']) === [],
+        'Client rejection exposes only its documented safe fields');
+    $encoded = json_encode($result, JSON_THROW_ON_ERROR);
+    foreach ($privateErrorText as $privateText) {
+        replyTransportCheck(!str_contains($encoded, $privateText), 'Numeric diagnostics never expose provider text or credentials');
+    }
+}
+$invalidDiagnosticNumbers = [
+    'array' => ['131026'], 'boolean' => true, 'fraction' => 131026.5,
+    'negative' => -1, 'oversized_integer' => 2147483648, 'oversized_string' => '2147483648',
+    'very_long' => str_repeat('9', 1000), 'newline' => "131026\nMETA_PRIVATE_DETAILS",
+    'html' => '<script>131026</script>', 'leading_zero' => '0131026',
+    'leading_plus' => '+131026', 'decimal_string' => '131026.0',
+];
+foreach ($invalidDiagnosticNumbers + ['zero' => 0, 'zero_string' => '0'] as $case => $code) {
+    $attempts = 0;
+    $adapter = new WhatsAppTextSender('v23.0', static function () use (&$attempts, $diagnosticError, $code): array {
+        $attempts++;
+        return replyTransportJson(400, $diagnosticError($code, 7));
+    });
+    $result = $adapter->send($token, $phoneId, $recipient, 'Reply');
+    replyTransportCheck($result['sent'] === false && $result['message_id'] === null && $attempts === 1
+        && ($result['error_code'] ?? null) === null && ($result['error_subcode'] ?? null) === null,
+        'Malformed primary code cannot produce diagnostics or a retry: ' . $case);
+    $encoded = json_encode($result, JSON_THROW_ON_ERROR);
+    foreach ($privateErrorText as $privateText) {
+        replyTransportCheck(!str_contains($encoded, $privateText), 'Malformed diagnostic cannot leak private text: ' . $case);
+    }
+}
+foreach ($invalidDiagnosticNumbers as $case => $subcode) {
+    $attempts = 0;
+    $adapter = new WhatsAppTextSender('v23.0', static function () use (&$attempts, $diagnosticError, $subcode): array {
+        $attempts++;
+        return replyTransportJson(400, $diagnosticError(131026, $subcode));
+    });
+    $result = $adapter->send($token, $phoneId, $recipient, 'Reply');
+    replyTransportCheck($result['sent'] === false && $result['ambiguous'] === false && $attempts === 1
+        && ($result['error_code'] ?? null) === 131026 && ($result['error_subcode'] ?? null) === null,
+        'Malformed subcode is discarded without losing its valid primary code: ' . $case);
+    $encoded = json_encode($result, JSON_THROW_ON_ERROR);
+    foreach ($privateErrorText as $privateText) {
+        replyTransportCheck(!str_contains($encoded, $privateText), 'Malformed subcode cannot leak private text: ' . $case);
+    }
+}
 
 $attempts = 0;
 $adapter = new WhatsAppTextSender('v23.0', function () use (&$attempts): array {
