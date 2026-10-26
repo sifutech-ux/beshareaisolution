@@ -1,0 +1,58 @@
+{
+    "audit_logs": {
+        "count": 3,
+        "rows_sha256": "590191fb372d4327ac8367a91af45faf67b8a6492372b60e0de482d691aed37a",
+        "ddl_sha256": "596641de733b0f0d52d1a0e1080dc81cb5f8dcd7b6969ad7b5970124649abde8"
+    },
+    "business_users": {
+        "count": 2,
+        "rows_sha256": "6231d6288e46a5222c3bc7bb8e90887daba0fdf353886d713a123fe01ffde4d2",
+        "ddl_sha256": "f509d9c309a913fc7de257de3fa8f51ab9367150ebc436e2c06c06612732dcc6"
+    },
+    "businesses": {
+        "count": 2,
+        "rows_sha256": "cf1d66e1d9388754ab4e9e3521be3fb6968ac3ad6c05a23fda938c178633ce37",
+        "ddl_sha256": "0550d2931384cc9b49d408f514e88b3405f5804330320cc59bc455c85b82abb3"
+    },
+    "coexistence_contacts": {
+        "count": 0,
+        "rows_sha256": "35786c7117b4e38d0f169239752ce71158266ae2f6e4aa230fbbb87bd699c0e3",
+        "ddl_sha256": "f14285d82533df1db1a83f1746a18b312aa9d515a7544c6ffb9a2d96e00519db"
+    },
+    "coexistence_messages": {
+        "count": 200,
+        "rows_sha256": "e07f8b6743a39f46a36f10e492b941ceccf373c5d94f366e392b0bb80a0d9719",
+        "ddl_sha256": "e18f8305373ce20382b4cf078776b257c87c6635f738c3ee772dbb537172ba83"
+    },
+    "coexistence_sync_jobs": {
+        "count": 1,
+        "rows_sha256": "fadb62fdbe7db62ceb05dfbd9f435900706a41a923477d59675a1dd6634c2c2c",
+        "ddl_sha256": "39cee25bfc8cf14f549443a49cedda5fdbfbfefd16fa1f99e039b4684229fca2"
+    },
+    "onboarding_sessions": {
+        "count": 0,
+        "rows_sha256": "35786c7117b4e38d0f169239752ce71158266ae2f6e4aa230fbbb87bd699c0e3",
+        "ddl_sha256": "aa44f866b9b8abd8760ad01992a35b2830a55b29d0e570c93591620445edc5f9"
+    },
+    "schema_migrations": {
+        "count": 0,
+        "rows_sha256": "35786c7117b4e38d0f169239752ce71158266ae2f6e4aa230fbbb87bd699c0e3",
+        "ddl_sha256": "09977dc80992b4f3dfc9e3a6bc16a7c3457659c0af2f749c9187921fc56bc9e7"
+    },
+    "users": {
+        "count": 2,
+        "rows_sha256": "308a96859bfede0bb44feec210582802ba0d9e5801408dffd89f785d580d3de0",
+        "ddl_sha256": "24e8905233ad424d3722e2030565daad26fdc80a4781f48888a8da7ee32375ab"
+    },
+    "webhook_events": {
+        "count": 0,
+        "rows_sha256": "35786c7117b4e38d0f169239752ce71158266ae2f6e4aa230fbbb87bd699c0e3",
+        "ddl_sha256": "6dec9a6e5217be80625320a800963181eeb5d6955a2ba7116167a6ec62527b16"
+    },
+    "whatsapp_connections": {
+        "count": 1,
+        "rows_sha256": "336b91c95110e207dedadb1a3eda27d0c694d2aeb90b90a230d9cc97fcfe3711",
+        "ddl_sha256": "8b940d39d463040b4e0b5f2bd30004fd62e5b5f0e0325c495ecf79f72fe830f8"
+    },
+    "_triggers_sha256": "3eee1b2a4a2ae4ecf629bd9cb1595682b6f7b1176f7491721d37cff1b0cde65f"
+}

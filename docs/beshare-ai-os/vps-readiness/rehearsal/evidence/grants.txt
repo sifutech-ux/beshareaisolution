@@ -1,0 +1,31 @@
+web
+GRANT USAGE ON *.* TO `web`@`localhost`
+GRANT INSERT ON `u879723783_beshare_os`.`audit_logs` TO `web`@`localhost`
+GRANT SELECT, INSERT, UPDATE, DELETE ON `u879723783_beshare_os`.`business_users` TO `web`@`localhost`
+GRANT SELECT, INSERT, UPDATE, DELETE ON `u879723783_beshare_os`.`businesses` TO `web`@`localhost`
+GRANT SELECT, INSERT, UPDATE, DELETE ON `u879723783_beshare_os`.`coexistence_contacts` TO `web`@`localhost`
+GRANT SELECT, INSERT, UPDATE, DELETE ON `u879723783_beshare_os`.`coexistence_messages` TO `web`@`localhost`
+GRANT SELECT, INSERT, UPDATE, DELETE ON `u879723783_beshare_os`.`coexistence_sync_jobs` TO `web`@`localhost`
+GRANT SELECT, INSERT, UPDATE, DELETE ON `u879723783_beshare_os`.`onboarding_sessions` TO `web`@`localhost`
+GRANT SELECT ON `u879723783_beshare_os`.`schema_migrations` TO `web`@`localhost`
+GRANT SELECT, INSERT, UPDATE, DELETE ON `u879723783_beshare_os`.`users` TO `web`@`localhost`
+GRANT SELECT, INSERT, UPDATE, DELETE ON `u879723783_beshare_os`.`webhook_events` TO `web`@`localhost`
+GRANT SELECT, INSERT, UPDATE, DELETE ON `u879723783_beshare_os`.`whatsapp_connections` TO `web`@`localhost`
+worker
+GRANT USAGE ON *.* TO `worker`@`localhost`
+GRANT INSERT ON `u879723783_beshare_os`.`audit_logs` TO `worker`@`localhost`
+GRANT SELECT ON `u879723783_beshare_os`.`business_users` TO `worker`@`localhost`
+GRANT SELECT ON `u879723783_beshare_os`.`businesses` TO `worker`@`localhost`
+GRANT SELECT, INSERT, UPDATE ON `u879723783_beshare_os`.`coexistence_contacts` TO `worker`@`localhost`
+GRANT SELECT, INSERT, UPDATE ON `u879723783_beshare_os`.`coexistence_messages` TO `worker`@`localhost`
+GRANT SELECT, UPDATE ON `u879723783_beshare_os`.`coexistence_sync_jobs` TO `worker`@`localhost`
+GRANT SELECT ON `u879723783_beshare_os`.`users` TO `worker`@`localhost`
+GRANT SELECT, UPDATE ON `u879723783_beshare_os`.`webhook_events` TO `worker`@`localhost`
+GRANT SELECT, UPDATE ON `u879723783_beshare_os`.`whatsapp_connections` TO `worker`@`localhost`
+backup
+GRANT USAGE ON *.* TO `backup`@`localhost`
+GRANT SELECT, SHOW VIEW, TRIGGER ON `u879723783_beshare_os`.* TO `backup`@`localhost`
+definer
+GRANT USAGE ON *.* TO `definer`@`localhost`
+GRANT SELECT, TRIGGER ON `u879723783_beshare_os`.`business_users` TO `definer`@`localhost`
+GRANT SELECT, TRIGGER ON `u879723783_beshare_os`.`businesses` TO `definer`@`localhost`

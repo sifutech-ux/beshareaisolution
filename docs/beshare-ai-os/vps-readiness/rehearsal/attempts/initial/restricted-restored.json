@@ -1,0 +1,6 @@
+{
+  "seconds": 1.0483333329902962,
+  "exit": 0,
+  "stdout": "OK 11 tables\nOK 5 triggers\nOK no fabricated ledger rows\nOK UTF8 roundtrip\nOK encrypted binary roundtrip\nOK wrong key rejected\nOK denied UPDATE errno=3819\nOK denied DELETE errno=1644\nOK denied UPDATE errno=1644\nOK denied INSERT errno=1452\nOK denied INSERT errno=1062\nOK denied INSERT errno=1062\nOK denied CREATE errno=1142\nOK denied SELECT errno=1142\nOK denied GRANT errno=1142\nOK denied CREATE errno=1142\nOK denied SELECT errno=1142\nOK denied GRANT errno=1142\nOK denied CREATE errno=1142\nOK denied SELECT errno=1142\nOK denied GRANT errno=1142\nOK denied UPDATE errno=1142\nOK denied DELETE errno=1142\nOK denied UPDATE errno=1142\nOK denied UPDATE errno=1205\nOK transaction rollback\nOK worker actual dueJobs query with restricted role\nOK worker recoverInterrupted query and update\nOK ambiguous job remains review\nOK duplicate recovery idempotent\nOK backup SELECT\n",
+  "stderr": ""
+}
