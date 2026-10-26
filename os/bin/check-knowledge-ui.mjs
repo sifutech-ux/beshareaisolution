@@ -294,6 +294,20 @@ check('outbound image renders using the authenticated same-origin media endpoint
 thread.messages[0].media_url = 'https://outside.invalid/pixel?id=' + 'a'.repeat(32);
 check('arbitrary external image URLs are not rendered', !f.context.talk(f.context.load(), thread).includes('class="msg-image"'));
 
+const renderDelivery = (status, extra = {}) => f.context.talk(f.context.load(), {
+  ...thread,
+  messages: [{ from: 'ai', text: 'Balasan yang dijana.', wamid: 'wamid.internal-id-not-for-display', status,
+    at: '2026-10-26 06:12:00', ...extra }]
+});
+const acceptedReply = renderDelivery('sent', { error_code: 131026 });
+check('API acceptance is visibly awaiting delivery, with no stale failure code or internal message id', acceptedReply.includes('Menunggu pengesahan sampai') && acceptedReply.includes('Penghantaran kepada pelanggan belum disahkan') && !acceptedReply.includes('msg-status--success') && !acceptedReply.includes('Kod Meta:') && !acceptedReply.includes('wamid.internal'));
+check('AI timestamp is identified as generation time and retains an unambiguous UTC datetime', acceptedReply.includes('Dijana:') && acceptedReply.includes('datetime="2026-10-26T06:12:00.000Z"') && acceptedReply.includes('MYT'));
+const failedReply = renderDelivery('failed', { error_code: 131026, error_subcode: 7, failure_reason: 'provider-text-must-not-be-shown' });
+check('failed outbound reply stays visible with a distinct failure state and safe numeric code', failedReply.includes('Balasan yang dijana.') && failedReply.includes('msg--failed') && failedReply.includes('Gagal dihantar') && failedReply.includes('tidak berjaya dihantar kepada pelanggan') && failedReply.includes('Kod Meta: 131026') && failedReply.includes('Subkod: 7') && !failedReply.includes('provider-text-must-not-be-shown'));
+check('older failed replies without diagnostics remain clear and malformed diagnostic fields are ignored', [renderDelivery('failed'), renderDelivery('failed', { error_code: '<img src=x>', error_subcode: 'not-a-number' })].every(html => html.includes('Gagal dihantar') && !html.includes('Kod Meta:') && !html.includes('<img')));
+check('confirmed delivery and read receipts are distinct from acceptance', renderDelivery('delivered').includes('Sudah sampai') && !renderDelivery('delivered').includes('Menunggu pengesahan sampai') && renderDelivery('read').includes('Sudah dibaca'));
+check('unsent, uncertain and unrecognized states never appear as confirmed delivery', ['generated', 'sending', 'unknown', 'handoff', 'future-status'].every(status => !renderDelivery(status).includes('msg-status--success')));
+
 await f.click('logout');
 check('logout clears in-memory payment and source drafts', f.editor() === null);
 const g = await fixture();

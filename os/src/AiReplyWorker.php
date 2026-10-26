@@ -10,6 +10,7 @@ use Throwable;
 require_once __DIR__ . '/KnowledgeReply.php';
 require_once __DIR__ . '/PlatformAccess.php';
 require_once __DIR__ . '/AiReplyPolicy.php';
+require_once __DIR__ . '/WhatsAppDeliveryError.php';
 
 /**
  * A single-attempt tenant worker over the already authenticated OS queue.
@@ -421,7 +422,7 @@ final class AiReplyWorker
             $definiteFailure = is_array($result) && ($result['sent'] ?? null) === false
                 && ($result['ambiguous'] ?? null) === false;
             $this->terminal($job, $definiteFailure ? 'failed' : 'unknown',
-                $definiteFailure ? 'send_rejected' : 'send_unknown', true);
+                $definiteFailure ? WhatsAppDeliveryError::reason($result, 'send_rejected') : 'send_unknown', true);
             return $definiteFailure ? 'failed' : 'unknown';
         });
     }
@@ -622,12 +623,28 @@ final class AiReplyWorker
         $current = (string) $message['status'];
         $advance = $incoming === 'failed'
             ? !in_array($current, ['delivered', 'read'], true)
-            : ($ranks[$incoming] ?? 0) > ($ranks[$current] ?? 0);
+            : !($current === 'failed' && $incoming === 'sent')
+                && ($ranks[$incoming] ?? 0) > ($ranks[$current] ?? 0);
         if ($advance) {
             $this->execute(
                 'UPDATE ai_messages SET status = ?, updated_at = ? WHERE id = ? AND business_id = ?',
                 [$incoming, $this->date($this->clock()), $message['id'], $businessId]
             );
+            if ($incoming === 'failed') {
+                // API acceptance remains the job's send outcome. Record the later
+                // delivery failure separately, without retrying or exposing raw errors.
+                $job = $this->one('SELECT event_id,last_error FROM ai_reply_jobs
+                    WHERE business_id=? AND connection_id=? AND reply_message_id=? FOR UPDATE',
+                    [$businessId, $connectionId, $message['id']]);
+                if ($job !== null) {
+                    $reason = WhatsAppDeliveryError::reason($body, 'delivery_failed');
+                    // A repeated receipt without a code must not erase a known code.
+                    if ($reason !== 'delivery_failed' || WhatsAppDeliveryError::inbox($job['last_error'])['error_code'] === null) {
+                        $this->execute('UPDATE ai_reply_jobs SET last_error=?,updated_at=? WHERE event_id=? AND business_id=?',
+                            [$reason, $this->date($this->clock()), $job['event_id'], $businessId]);
+                    }
+                }
+            }
         }
     }
 

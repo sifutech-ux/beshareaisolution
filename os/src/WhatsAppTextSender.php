@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace BesharOs;
 
+require_once __DIR__ . '/WhatsAppDeliveryError.php';
+
 /**
  * One bounded text or image-send attempt. The caller owns authorization, consent,
  * customer-service-window checks, durable reservation, and reconciliation.
@@ -29,7 +31,7 @@ final class WhatsAppTextSender
      * No retries occur here. An ambiguous result MUST NOT be automatically retried:
      * Meta may have accepted the request even when the response was lost/invalid.
      *
-     * @return array{sent:bool,message_id:?string,ambiguous:bool,error:?string}
+     * @return array{sent:bool,message_id:?string,ambiguous:bool,error:?string,error_code?:int,error_subcode?:?int}
      */
     public function send(
         #[\SensitiveParameter] string $token,
@@ -142,11 +144,12 @@ final class WhatsAppTextSender
         // A complete Graph client-error response confirms rejection. A timeout,
         // malformed response, redirect, or server failure does not prove no send.
         $graphError = $json['error'] ?? null;
+        $diagnostic = WhatsAppDeliveryError::fromGraph($graphError);
         if ($status >= 400 && $status < 500 && $status !== 408
-            && is_array($graphError) && is_int($graphError['code'] ?? null) && $graphError['code'] > 0
+            && $diagnostic !== null
             && is_string($graphError['message'] ?? null) && is_string($graphError['type'] ?? null)
             && !array_key_exists('messages', $json) && !array_key_exists('contacts', $json)) {
-            return $this->failed(false, 'rejected');
+            return $this->failed(false, 'rejected') + $diagnostic;
         }
         if ($status < 200 || $status >= 300 || array_key_exists('error', $json)
             || ($json['messaging_product'] ?? null) !== 'whatsapp') {

@@ -6,6 +6,8 @@ namespace BesharOs;
 use PDO;
 use PDOException;
 
+require_once __DIR__ . '/WhatsAppDeliveryError.php';
+
 final class WhatsAppWebhook
 {
     public function __construct(private PDO $pdo, private TokenSeal $seal)
@@ -174,7 +176,7 @@ final class WhatsAppWebhook
                                 'status' => $name,
                                 'timestamp' => $stamp,
                                 'recipient_id' => $this->digits((string) ($status['recipient_id'] ?? '')),
-                            ],
+                            ] + ($name === 'failed' ? (WhatsAppDeliveryError::fromStatus($status['errors'] ?? null) ?? []) : []),
                         ];
                     }
                     continue;

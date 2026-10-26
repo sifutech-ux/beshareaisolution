@@ -10,11 +10,13 @@ require_once __DIR__ . '/../src/TenantIntakeBridge.php';
 
 use BesharOs\AiProductionSchema;
 use BesharOs\AiReplyDispatcher;
+use BesharOs\AiReplyStore;
 use BesharOs\AiReplyWorker;
 use BesharOs\AuthException;
 use BesharOs\OwnerIntakeBridge;
 use BesharOs\TenantIntakeBridge;
 use BesharOs\WhatsAppWebhook;
+use BesharOs\WhatsAppTextSender;
 
 const RUNTIME_SECRET = 'synthetic-customer-runtime-hmac-only';
 
@@ -73,13 +75,13 @@ function runtimeBridge(array $f, array $config, array $entries): array
     return TenantIntakeBridge::deliver($raw, runtimeSignature($raw), $config, $f['pdo'], $f['seal']);
 }
 
-function runtimeWorker(array $f, int $now, array &$calls, bool $rollout = true, ?callable $generate = null): AiReplyWorker
+function runtimeWorker(array $f, int $now, array &$calls, bool $rollout = true, ?callable $generate = null, ?callable $send = null): AiReplyWorker
 {
     $generator = $generate ?? function (string $knowledge, string $text, array $history) use (&$calls): array {
         $calls['generate'][] = ['knowledge' => $knowledge, 'text' => $text, 'history' => $history];
         return ['reply' => 'Synthetic approved reply.', 'handoff' => false];
     };
-    $send = function (string $token, string $phone, string $peer, string $text, ?string $replyTo) use (&$calls): array {
+    $send ??= function (string $token, string $phone, string $peer, string $text, ?string $replyTo) use (&$calls): array {
         $calls['send'][] = compact('token', 'phone', 'peer', 'text', 'replyTo');
         return ['sent' => true, 'message_id' => 'wamid.runtime.out.' . count($calls['send']), 'ambiguous' => false, 'error' => null];
     };
@@ -190,6 +192,125 @@ adminTest('All-customer replies use each consenting business own knowledge token
     adminAssert($second['sent'] === 1 && count($calls['send']) === 2
         && $calls['send'][1]['phone'] === $phoneB && $calls['send'][1]['token'] === 'synthetic-runtime-token-B'
         && str_contains($calls['generate'][1]['knowledge'], 'business B'), 'Business B replies to unlisted customer only with its own consent');
+});
+
+adminTest('Failed delivery receipts retain bounded diagnostics without replay or status regression', function () use ($f, $pdo, $a, $b, $worker, $config, $wabaB, $phoneB, $now, &$calls): void {
+    $before = runtimeCalls($calls);
+    $quotaBefore = adminSql($pdo, 'SELECT quota_used FROM ai_reply_settings WHERE business_id=?', [$b['business_id']])->fetchColumn();
+    $sentinel = 'RAW_PROVIDER_SECRET_AND_MESSAGE_MUST_NOT_ESCAPE';
+    $receipt = static function (string $status, int $stamp, mixed $errors = null) use ($wabaB, $phoneB): array {
+        return ['id' => $wabaB, 'changes' => [['field' => 'messages', 'value' => [
+            'metadata' => ['phone_number_id' => $phoneB],
+            'statuses' => [['id' => 'wamid.runtime.out.2', 'status' => $status,
+                'timestamp' => (string) $stamp, 'recipient_id' => '601199999111', 'errors' => $errors]],
+        ]]]];
+    };
+    $result = runtimeBridge($f, $config, [$receipt('failed', $now, [[
+        'code' => 131026, 'error_subcode' => '2494010', 'title' => $sentinel,
+        'message' => $sentinel, 'error_data' => ['details' => $sentinel], 'access_token' => $sentinel,
+    ]])]);
+    adminAssert($result['status'] === 'stored' && $result['stored'] === 1, 'Signed failed delivery receipt is retained in the intended tenant');
+    $queued = adminSql($pdo, "SELECT payload_ciphertext,payload_nonce,payload_tag,payload_key_version FROM webhook_events
+        WHERE business_id=? AND event_kind='status' ORDER BY id DESC LIMIT 1", [$b['business_id']])->fetch();
+    $plain = $f['seal']->open($queued['payload_ciphertext'], $queued['payload_nonce'], $queued['payload_tag'], (int) $queued['payload_key_version']);
+    $normalized = json_decode($plain, true, 16, JSON_THROW_ON_ERROR);
+    adminAssert($normalized['error_code'] === 131026 && $normalized['error_subcode'] === 2494010
+        && !str_contains($plain, $sentinel) && !isset($normalized['errors']),
+        'Webhook normalization retains only numeric error code and subcode, never provider strings');
+    $worker->run($b['business_id']);
+    $outgoing = adminSql($pdo, "SELECT m.id,m.status,m.conversation_id,j.event_id,j.status AS job_status,j.last_error,j.send_attempts
+        FROM ai_messages m JOIN ai_reply_jobs j ON j.business_id=m.business_id AND j.reply_message_id=m.id
+        WHERE m.business_id=? AND m.wamid='wamid.runtime.out.2'", [$b['business_id']])->fetch();
+    adminAssert($outgoing['status'] === 'failed' && $outgoing['job_status'] === 'sent'
+        && $outgoing['last_error'] === 'meta_error_131026_sub_2494010' && (int) $outgoing['send_attempts'] === 1,
+        'Async failure preserves API acceptance while recording concise numeric delivery reason');
+    $inboxConfig = ['ai_customer_rollout' => 'all', 'ai_enabled' => 'true',
+        'gemini_api_key' => 'synthetic-runtime-inbox-key', 'gemini_model' => 'synthetic-model'];
+    $store = new AiReplyStore($pdo, $f['seal'], $inboxConfig);
+    $findMessage = static function (array $inbox): array {
+        foreach ($inbox['conversations'] as $conversation) {
+            foreach ($conversation['messages'] as $message) {
+                if (($message['wamid'] ?? '') === 'wamid.runtime.out.2') { return $message; }
+            }
+        }
+        return [];
+    };
+    $message = $findMessage($store->inbox($b['member'], []));
+    adminAssert($message['status'] === 'failed' && $message['failure_reason'] === 'meta_error'
+        && $message['error_code'] === 131026 && $message['error_subcode'] === 2494010,
+        'Own inbox exposes safe typed failure diagnostics');
+    $otherInbox = $store->inbox($a['member'], []);
+    adminAssert(!str_contains(json_encode($otherInbox, JSON_THROW_ON_ERROR), 'wamid.runtime.out.2')
+        && !str_contains(json_encode($otherInbox, JSON_THROW_ON_ERROR), '131026'),
+        'Failure metadata and reply remain isolated from another tenant');
+    runtimeBridge($f, $config, [$receipt('sent', $now - 5)]);
+    $worker->run($b['business_id']);
+    adminAssert(adminSql($pdo, 'SELECT status FROM ai_messages WHERE id=?', [$outgoing['id']])->fetchColumn() === 'failed',
+        'An older late sent receipt cannot erase confirmed failure');
+    runtimeBridge($f, $config, [$receipt('failed', $now + 1, [[
+        'code' => '<script>' . $sentinel, 'error_subcode' => ['secret' => $sentinel], 'message' => $sentinel,
+    ]])]);
+    $queued = adminSql($pdo, "SELECT payload_ciphertext,payload_nonce,payload_tag,payload_key_version FROM webhook_events
+        WHERE business_id=? AND event_kind='status' ORDER BY id DESC LIMIT 1", [$b['business_id']])->fetch();
+    $plain = $f['seal']->open($queued['payload_ciphertext'], $queued['payload_nonce'], $queued['payload_tag'], (int) $queued['payload_key_version']);
+    adminAssert(!str_contains($plain, $sentinel) && !str_contains($plain, 'error_code'),
+        'Malicious nonnumeric async diagnostics are discarded before storage');
+    $worker->run($b['business_id']);
+    adminAssert(adminSql($pdo, 'SELECT last_error FROM ai_reply_jobs WHERE event_id=?', [$outgoing['event_id']])->fetchColumn() === 'meta_error_131026_sub_2494010',
+        'Repeated failure without usable metadata cannot erase a known numeric reason');
+    foreach ([null, $sentinel] as $oldReason) {
+        adminSql($pdo, 'UPDATE ai_reply_jobs SET last_error=? WHERE event_id=?', [$oldReason, $outgoing['event_id']]);
+        $message = $findMessage($store->inbox($b['member'], []));
+        adminAssert($message['failure_reason'] === 'delivery_failed' && $message['error_code'] === null
+            && $message['error_subcode'] === null && !str_contains(json_encode($message, JSON_THROW_ON_ERROR), $sentinel),
+            'Old or unexpected persisted errors expose only a generic safe failure');
+    }
+    adminSql($pdo, "UPDATE ai_reply_jobs SET last_error='meta_error_131026_sub_2494010' WHERE event_id=?", [$outgoing['event_id']]);
+    foreach (['delivered', 'read'] as $position => $status) {
+        runtimeBridge($f, $config, [$receipt($status, $now + 2 + $position * 2)]);
+        $worker->run($b['business_id']);
+        $message = $findMessage($store->inbox($b['member'], []));
+        adminAssert($message['status'] === $status && !array_key_exists('failure_reason', $message)
+            && !array_key_exists('error_code', $message) && !array_key_exists('error_subcode', $message),
+            $status . ' proof can follow failed and exposes no stale failure diagnostics');
+        runtimeBridge($f, $config, [$receipt('failed', $now + 3 + $position * 2, [['code' => 131047]])]);
+        $worker->run($b['business_id']);
+        adminAssert(adminSql($pdo, 'SELECT status FROM ai_messages WHERE id=?', [$outgoing['id']])->fetchColumn() === $status
+            && adminSql($pdo, 'SELECT last_error FROM ai_reply_jobs WHERE event_id=?', [$outgoing['event_id']])->fetchColumn() === 'meta_error_131026_sub_2494010',
+            'Late failure cannot regress ' . $status . ' or overwrite its prior diagnostic');
+    }
+    adminAssert(runtimeCalls($calls) === $before
+        && adminSql($pdo, 'SELECT quota_used FROM ai_reply_settings WHERE business_id=?', [$b['business_id']])->fetchColumn() === $quotaBefore
+        && adminSql($pdo, 'SELECT mode FROM ai_conversations WHERE id=?', [$outgoing['conversation_id']])->fetchColumn() === 'ai',
+        'Receipt diagnostics do not call providers, consume quota, change consent, or introduce replay');
+});
+
+adminTest('Immediate structured send rejection survives worker storage as numeric diagnostics', function () use ($f, $pdo, $b, $config, $wabaB, $phoneB, $now, &$calls): void {
+    $requests = 0;
+    $sentinel = 'HTTP_PROVIDER_SECRET_MUST_NOT_ESCAPE';
+    $sender = new WhatsAppTextSender('v23.0', static function () use (&$requests, $sentinel): array {
+        $requests++;
+        return ['status' => 400, 'body' => json_encode(['error' => [
+            'code' => 190, 'error_subcode' => 463, 'message' => $sentinel, 'type' => $sentinel,
+        ]], JSON_THROW_ON_ERROR)];
+    });
+    $send = static function (string $token, string $phone, string $peer, string $text, ?string $replyTo) use ($sender, &$calls): array {
+        $calls['send'][] = ['synthetic' => 'structured rejection'];
+        return $sender->send($token, $phone, $peer, $text, $replyTo);
+    };
+    runtimeBridge($f, $config, [runtimeEntry($wabaB, $phoneB, 'wamid.RUNTIMEERROR0001', '601199999999')]);
+    $result = runtimeWorker($f, $now, $calls, true, null, $send)->run($b['business_id']);
+    $row = adminSql($pdo, "SELECT j.status,j.last_error,j.send_attempts,m.status AS message_status,c.mode
+        FROM ai_reply_jobs j JOIN ai_messages m ON m.business_id=j.business_id AND m.id=j.reply_message_id
+        JOIN ai_conversations c ON c.business_id=j.business_id AND c.id=j.conversation_id
+        WHERE j.business_id=? AND c.recipient='601199999999'", [$b['business_id']])->fetch();
+    adminAssert($result['failed'] === 1 && $requests === 1 && $row['status'] === 'failed'
+        && $row['message_status'] === 'failed' && $row['last_error'] === 'meta_error_190_sub_463'
+        && (int) $row['send_attempts'] === 1 && $row['mode'] === 'human',
+        'Definite rejection keeps numeric diagnostics and existing single-attempt human handoff');
+    $before = runtimeCalls($calls);
+    runtimeWorker($f, $now, $calls, true, null, $send)->run($b['business_id']);
+    adminAssert($requests === 1 && runtimeCalls($calls) === $before, 'Diagnostic recording never retries the failed request');
 });
 
 adminTest('Historical receipts survive suspension disabled owners and disconnected known assets', function () use ($f, $pdo, $a, $connectionA, $config, $wabaA, $phoneA, $now, &$calls): void {
