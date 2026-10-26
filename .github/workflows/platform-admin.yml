@@ -1,0 +1,73 @@
+name: Platform administration boundaries
+on:
+  pull_request:
+    paths:
+      - 'os/src/Platform*.php'
+      - 'os/src/AdminWhatsAppActivation.php'
+      - 'os/src/CloudPhoneRegistration.php'
+      - 'os/src/AiReplyStore.php'
+      - 'os/src/AiReplyWorker.php'
+      - 'os/src/AuthHttp.php'
+      - 'os/src/CoexistenceSync.php'
+      - 'os/src/LegacyDesk.php'
+      - 'os/src/bootstrap.php'
+      - 'os/bin/platform-admin.php'
+      - 'os/bin/prepare-platform-admin.php'
+      - 'os/migrations/0006_platform_admin.up.sql'
+      - 'os/tests/admin-fixture.php'
+      - 'os/tests/check-platform-admin.php'
+      - 'os/tests/check-admin-whatsapp.php'
+      - 'os/tests/check-admin-ui.mjs'
+      - 'whatsapp/pemilik/**'
+      - 'whatsapp/akaun/knowledge-media.php'
+      - 'whatsapp/ruang.html'
+      - 'whatsapp/ruang.js'
+      - '.github/workflows/platform-admin.yml'
+permissions:
+  contents: read
+jobs:
+  platform-admin:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: synthetic-platform-admin-ci-only
+          MYSQL_ROOT_HOST: '%'
+        ports:
+          - 33306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -psynthetic-platform-admin-ci-only --silent"
+          --health-interval=5s --health-timeout=5s --health-retries=24
+    env:
+      BESHARE_ADMIN_TEST_DSN: mysql:host=127.0.0.1;port=33306;dbname=beshare_platform_admin_test
+      BESHARE_ADMIN_TEST_USER: root
+      BESHARE_ADMIN_TEST_PASSWORD: synthetic-platform-admin-ci-only
+    steps:
+      - name: Fetch proposed source without persisted credentials
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git init .
+          git remote add origin https://github.com/sifutech-ux/beshareaisolution.git
+          git fetch --depth=1 origin "$SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+      - name: Prepare PHP for targeted admin checks
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, curl, openssl, posix, fileinfo
+          coverage: none
+          tools: none
+      - name: Syntax of new administration and changed enforcement paths
+        run: |
+          for file in os/src/PlatformAccess.php os/src/PlatformAdminSchema.php os/src/PlatformAdminStore.php os/src/PlatformAdminHttp.php os/src/AdminWhatsAppActivation.php os/src/CloudPhoneRegistration.php os/src/AiReplyStore.php os/src/AiReplyWorker.php os/src/AuthHttp.php os/src/CoexistenceSync.php os/src/LegacyDesk.php os/src/bootstrap.php os/bin/platform-admin.php os/bin/prepare-platform-admin.php os/tests/admin-fixture.php os/tests/check-platform-admin.php os/tests/check-admin-whatsapp.php whatsapp/pemilik/pintu.php whatsapp/akaun/knowledge-media.php; do php -l "$file"; done
+          node --check whatsapp/pemilik/pemilik.js
+          node --check whatsapp/ruang.js
+      - name: Platform role, metadata, suspension, AI and migration boundaries
+        run: php os/tests/check-platform-admin.php
+      - name: Tenant-bound activation with synthetic Meta and durable dispatch checks
+        run: php os/tests/check-admin-whatsapp.php
+      - name: Admin UI confirmation, target binding and stale-request handling
+        run: node os/tests/check-admin-ui.mjs

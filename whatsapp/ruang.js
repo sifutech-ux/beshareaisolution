@@ -106,10 +106,12 @@ function load() {
   return {
     ...ui,
     user: live.user,
+    platformAdmin: live.platform_admin === true,
     business: {
       name: live.business.name,
       public_id: live.business.public_id,
       status: live.business.status,
+      accessStatus: live.business.access_status || "active",
       industry: ui.industry,
       language: ui.language,
       hours: ui.hours
@@ -162,7 +164,7 @@ function serverConnection() {
     token: typeof source.token === "string" && source.token ? source.token : "Belum",
     webhook: typeof source.webhook === "string" && source.webhook ? source.webhook : "Belum",
     registration: typeof source.registration === "string" && source.registration ? source.registration : "Belum",
-    messaging: typeof source.messaging === "string" && source.messaging ? source.messaging : "Belum",
+    messaging: source.linked === true && source.messaging === "Belum" ? "Belum ada bukti mesej" : (typeof source.messaging === "string" && source.messaging ? source.messaging : "Belum"),
     note: typeof source.note === "string" ? source.note : "",
     phone: typeof source.phone === "string" ? source.phone : ""
   };
@@ -318,6 +320,7 @@ function route() {
   }
   if (hash === "daftar" || hash === "masuk" || hash === "lupa") root.innerHTML = authView(hash, state);
   else if (hash === "sahkan") root.innerHTML = `<main class="page"><section class="panel" style="max-width:560px;margin:2rem auto;"><h1>Pengesahan e-mel</h1><p class="muted">Pengesahan e-mel tidak digunakan. Tiada e-mel dihantar.</p><p><a href="#masuk">Masuk</a></p></section></main>`;
+  else if (state && state.business.accessStatus === "suspended") root.innerHTML = shell(state, "papan", '<article class="panel"><h1>Akses perniagaan digantung</h1><p>Hubungi pemilik sistem BeShare untuk bantuan. Anda masih boleh memilih ruang perniagaan lain atau keluar daripada akaun.</p></article>');
   else if (hash === "mula") root.innerHTML = shell(state, "papan", board(state));
   else if (!NAV.some(([id]) => id === hash)) root.innerHTML = shell(state, "papan", board(state));
   else {
@@ -332,8 +335,8 @@ function route() {
   };
   place();
   requestAnimationFrame(place);
-  if (hash === "sambungan") prepareSignup();
-  if (state && (hash === "peti" || hash === "kenalan" || hash === "papan" || hash === "sambungan" || hash === "pengetahuan") && inboxLoad !== hash) {
+  if (hash === "sambungan" && state && state.business.accessStatus !== "suspended") prepareSignup();
+  if (state && state.business.accessStatus !== "suspended" && (hash === "peti" || hash === "kenalan" || hash === "papan" || hash === "sambungan" || hash === "pengetahuan") && inboxLoad !== hash) {
     const requested = hash;
     inboxLoad = hash;
     const action = hash === "peti" || hash === "kenalan" ? "peti" : "sesi";
@@ -405,6 +408,7 @@ function shell(state, hash, body) {
       </div>
       <div class="nav-links">${links}</div>
       <div class="nav-tools">
+        ${state.platformAdmin ? '<a class="btn btn--ghost" href="/whatsapp/pemilik/">Panel Pemilik</a>' : ""}
         ${(state.memberships || []).length > 1 ? `<label class="muted">Perniagaan
           <select data-act="pilih" aria-label="Perniagaan">
             ${state.memberships.map((item) => `<option value="${esc(item.public_id)}" ${item.public_id === state.business.public_id ? "selected" : ""}>${esc(item.name)}</option>`).join("")}
@@ -1574,6 +1578,7 @@ function onSubmit(event) {
         return;
       }
       applyLive(result);
+      if (openOwnerPanel()) return;
       location.hash = consumeAuthReturn(load());
       route();
     });
@@ -1697,6 +1702,15 @@ function onSubmit(event) {
       route();
     });
   }
+}
+
+// Only one fixed same-origin destination; the server independently authorizes every admin request.
+function openOwnerPanel() {
+  if (live && live.platform_admin === true && new URLSearchParams(location.search || "").get("tujuan") === "pemilik") {
+    location.href = "/whatsapp/pemilik/";
+    return true;
+  }
+  return false;
 }
 
 function onInput(event) {
@@ -2180,6 +2194,7 @@ async function boot() {
   if (root) root.innerHTML = `<main class="page"><p class="muted">Memuatkan sesi…</p></main>`;
   try {
     applyLive(await callApi("sesi"));
+    if (openOwnerPanel()) return;
   } catch {
     live = null;
   }

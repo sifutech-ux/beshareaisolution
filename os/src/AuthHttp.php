@@ -5,6 +5,8 @@ namespace BesharOs;
 
 use PDO;
 
+require_once __DIR__ . '/PlatformAccess.php';
+
 final class AuthHttp
 {
     public function __construct(private PDO $pdo, private RateLimit $rates, private ?WhatsAppGateway $whatsapp = null, private ?AiReplyStore $ai = null, private ?KnowledgeCentre $knowledge = null)
@@ -33,14 +35,17 @@ final class AuthHttp
         }
         if ($method === 'GET' && $action === 'ahli') {
             $actor = $this->actor($session);
+            PlatformAccess::assertBusinessAccess($this->pdo, $actor['business_id']);
             return $this->respond($session, false, $this->payload($actor));
         }
         if ($method === 'GET' && $action === 'audit') {
             $actor = $this->actor($session);
+            PlatformAccess::assertBusinessAccess($this->pdo, $actor['business_id']);
             return $this->respond($session, false, $this->payload($actor));
         }
         if ($method === 'GET' && $action === 'peti') {
             $actor = $this->actor($session);
+            PlatformAccess::assertBusinessAccess($this->pdo, $actor['business_id']);
             return $this->respond($session, false, $this->withInbox($actor));
         }
         if ($method !== 'POST') {
@@ -62,6 +67,9 @@ final class AuthHttp
             ];
         }
         $actor = $this->actor($session);
+        // Platform restrictions are separate from the customer's own business status.
+        // Switching to another membership and signing out remain available.
+        if ($action !== 'pilih') { PlatformAccess::assertBusinessAccess($this->pdo, $actor['business_id']); }
         if (in_array($action, ['knowsave', 'knowpublish', 'knowimport'], true)) {
             if (!$this->knowledge instanceof KnowledgeCentre) { throw new AuthException('Pusat Pengetahuan belum tersedia.', 409); }
             $this->knowledge->assertRequestScope($actor, $body['expected_business_public_id'] ?? null);
@@ -238,7 +246,8 @@ final class AuthHttp
      */
     private function payload(array $context): array
     {
-        $ai = $this->ai instanceof AiReplyStore ? $this->ai->view($context) : ['available' => false, 'enabled' => false, 'can_manage' => false];
+        $access = PlatformAccess::businessStatus($this->pdo, $context['business_id']);
+        $ai = $access === 'active' && $this->ai instanceof AiReplyStore ? $this->ai->view($context) : ['available' => false, 'enabled' => false, 'can_manage' => false];
         $memberships = [];
         foreach (Membership::list($this->pdo, $context['user_id']) as $row) {
             $memberships[] = [
@@ -250,7 +259,7 @@ final class AuthHttp
         }
         $members = [];
         $audit = [];
-        if ($context['role'] === 'owner' || $context['role'] === 'admin') {
+        if ($access === 'active' && ($context['role'] === 'owner' || $context['role'] === 'admin')) {
             $members = Tenants::members($this->pdo, $context);
             $audit = Tenants::audit($this->pdo, $context);
         }
@@ -265,15 +274,17 @@ final class AuthHttp
                 'public_id' => $context['public_id'],
                 'name' => $context['business_name'],
                 'status' => $context['status'],
+                'access_status' => $access,
             ],
+            'platform_admin' => PlatformAccess::admin($this->pdo, $context['user_id']) !== null,
             'memberships' => $memberships,
             'members' => $members,
             'audit' => $audit,
-            'connection' => $this->connection($context),
-            'inbox_ready' => $this->whatsapp instanceof WhatsAppGateway || $ai['available'],
+            'connection' => $access === 'active' ? $this->connection($context) : ['token'=>'Belum','webhook'=>'Belum','registration'=>'Belum','messaging'=>'Belum','note'=>'Akses perniagaan digantung.','phone'=>'','linked'=>false],
+            'inbox_ready' => $access === 'active' && ($this->whatsapp instanceof WhatsAppGateway || $ai['available']),
             'ai' => $ai,
         ];
-        if ($context['role'] === 'owner' && $context['user_id'] === $context['owner_user_id']) {
+        if ($access === 'active' && $context['role'] === 'owner' && $context['user_id'] === $context['owner_user_id']) {
             $payload['knowledge_centre'] = $this->knowledge instanceof KnowledgeCentre
                 ? $this->knowledge->view($context) : ['available' => false, 'can_manage' => false];
         }

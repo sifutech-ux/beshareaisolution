@@ -8,6 +8,7 @@ use PDO;
 use Throwable;
 
 require_once __DIR__ . '/KnowledgeReply.php';
+require_once __DIR__ . '/PlatformAccess.php';
 
 /**
  * A single-attempt owner pilot worker over the already authenticated OS queue.
@@ -521,6 +522,9 @@ final class AiReplyWorker
         }
         if ($b === null || $b['status'] !== 'active' || $b['owner_status'] !== 'active' || $b['role'] !== 'owner') {
             return 'inactive_business';
+        }
+        if (PlatformAccess::businessStatus($this->pdo, (int) $s['business_id']) !== 'active') {
+            return 'platform_suspended';
         }
         if ($c === null || $v === null || (int) $s['connection_id'] !== (int) $c['id']
             || ($body['waba_id'] ?? null) !== $c['waba_id']

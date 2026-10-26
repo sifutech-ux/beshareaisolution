@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="same-origin">
+  <title>Panel Pemilik — BeShare AI OS</title>
+  <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+  <link rel="stylesheet" href="pemilik.css?v=20261026-r1">
+  <script src="pemilik.js?v=20261026-r1" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Langkau ke kandungan</a>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Navigasi panel pemilik">
+      <a class="brand" href="./" aria-label="BeShare AI, panel pemilik"><span class="brand-mark" aria-hidden="true">b<span>·</span></span><span>BeShare <b>AI</b><small>Panel pemilik</small></span></a>
+      <div class="sidebar-section">RUANG KAWALAN</div>
+      <nav class="side-nav" aria-label="Bahagian utama">
+        <a class="nav-item is-active" href="#main" aria-current="page"><span aria-hidden="true">◈</span> Gambaran keseluruhan</a>
+        <a class="nav-item" href="#customers"><span aria-hidden="true">▤</span> Pelanggan</a>
+        <button class="nav-item" id="attentionShortcut" type="button"><span aria-hidden="true">◎</span> Perlu perhatian <span class="nav-count" id="attentionCount">—</span></button>
+      </nav>
+      <div class="sidebar-foot">
+        <a class="workspace-link" href="../ruang.html"><span aria-hidden="true">↗</span> Ruang perniagaan saya</a>
+        <div class="admin-identity"><span class="avatar" id="adminInitial" aria-hidden="true">B</span><span><strong id="adminName">Pemilik sistem</strong><small id="adminRole">Menyemak akses…</small></span></div>
+      </div>
+    </aside>
+    <main id="main" class="main" tabindex="-1">
+      <header class="page-header">
+        <div><p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span> BESHARE AI OS</p><h1>Pusat kawalan pemilik</h1><p class="subtitle">Pantau pelanggan dan bantu sambungan mereka hingga sedia digunakan.</p></div>
+        <div class="header-actions"><span class="updated" id="updatedAt">Data belum dimuatkan</span><button class="button button-quiet" id="reloadAll" type="button" disabled><span aria-hidden="true">↻</span> Muat semula</button></div>
+      </header>
+
+      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+
+      <section id="accessGate" class="access-gate panel" aria-labelledby="gateTitle">
+        <span class="gate-symbol" aria-hidden="true">◈</span>
+        <h2 id="gateTitle">Menyemak akses pemilik</h2>
+        <p id="gateMessage">Sila tunggu sebentar.</p>
+        <div id="gateActions" class="button-row" hidden><a class="button button-primary" href="../ruang.html?tujuan=pemilik#masuk">Masuk ke BeShare</a><button class="button button-quiet" id="retryAccess" type="button">Cuba semula</button></div>
+      </section>
+
+      <div id="dashboard" hidden>
+        <section class="metrics" id="metrics" aria-label="Ringkasan operasi" aria-busy="true">
+          <article class="metric"><span class="metric-icon violet" aria-hidden="true">▤</span><span class="metric-label">Jumlah pelanggan</span><strong data-metric="customers">—</strong><small>Ruang perniagaan berdaftar</small></article>
+          <article class="metric"><span class="metric-icon blue" aria-hidden="true">+</span><span class="metric-label">Pelanggan baharu</span><strong data-metric="new_customers">—</strong><small id="newCustomersPeriod">Pendaftaran dalam 7 hari</small></article>
+          <article class="metric"><span class="metric-icon green" aria-hidden="true">✓</span><span class="metric-label">WhatsApp sedia</span><strong data-metric="ready_connections">—</strong><small>Nombor sedia digunakan</small></article>
+          <article class="metric"><span class="metric-icon amber" aria-hidden="true">◷</span><span class="metric-label">Pengaktifan tertangguh</span><strong data-metric="pending_connections">—</strong><small>Sambungan perlu dilengkapkan</small></article>
+          <article class="metric"><span class="metric-icon pink" aria-hidden="true">✧</span><span class="metric-label">AI dihidupkan</span><strong data-metric="ai_enabled">—</strong><small>Tetapan balasan pelanggan</small></article>
+          <article class="metric"><span class="metric-icon red" aria-hidden="true">Ⅱ</span><span class="metric-label">Akses digantung</span><strong data-metric="suspended_customers">—</strong><small>Akses BeShare pelanggan</small></article>
+        </section>
+
+        <section id="customers" class="panel customer-panel" aria-labelledby="customersTitle">
+          <div class="section-heading"><div><p class="eyebrow">DIREKTORI PELANGGAN</p><h2 id="customersTitle">Semua perniagaan, tersusun.</h2></div><span class="count-label" id="customerCount">Memuatkan pelanggan…</span></div>
+          <div class="list-toolbar">
+            <label class="search"><span aria-hidden="true">⌕</span><span class="sr-only">Cari nama, e-mel atau nombor pelanggan</span><input type="search" id="searchInput" maxlength="160" autocomplete="off" placeholder="Cari nama, e-mel atau nombor…"></label>
+            <div class="filters" role="group" aria-label="Tapis pelanggan"><button type="button" data-filter="all" aria-pressed="true">Semua</button><button type="button" data-filter="attention" aria-pressed="false">Perlu perhatian</button><button type="button" data-filter="ready" aria-pressed="false">WhatsApp sedia</button><button type="button" data-filter="suspended" aria-pressed="false">Digantung</button></div>
+          </div>
+          <div id="listStatus" class="list-status" role="status" aria-live="polite"></div>
+          <div class="table-wrap" id="tableWrap" aria-busy="true"><table class="customer-table"><caption class="sr-only">Pelanggan BeShare dan status operasi mereka</caption><thead><tr><th scope="col">Pelanggan / Perniagaan</th><th scope="col">WhatsApp</th><th scope="col">Akses BeShare</th><th scope="col">AI</th><th scope="col">Aktiviti terakhir</th><th scope="col"><span class="sr-only">Tindakan</span></th></tr></thead><tbody id="customerRows"></tbody></table></div>
+          <footer class="pagination"><span id="pageInfo">—</span><div><button class="button button-small button-quiet" id="previousPage" type="button" disabled>← Sebelum</button><button class="button button-small button-quiet" id="nextPage" type="button" disabled>Seterusnya →</button></div></footer>
+        </section>
+        <p class="dashboard-note"><span aria-hidden="true">◈</span> Akses BeShare, kesediaan WhatsApp dan AI dipaparkan secara berasingan.</p>
+      </div>
+      <footer class="page-footer"><span>BeShare AI Solution</span><span>Panel pemilik · Malaysia</span></footer>
+    </main>
+  </div>
+
+  <dialog id="detailDialog" class="detail-dialog" aria-labelledby="detailTitle">
+    <div class="dialog-top"><span class="eyebrow">BUTIRAN PELANGGAN</span><button class="icon-button" id="closeDetail" type="button" aria-label="Tutup butiran pelanggan">✕</button></div>
+    <div class="detail-heading"><h2 id="detailTitle">Memuatkan pelanggan…</h2><p id="detailSubtitle" class="muted"></p></div>
+    <div id="detailNotice" class="notice" role="status" aria-live="polite" hidden></div>
+    <div id="detailContent" aria-busy="true"></div>
+  </dialog>
+
+  <dialog id="confirmDialog" class="confirm-dialog" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+    <span class="confirm-icon" aria-hidden="true">◈</span><h2 id="confirmTitle">Sahkan tindakan</h2><p id="confirmMessage" class="muted"></p><dl class="confirmation-target" id="confirmTarget"></dl><p class="confirm-note" id="confirmNote"></p>
+    <div class="confirm-actions"><button id="cancelConfirm" type="button" class="button button-quiet">Batal</button><button id="executeConfirm" type="button" class="button button-primary">Sahkan</button></div>
+  </dialog>
+  <noscript><p class="noscript">Aktifkan JavaScript untuk menggunakan panel pemilik. <a href="../ruang.html">Kembali ke ruang perniagaan</a>.</p></noscript>
+</body>
+</html>
