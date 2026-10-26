@@ -419,7 +419,7 @@ function shell(state, hash, body) {
       </div>
     </aside>
     <section${hash === "peti" || hash === "pengetahuan" ? ' class="workspace-bounded"' : ""}>
-      <p class="demo-banner">${state.ai.available ? "Peti masuk dan tetapan AI disimpan pada pelayan. Ujian AI hanya membalas nombor yang ditetapkan dalam Pengetahuan. Peraturan automasi, analitik dan bil belum disambung." : state.inboxReady ? "Akaun, pasukan, dan keadaan sambungan datang dari pelayan. Peti masuk hanya memaparkan mesej webhook yang disahkan. Pengetahuan, automasi, analitik, dan bil belum disambung." : "Akaun dan pasukan datang dari pelayan. Sambungan Meta belum dikonfigurasi pada pelayan ini. Peti masuk, pengetahuan, automasi, analitik, dan bil belum disambung."}</p>
+      <p class="demo-banner">${state.ai.available ? "Urus mesej, pengetahuan dan balasan AI untuk perniagaan ini. Pilih penerima dan had balasan dalam Pengetahuan; ambil alih perbualan melalui Peti masuk." : state.knowledgeCentre.available ? "Sediakan dan terbitkan maklumat perniagaan dalam Pengetahuan. Status nombor WhatsApp boleh disemak dalam Sambungan." : state.inboxReady ? "Peti masuk memaparkan mesej WhatsApp yang diterima melalui sambungan perniagaan ini." : "Lengkapkan sambungan WhatsApp untuk mula menerima mesej pelanggan."}</p>
       ${state.notice ? `<p class="error">${esc(state.notice)}</p>` : ""}
       ${body}
     </section>
@@ -487,7 +487,7 @@ function talk(state, current) {
     ? `<p class="error">Tetingkap perkhidmatan pelanggan telah tamat. Mesej biasa tidak dihantar. Templat yang diluluskan diperlukan.</p>`
     : current.mode === "human_takeover"
       ? current.can_control ? `<p class="muted">AI dijeda untuk perbualan ini. Penghantaran manual oleh staf belum tersedia dalam peti masuk.</p>` : `<form id="reply"><label class="field">Balasan staf<input name="text" required></label><button class="btn" type="submit">Hantar</button></form>`
-      : `<p class="muted">${current.mode === "ai_active" ? "AI aktif untuk mesej baharu yang memenuhi tetapan ujian. Ambil alih untuk menjeda balasan dalam perbualan ini." : "AI dijeda. Semak tetapan dalam Pengetahuan sebelum ujian seterusnya."}</p>`;
+      : `<p class="muted">${current.mode === "ai_active" ? "AI aktif untuk mesej baharu mengikut tetapan perniagaan. Ambil alih untuk menjeda balasan dalam perbualan ini." : "AI dijeda. Semak tetapan balasan dalam Pengetahuan."}</p>`;
   const actions = current.mode === "human_takeover"
     ? `<button class="btn btn--ghost" type="button" data-act="release">Pulangkan kepada AI</button>${current.can_control ? "" : ' <button class="btn btn--ghost" type="button" data-act="resolve">Selesai</button>'}`
     : `<button class="btn" type="button" data-act="take">Ambil alih</button>`;
@@ -609,6 +609,7 @@ function knowledgeEditorFor(state) {
     knowledgeEditor = {
       scope, businessPublicId: state.business.public_id, document: doc, saved: JSON.stringify(doc), revision, dirty: false, busy: "", conflict: false,
       media: new Map(), open: new Set(), review: false, notice: "", noticeKind: "info", controls: null,
+      publicationConnection: state.ai.connection_id || 0,
       publishedRevision: centre.published_revision || 0, publishedAt: centre.published_at || ""
     };
   }
@@ -741,10 +742,12 @@ function knowledgeReview(editor, state) {
   const doc = editor.document;
   const sources = doc.sources.filter((item) => item.enabled);
   const assets = doc.assets.filter((item) => item.enabled);
+  const connections = Array.isArray(state.ai.connections) ? state.ai.connections : [];
+  const firstPublication = !state.ai.revision;
   return `<section class="kc-review kc-section" id="kc-review" aria-labelledby="kc-review-title">
     <h2 id="kc-review-title">Semak sebelum diterbitkan</h2>
     <p>Anda akan menggantikan pengetahuan aktif dengan draf versi ${editor.revision}. Hanya maklumat dan gambar yang disertakan di bawah boleh digunakan AI.</p>
-    ${!state.ai.revision ? '<p class="kc-notice">Untuk penerbitan pertama, pilih nombor perniagaan dalam bahagian Ujian & kawalan AI. Balasan AI kekal dimatikan sehingga anda menyimpan tetapan ujian.</p>' : ""}
+    ${firstPublication ? '<p class="kc-notice">Pilih nombor WhatsApp yang akan menggunakan pengetahuan ini. Selepas penerbitan, lengkapkan kawalan AI untuk menghidupkan balasan.</p>' : ""}
     <h3>Fakta perniagaan</h3><div class="kc-preview-text">${esc(doc.facts || "Tiada fakta utama.")}</div>
     ${sources.length ? `<h3>Sumber yang disertakan</h3>${sources.map((item) => `<details class="kc-card"><summary>${esc(item.title)}</summary><div class="kc-card-body"><p class="muted kc-preserve">${esc(item.url)}</p><div class="kc-preview-text">${esc(item.text)}</div></div></details>`).join("")}` : '<p class="muted">Tiada pautan sumber disertakan.</p>'}
     ${assets.length ? `<h3>Gambar yang dibenarkan</h3><div class="kc-review-media">${assets.map((item) => `<article class="kc-mini-card">${knowledgeMediaPreview(editor, item.media_id, item.title)}<h4>${esc(item.title)}</h4><p class="kc-preserve">${esc(item.facts)}</p><p class="kc-preserve"><strong>Kapsyen:</strong> ${esc(item.caption || "Tiada kapsyen")}</p><p class="kc-preserve"><strong>Bila dihantar:</strong> ${esc(item.when_to_send)}</p></article>`).join("")}</div>` : '<p class="muted">Tiada gambar produk dibenarkan untuk AI.</p>'}
@@ -753,12 +756,13 @@ function knowledgeReview(editor, state) {
     <p class="muted kc-hint">Had gabungan fakta untuk penerbitan ialah 8,000 bait. Jika terlalu panjang, ringkaskan sumber atau nyahpilih maklumat yang tidak diperlukan.</p>
     <form id="knowledge-publish">
       <fieldset class="kc-fields" ${editor.busy ? "disabled" : ""}>
+        ${firstPublication ? connections.length ? `<label class="field">Nombor WhatsApp untuk pengetahuan ini<select name="connection" data-kc-control="publication_connection" required><option value="" ${!editor.publicationConnection ? "selected" : ""}>Pilih nombor perniagaan</option>${connections.map((connection) => `<option value="${esc(connection.id)}" ${Number(connection.id) === Number(editor.publicationConnection) ? "selected" : ""}>${esc(connection.display_phone || "Nombor belum disahkan")}</option>`).join("")}</select></label>` : '<p class="kc-notice">Sambungkan nombor WhatsApp dalam halaman Sambungan sebelum penerbitan pertama. Draf ini kekal disimpan.</p>' : ""}
         <label class="kc-check"><input type="checkbox" name="approved" required> <span>Saya telah menyemak dan mengesahkan fakta, sumber dan gambar yang disertakan.</span></label>
         ${doc.payment.enabled ? '<label class="kc-check"><input type="checkbox" name="payment_confirmed" required> <span>Saya telah menyemak bank, nama pemegang akaun, nombor akaun, arahan dan kod QR (jika ada) yang dipaparkan.</span></label>' : ""}
-        <p class="kc-actions"><button class="btn" type="submit">Sahkan & terbitkan pengetahuan</button><button class="btn btn--ghost" type="button" data-act="kc-close-review">Kembali menyunting</button></p>
+        <p class="kc-actions"><button class="btn" type="submit" ${firstPublication && !connections.length ? "disabled" : ""}>Sahkan & terbitkan pengetahuan</button><button class="btn btn--ghost" type="button" data-act="kc-close-review">Kembali menyunting</button></p>
       </fieldset>
     </form>
-    <p class="muted kc-hint">Penerbitan mengemas kini pengetahuan. Pengaktifan dan nombor ujian dikawal secara berasingan di bawah.</p>
+    <p class="muted kc-hint">Penerbitan mengemas kini pengetahuan. Pilihan penerima, had harian dan pengaktifan balasan diurus dalam Kawalan AI.</p>
   </section>`;
 }
 
@@ -775,7 +779,7 @@ function knowledgeCentre(state) {
       <p class="muted">Sediakan fakta, gambar dan maklumat bayaran untuk membantu AI menjawab pelanggan. Simpan draf, semak kandungannya, kemudian terbitkan apabila semuanya betul.</p>
       <div class="kc-status-row"><span class="kc-status" id="kc-save-state">${editor.dirty ? "Perubahan belum disimpan" : editor.revision ? `Draf disimpan · Versi ${editor.revision}` : "Draf baharu"}</span><span class="muted">${editor.publishedRevision ? `Versi aktif ${esc(editor.publishedRevision)}${editor.publishedAt ? " · " + esc(editor.publishedAt) : ""}` : "Belum diterbitkan"}</span></div>
     </header>
-    <nav class="kc-nav" aria-label="Bahagian pusat pengetahuan">${[["kc-facts", "01", "Fakta & pautan"], ["kc-assets", "02", "Gambar produk"], ["kc-payment", "03", "Bayaran"], ["kc-test", "04", "Ujian AI"]].map(([id, number, label]) => `<button type="button" data-act="kc-jump" data-value="${id}"><span>${number}</span>${label}</button>`).join("")}</nav>
+    <nav class="kc-nav" aria-label="Bahagian pusat pengetahuan">${[["kc-facts", "01", "Fakta & pautan"], ["kc-assets", "02", "Gambar produk"], ["kc-payment", "03", "Bayaran"], ["kc-test", "04", "Kawalan AI"]].map(([id, number, label]) => `<button type="button" data-act="kc-jump" data-value="${id}"><span>${number}</span>${label}</button>`).join("")}</nav>
     <p id="kc-feedback" class="kc-notice ${!editor.busy && editor.noticeKind === "error" ? "kc-notice--error" : ""}" role="${editor.noticeKind === "error" ? "alert" : "status"}" ${note ? "" : "hidden"}>${esc(note)}</p>
     ${editor.conflict ? '<div class="kc-notice kc-notice--error" role="alert"><p>Draf pelayan telah berubah dalam sesi lain. Perubahan anda masih berada dalam borang ini. Salin perubahan yang diperlukan sebelum memuat semula draf.</p><button class="btn btn--ghost" type="button" data-act="kc-reload">Buang perubahan & muat semula draf</button></div>' : ""}
     <form id="knowledge-draft" autocomplete="off">
@@ -814,39 +818,84 @@ function knowledgeCentre(state) {
   </article>`;
 }
 
+function aiControlDefaults(ai) {
+  const configured = ai.controls_configured === true || (ai.controls_configured !== false && Number(ai.revision) > 0);
+  return {
+    connection: ai.connection_id || 0, revision: ai.revision || 0, allowlist: (ai.allowlist || []).join("\n"),
+    audience_mode: ai.production_available === true && !configured ? "all" : ai.audience_mode === "all" ? "all" : "test",
+    daily_limit: ai.daily_limit || 20, enabled: ai.enabled && ai.deployment_ready, approved: false
+  };
+}
+
+function aiAudienceCopy(mode) {
+  return mode === "all" ? {
+    consent: "Saya sahkan pengetahuan aktif dan membenarkan AI membalas mesej baharu daripada semua pelanggan yang menghubungi nombor perniagaan ini, mengikut had harian yang ditetapkan.",
+    enable: "Aktifkan AI Auto Reply untuk mesej baharu daripada semua pelanggan.",
+    followup: "Selepas mengaktifkan AI, hantar mesej baharu kepada nombor perniagaan daripada nombor WhatsApp lain. Semak mesej masuk, balasan AI dan status penghantaran dalam Peti masuk."
+  } : {
+    consent: "Saya sahkan pengetahuan aktif dan membenarkan AI membalas mesej baharu daripada nombor ujian yang disenaraikan, mengikut had harian yang ditetapkan.",
+    enable: "Aktifkan balasan untuk mesej baharu daripada nombor ujian.",
+    followup: "Selepas mengaktifkan AI, hantar mesej baharu daripada nombor ujian yang disenaraikan. Semak mesej masuk, balasan AI dan status penghantaran dalam Peti masuk."
+  };
+}
+
+function updateAiAudienceControls(target) {
+  if (!target || !["all", "test"].includes(target.value)) return;
+  const all = target.value === "all";
+  const copy = aiAudienceCopy(target.value);
+  const recipients = document.getElementById("ai-test-recipients");
+  const allowlist = document.getElementById("ai-allowlist");
+  const approved = document.getElementById("ai-approved");
+  if (recipients) recipients.hidden = all;
+  if (allowlist) allowlist.required = !all;
+  if (approved) approved.checked = false;
+  for (const [id, text] of [["ai-consent-copy", copy.consent], ["ai-enable-copy", copy.enable], ["ai-followup-copy", copy.followup]]) {
+    const node = document.getElementById(id);
+    if (node) node.textContent = text;
+  }
+}
+
 function aiSettings(state, embedded = false) {
   const ai = state.ai;
   const centre = state.knowledgeCentre.available === true;
   const editor = centre ? knowledgeEditorFor(state) : null;
-  const controls = editor && editor.controls ? editor.controls : {
-    connection: ai.connection_id, revision: ai.revision || 0, allowlist: (ai.allowlist || []).join("\n"),
-    daily_limit: ai.daily_limit || 20, enabled: ai.enabled && ai.deployment_ready, approved: false
-  };
+  const controls = editor && editor.controls ? editor.controls : aiControlDefaults(ai);
+  const all = controls.audience_mode === "all";
+  const copy = aiAudienceCopy(controls.audience_mode);
+  const active = ai.enabled && ai.deployment_ready && ai.controls_configured !== false
+    && (ai.audience_mode !== "all" || ai.audience_approved === true);
+  const status = active ? "aktif" : ai.enabled ? "dijeda" : "dimatikan";
   const tag = embedded ? "section" : "article";
   const heading = embedded ? "h2" : "h1";
-  if (!ai.can_manage) return `<${tag} class="${embedded ? "kc-section" : "panel"}"><${heading}>Ujian & kawalan AI</${heading}><p>Pemilik perniagaan mengurus fakta dan pengaktifan AI. Mod semasa: ${ai.enabled && ai.deployment_ready ? "ujian aktif" : "dimatikan"}.</p></${tag}>`;
+  if (!ai.can_manage) return `<${tag} class="${embedded ? "kc-section" : "panel"}" ${embedded ? 'id="kc-test"' : ""}><${heading}>Kawalan AI Auto Reply</${heading}><p>Pemilik perniagaan mengurus fakta dan pengaktifan AI. Status semasa: ${status}.</p>${role(state) === "owner" && !ai.available ? '<p class="muted">Kawalan AI belum tersedia. Anda masih boleh menyediakan dan menerbitkan pengetahuan perniagaan.</p>' : ""}</${tag}>`;
   const connections = Array.isArray(ai.connections) ? ai.connections : [];
   return `<${tag} class="${embedded ? "kc-section" : "panel"}" ${embedded ? 'id="kc-test"' : ""}>
-    <${heading}>${embedded ? '<span class="kc-number">04</span> Ujian & kawalan AI' : "Pengetahuan dan ujian AI"}</${heading}>
+    <${heading}>${embedded ? '<span class="kc-number">04</span> Kawalan AI Auto Reply' : "Pengetahuan dan AI Auto Reply"}</${heading}>
     <p>AI menjawab menggunakan pengetahuan yang anda sahkan. Soalan yang memerlukan tindakan atau maklumat tambahan diserahkan kepada manusia.</p>
-    <p><strong>${ai.enabled && ai.deployment_ready ? "Ujian AI aktif" : "Ujian AI dimatikan"}</strong> · Penggunaan hari ini: ${esc(ai.quota_used || 0)} / ${esc(ai.daily_limit || 20)} cubaan jawapan.</p>
-    ${!ai.deployment_ready ? '<p class="muted">Pengaktifan AI pada pelayan belum tersedia. Anda boleh menyimpan fakta dan nombor ujian dahulu.</p>' : ""}
+    <p><strong>AI Auto Reply ${status}</strong> · Penggunaan hari ini: ${esc(ai.quota_used || 0)} / ${esc(ai.daily_limit || 20)} cubaan jawapan.</p>
+    ${ai.enabled && !active && ai.deployment_ready ? '<p class="kc-notice">Pemilik semasa perlu menyemak pengetahuan dan meluluskan pilihan penerima sebelum balasan diteruskan.</p>' : ""}
+    ${ai.controls_configured === true ? `<p class="muted">Penerima tersimpan: ${ai.audience_mode === "all" ? "semua pelanggan yang menghubungi nombor perniagaan" : "nombor ujian yang disenaraikan"}.</p>` : ""}
+    ${!ai.deployment_ready ? '<p class="muted">Pengaktifan AI pada pelayan belum tersedia. Anda boleh menyediakan pengetahuan dan tetapan balasan dahulu.</p>' : ""}
     ${ai.enabled ? '<p><button class="btn btn--ghost" type="button" data-act="ai-stop">Hentikan AI</button></p>' : ""}
     ${connections.length ? `<form id="ai-settings">
       <p class="error" id="form-error" hidden></p>
       <fieldset class="kc-fields" ${editor && editor.busy ? "disabled" : ""}>
       <input name="revision" type="hidden" value="${esc(controls.revision)}">
-      <label class="field">Nombor perniagaan<select name="connection" ${centre ? 'data-kc-control="connection"' : ""} required>${centre && !ai.revision ? `<option value="" ${!controls.connection ? "selected" : ""}>Pilih nombor perniagaan</option>` : ""}${connections.map((c) => `<option value="${esc(c.id)}" ${Number(c.id) === Number(controls.connection) ? "selected" : ""}>${esc(c.display_phone || "Nombor belum disahkan")}</option>`).join("")}</select></label>
-      ${centre ? `<p class="muted">Tetapan ini menggunakan versi pengetahuan yang telah diterbitkan. Draf yang belum diterbitkan tidak mengubah balasan AI.</p>${!ai.knowledge ? '<p class="kc-notice">Terbitkan pengetahuan perniagaan sebelum mengaktifkan ujian AI.</p>' : ""}` : `<label class="field">Fakta yang boleh digunakan AI<textarea name="knowledge" rows="10" required maxlength="8000" placeholder="Nyatakan perkhidmatan, harga yang disahkan, waktu operasi dan cara mendapatkan bantuan.">${esc(ai.knowledge || "")}</textarea></label>`}
-      <label class="field">Nombor telefon untuk ujian<textarea name="allowlist" ${centre ? 'data-kc-control="allowlist"' : ""} rows="3" required placeholder="Satu nombor pada setiap baris, bermula dengan kod negara.">${esc(controls.allowlist)}</textarea></label>
-      <p class="muted">Gunakan nombor telefon lain yang anda kawal untuk menghantar mesej kepada nombor perniagaan. Maksimum 10 nombor ujian.</p>
+      <label class="field">Nombor perniagaan<select name="connection" ${centre ? 'data-kc-control="connection"' : ""} required>${!controls.connection ? '<option value="" selected>Pilih nombor perniagaan</option>' : ""}${connections.map((c) => `<option value="${esc(c.id)}" ${Number(c.id) === Number(controls.connection) ? "selected" : ""}>${esc(c.display_phone || "Nombor belum disahkan")}</option>`).join("")}</select></label>
+      ${centre ? `<p class="muted">Tetapan ini menggunakan versi pengetahuan yang telah diterbitkan. Draf yang belum diterbitkan tidak mengubah balasan AI.</p>${!ai.knowledge ? '<p class="kc-notice">Terbitkan pengetahuan perniagaan sebelum mengaktifkan AI Auto Reply.</p>' : ""}` : `<label class="field">Fakta yang boleh digunakan AI<textarea name="knowledge" rows="10" required maxlength="8000" placeholder="Nyatakan perkhidmatan, harga yang disahkan, waktu operasi dan cara mendapatkan bantuan.">${esc(ai.knowledge || "")}</textarea></label>`}
+      <label class="field">Siapa yang boleh menerima balasan AI?<select name="audience_mode" data-ai-audience ${centre ? 'data-kc-control="audience_mode"' : ""}>${ai.production_available === true || all ? `<option value="all" ${all ? "selected" : ""} ${ai.production_available === true ? "" : "disabled"}>Semua pelanggan yang menghubungi nombor perniagaan</option>` : ""}<option value="test" ${all ? "" : "selected"}>Nombor ujian yang disenaraikan sahaja</option></select></label>
+      <div id="ai-test-recipients" ${all ? "hidden" : ""}>
+        <label class="field">Nombor telefon untuk ujian<textarea id="ai-allowlist" name="allowlist" ${centre ? 'data-kc-control="allowlist"' : ""} rows="3" ${all ? "" : "required"} placeholder="Satu nombor pada setiap baris, bermula dengan kod negara.">${esc(controls.allowlist)}</textarea></label>
+        <p class="muted">Gunakan nombor telefon lain yang anda kawal untuk menghantar mesej kepada nombor perniagaan. Maksimum 10 nombor ujian.</p>
+      </div>
       <label class="field">Had cubaan jawapan sehari<input name="daily_limit" ${centre ? 'data-kc-control="daily_limit"' : ""} type="number" min="1" max="1000" required value="${esc(controls.daily_limit)}"></label>
-      <label class="kc-check"><input name="approved" ${centre ? 'data-kc-control="approved"' : ""} type="checkbox" ${controls.approved ? "checked" : ""} required> <span>Saya sahkan pengetahuan aktif sesuai digunakan dalam balasan kepada nombor ujian.</span></label>
-      <p><label class="kc-check"><input name="enabled" ${centre ? 'data-kc-control="enabled"' : ""} type="checkbox" ${controls.enabled ? "checked" : ""} ${ai.deployment_ready ? "" : "disabled"}> <span>Aktifkan balasan untuk mesej baharu daripada nombor ujian.</span></label></p>
-      <button class="btn" type="submit">${centre ? "Simpan tetapan ujian" : "Simpan fakta dan tetapan"}</button>
+      <label class="kc-check"><input id="ai-approved" name="approved" ${centre ? 'data-kc-control="approved"' : ""} type="checkbox" ${controls.approved ? "checked" : ""} required> <span id="ai-consent-copy">${copy.consent}</span></label>
+      <p><label class="kc-check"><input name="enabled" ${centre ? 'data-kc-control="enabled"' : ""} type="checkbox" ${controls.enabled ? "checked" : ""} ${ai.deployment_ready ? "" : "disabled"}> <span id="ai-enable-copy">${copy.enable}</span></label></p>
+      <button class="btn" type="submit">${centre ? "Simpan tetapan AI" : "Simpan fakta dan tetapan"}</button>
       </fieldset>
-    </form>` : '<p>Sambungkan nombor perniagaan pada pelayan dahulu. Tetapan AI boleh disimpan selepas sambungan itu tersedia.</p>'}
-    <p class="muted">Selepas menyimpan, hantar mesej baharu daripada nombor ujian. Lihat jawapan dan status penghantaran dalam Peti masuk. Perbualan yang diambil alih boleh dipulangkan kepada AI dari situ.</p>
+    </form>` : '<p>Sambungkan nombor perniagaan dahulu. Tetapan AI boleh disimpan selepas sambungan itu tersedia.</p>'}
+    <p id="ai-followup-copy" class="muted">${copy.followup}</p>
+    <p class="muted">Anda boleh menghentikan AI di sini atau mengambil alih perbualan tertentu melalui Peti masuk.</p>
     <p><a class="btn btn--ghost" href="#peti">Buka peti masuk</a></p>
   </${tag}>`;
 }
@@ -902,12 +951,13 @@ function knowledgeInput(target) {
   if (!editor || editor.busy) return true;
   const value = target.type === "checkbox" ? target.checked : target.value;
   if (control) {
-    if (!["connection", "allowlist", "daily_limit", "enabled", "approved"].includes(control)) return true;
-    if (!editor.controls) editor.controls = {
-      connection: state.ai.connection_id, revision: state.ai.revision || 0,
-      allowlist: (state.ai.allowlist || []).join("\n"), daily_limit: state.ai.daily_limit || 20,
-      enabled: state.ai.enabled && state.ai.deployment_ready, approved: false
-    };
+    if (control === "publication_connection") { editor.publicationConnection = value; return true; }
+    if (!["connection", "allowlist", "audience_mode", "daily_limit", "enabled", "approved"].includes(control)) return true;
+    if (!editor.controls) editor.controls = aiControlDefaults(state.ai);
+    if (control === "audience_mode") {
+      if (!["all", "test"].includes(value) || (value === "all" && state.ai.production_available !== true)) return true;
+      if (editor.controls.audience_mode !== value) editor.controls.approved = false;
+    }
     editor.controls[control] = value;
     return true;
   }
@@ -992,7 +1042,13 @@ function knowledgeAccept(editor, result, submitted, publication = false) {
   editor.review = false;
   editor.publishedRevision = centre.published_revision || 0;
   editor.publishedAt = centre.published_at || "";
-  if (publication && editor.controls && result.ai) editor.controls.revision = result.ai.revision || 0;
+  if (publication && result.ai) {
+    editor.publicationConnection = result.ai.connection_id || editor.publicationConnection;
+    if (editor.controls) {
+      editor.controls.revision = result.ai.revision || 0;
+      if (!editor.controls.connection) editor.controls.connection = result.ai.connection_id || 0;
+    }
+  }
   knowledgeEditorFor(load());
   return true;
 }
@@ -1025,9 +1081,9 @@ async function publishKnowledge(data) {
   }
   const payload = { expected_business_public_id: editor.businessPublicId, expected_revision: editor.revision, approved: true, payment_confirmed: data.get("payment_confirmed") === "on" };
   if (!state.ai.revision) {
-    const connectionId = Number(editor.controls ? editor.controls.connection : state.ai.connection_id);
+    const connectionId = Number(data.get("connection") ?? editor.publicationConnection);
     if (!Number.isSafeInteger(connectionId) || connectionId < 1 || !(state.ai.connections || []).some((item) => Number(item.id) === connectionId)) {
-      knowledgeNotice(editor, "Pilih nombor perniagaan dalam bahagian Ujian & kawalan AI dahulu. Jika tiada pilihan, sambungkan nombor WhatsApp perniagaan.", "error");
+      knowledgeNotice(editor, "Pilih nombor perniagaan dalam semakan penerbitan ini dahulu. Jika tiada pilihan, sambungkan nombor WhatsApp perniagaan.", "error");
       route();
       return;
     }
@@ -1040,7 +1096,7 @@ async function publishKnowledge(data) {
   if (!knowledgeCurrent(editor)) return;
   editor.busy = "";
   if (result.ok && knowledgeAccept(editor, result, submitted, true)) {
-    knowledgeNotice(editor, "Pengetahuan diterbitkan. AI akan menggunakan versi yang disahkan mengikut tetapan ujian.");
+    knowledgeNotice(editor, "Pengetahuan diterbitkan. Lengkapkan Kawalan AI untuk membenarkan balasan menggunakan versi yang disahkan.");
   } else {
     knowledgeNotice(editor, result.error || "Status penerbitan belum dapat disahkan. Muat semula untuk menyemak versi aktif.", "error");
     editor.review = true;
@@ -1265,7 +1321,7 @@ function connection(state) {
     </div>
     ${state.connection.phone ? `<p>Nombor paparan: ${esc(state.connection.phone)}</p>` : ""}
     <p>Ralat terakhir: ${esc(state.connection.note || "Tiada.")}</p>
-    ${state.ai.available ? '<p><a class="btn" href="#pengetahuan">Tetapkan pengetahuan dan ujian AI</a></p>' : ""}
+    ${state.ai.available || state.knowledgeCentre.available ? '<p><a class="btn" href="#pengetahuan">Tetapkan pengetahuan dan AI Auto Reply</a></p>' : ""}
     <div class="record-actions">
       <button class="btn" type="button" data-act="connect">Buka tetingkap Meta</button>
       ${role(state) === "owner" ? `<button class="btn btn--ghost" type="button" data-act="connect-app">Sambung WhatsApp Business App</button>` : ""}
@@ -1523,7 +1579,12 @@ function onClick(event) {
 
 function onChange(event) {
   if (event.target && typeof event.target.getAttribute === "function" && event.target.getAttribute("data-kc-upload-group")) return uploadKnowledgeMedia(event.target);
-  if (knowledgeInput(event.target)) return;
+  const knowledgeHandled = knowledgeInput(event.target);
+  if (event.target && typeof event.target.getAttribute === "function" && event.target.getAttribute("data-ai-audience") !== null) {
+    updateAiAudienceControls(event.target);
+    return;
+  }
+  if (knowledgeHandled) return;
   const select = event.target.closest("select[data-act='pilih']");
   if (!select) return;
   callApi("pilih", { public_id: select.value }).then((data) => {
@@ -1591,15 +1652,25 @@ function onSubmit(event) {
   if (formId === "ai-settings") {
     const editor = state.knowledgeCentre.available ? knowledgeEditorFor(state) : null;
     if (editor && editor.busy) return;
+    const audienceMode = String(data.get("audience_mode") || state.ai.audience_mode || "test");
+    const approvalError = !["all", "test"].includes(audienceMode) || (audienceMode === "all" && state.ai.production_available !== true)
+      ? "Pilihan penerima AI belum tersedia. Muat semula tetapan sebelum meneruskan."
+      : data.get("approved") !== "on" ? "Sahkan pengetahuan dan pilihan penerima sebelum menyimpan tetapan AI." : "";
+    if (approvalError) {
+      if (editor) { knowledgeNotice(editor, approvalError, "error"); route(); }
+      else showError(approvalError);
+      return;
+    }
     const submit = form.querySelector('button[type="submit"]');
     if (submit) submit.disabled = true;
     if (editor) {
-      editor.busy = "Menyimpan tetapan ujian…";
+      editor.busy = "Menyimpan tetapan AI…";
       route();
     }
     callApi("aiconfig", {
       connection_id: Number(data.get("connection")), expected_revision: Number(data.get("revision")),
       knowledge: state.knowledgeCentre.available ? String(state.ai.knowledge || "") : String(data.get("knowledge") || ""),
+      audience_mode: audienceMode,
       allowlist: String(data.get("allowlist") || "").split(/[\n,]+/).map((s) => s.trim()).filter(Boolean),
       daily_limit: Number(data.get("daily_limit")), approved: data.get("approved") === "on", enabled: data.get("enabled") === "on"
     }).then((result) => {
@@ -1617,7 +1688,7 @@ function onSubmit(event) {
       }
       if (editor) {
         editor.controls = null;
-        knowledgeNotice(editor, "Tetapan ujian disimpan. Perubahan draf pengetahuan anda dikekalkan.");
+        knowledgeNotice(editor, "Tetapan AI disimpan. Perubahan draf pengetahuan anda dikekalkan.");
       } else {
         state.notice = "Fakta dan tetapan AI disimpan pada pelayan.";
         save(state);

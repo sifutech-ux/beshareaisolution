@@ -1,0 +1,67 @@
+name: Customer AI production boundaries
+on:
+  pull_request:
+    paths:
+      - 'os/src/**'
+      - 'os/bin/process-ai-replies.php'
+      - 'os/bin/prepare-customer-ai.php'
+      - 'os/migrations/0007_customer_ai.up.sql'
+      - 'os/tests/check-customer-ai-*.php'
+      - 'os/tests/check-ai-production-settings.php'
+      - 'os/tests/admin-fixture.php'
+      - 'webhook/index.php'
+      - 'whatsapp/ruang.js'
+      - 'whatsapp/pemilik/**'
+      - '.github/workflows/customer-ai.yml'
+permissions:
+  contents: read
+jobs:
+  customer-ai:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: synthetic-customer-ai-ci-only
+          MYSQL_ROOT_HOST: '%'
+        ports:
+          - 33306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -psynthetic-customer-ai-ci-only --silent"
+          --health-interval=5s --health-timeout=5s --health-retries=24
+    env:
+      BESHARE_ADMIN_TEST_DSN: mysql:host=127.0.0.1;port=33306;dbname=beshare_platform_admin_test
+      BESHARE_ADMIN_TEST_USER: root
+      BESHARE_ADMIN_TEST_PASSWORD: synthetic-customer-ai-ci-only
+    steps:
+      - name: Fetch the proposed source without persisted credentials
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git init .
+          git remote add origin https://github.com/sifutech-ux/beshareaisolution.git
+          git fetch --depth=1 origin "$SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+      - name: Prepare PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, curl, openssl, posix, fileinfo
+          coverage: none
+          tools: none
+      - name: Syntax for the customer rollout
+        run: |
+          for file in os/src/AiProductionSchema.php os/src/AiReplyPolicy.php os/src/AiReplyStore.php os/src/PlatformAdminStore.php os/src/AiReplyWorker.php os/src/AiReplyDispatcher.php os/src/TenantIntakeBridge.php os/src/WhatsAppWebhook.php os/bin/prepare-customer-ai.php os/bin/process-ai-replies.php os/tests/check-customer-ai-*.php os/tests/check-ai-production-settings.php webhook/index.php; do php -l "$file"; done
+          node --check whatsapp/ruang.js
+          node --check whatsapp/pemilik/pemilik.js
+      - name: Additive schema and original settings preservation
+        run: php os/tests/check-customer-ai-schema.php
+      - name: Current-owner consent and cross-business controls
+        run: php os/tests/check-ai-production-settings.php
+      - name: Signed tenant intake and fair single-attempt dispatch
+        run: php os/tests/check-customer-ai-runtime.php
+      - name: Production controls and first publication
+        run: |
+          node os/bin/check-knowledge-ui.mjs
+          node os/tests/check-admin-ui.mjs

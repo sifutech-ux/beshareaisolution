@@ -25,7 +25,7 @@ const detail = id => ({
     readiness: 'pending', reason: 'Pendaftaran nombor belum selesai.', can_refresh: true, can_activate: true,
     operation_status: '', last_verified_at: '2026-10-26T01:00:00Z'
   }],
-  ai: { available: true, enabled: false, can_enable: true, reason: 'Tetapan tersedia.', revision: 3 },
+  ai: { available: true, enabled: false, can_enable: true, reason: 'Tetapan tersedia.', revision: 3, audience_mode: 'test', audience_approved: false },
   knowledge: { published: true, published_at: '2026-10-26T01:00:00Z' }, audit: []
 });
 
@@ -95,6 +95,7 @@ check('Unverified messaging is described as missing evidence, not a failed numbe
 check('Uncertain registration hides the activation button even if a stale permission says true', !f.call('connectionCard', { ...detail('customer-a').connections[0], operation_status: 'unknown' }).includes('data-action="activate"'));
 check('A missing platform-access status is not reported as active', f.call('customerRow', { ...customer('customer-a'), access_status: undefined }).includes('Belum disahkan'));
 await f.call('openDetail', 'customer-a');
+check('Admin details identify saved test-only recipient scope', f.node('detailContent').innerHTML.includes('Penerima: Nombor ujian yang disenaraikan'));
 f.call('requestAction', 'activate', 101);
 check('Confirmation identifies the selected business and phone', f.node('confirmTarget').innerHTML.includes('+601100000001') && f.node('confirmTarget').innerHTML.includes('Perniagaan A'));
 check('Opening confirmation does not perform the action', f.requests.filter(r => r.action === 'activate').length === 0);
@@ -127,6 +128,12 @@ check('Access suspension is separate from WhatsApp activation', f.evaluate('stat
 f.call('cancelConfirm');
 f.call('requestAction', 'ai');
 check('AI activation uses the saved revision and separate operation', f.evaluate('state.pending.action') === 'ai' && f.evaluate('state.pending.body.expected_revision') === 3 && f.evaluate('state.pending.body.enabled') === true);
+f.call('cancelConfirm');
+f.evaluate("state.detail.ai.audience_mode = 'all'; state.detail.ai.audience_approved = true; renderDetail(state.detail)");
+check('Admin details identify all-customer recipient scope', f.node('detailContent').innerHTML.includes('Penerima: Semua pelanggan yang menghubungi nombor perniagaan'));
+f.call('requestAction', 'ai');
+check('All-customer activation confirmation clearly describes the saved reply audience', f.node('confirmMessage').textContent.includes('semua pelanggan') && f.node('confirmMessage').textContent.includes('persetujuan pemilik'));
+check('Admin enable action cannot create or replace customer audience consent', !f.evaluate('"audience_mode" in state.pending.body') && !f.evaluate('"approved" in state.pending.body'));
 f.call('cancelConfirm');
 f.evaluate('state.detail.ai.can_enable = false');
 f.call('requestAction', 'ai');

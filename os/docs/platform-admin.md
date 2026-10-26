@@ -17,7 +17,7 @@ Panel ini menambah pengurusan pelanggan pada versi selepas PR #72. Ia menggunaka
 |---|---|
 | Akses BeShare | Menulis `platform_business_access`; penggantungan mematikan AI dan dikuatkuasakan pada API pelanggan, media pengetahuan, jambatan meja lama dan pemproses AI/Coexistence. |
 | Pengaktifan WhatsApp | Menyemak sambungan tersimpan bagi pelanggan/nombor tertentu; mendaftarkan nombor baharu yang layak atau menyelaraskan status nombor yang sudah berdaftar. |
-| AI Auto Reply | Menghidupkan/mematikan tetapan sedia ada yang diluluskan pelanggan. Had pilot `owner_ai_business_id`, suis pelayan, kebenaran pelanggan, penerima dan kuota sedia ada kekal berkuat kuasa. |
+| AI Auto Reply | Menghidupkan/mematikan tetapan yang diluluskan pemilik pelanggan. Rollout `ai_customer_rollout=all` membuka semua perniagaan selepas migrasi 0007; suis pelayan, skop penerima, persetujuan pemilik dan kuota tetap berkuat kuasa. Lihat [AI pelanggan](customer-ai.md). |
 
 Mengaktifkan semula akses BeShare tidak menghidupkan AI secara automatik. Menggantung akses tidak memadam WABA, memutuskan nombor atau menukar pemilikan pelanggan. Tindakan yang telah dihantar kepada penyedia sebelum penggantungan tidak boleh ditarik balik; semakan sebelum panggilan seterusnya kekal berkuat kuasa.
 

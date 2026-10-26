@@ -6,11 +6,14 @@ namespace BesharOs;
 use PDO;
 
 require_once __DIR__ . '/PlatformAccess.php';
+require_once __DIR__ . '/AiReplyPolicy.php';
+require_once __DIR__ . '/AiProductionSchema.php';
 
-/** Tenant-bound settings and durable conversation view for the owner's pilot. */
+/** Tenant-bound settings, owner-approved audiences and encrypted conversation history. */
 final class AiReplyStore
 {
     private ?bool $installed = null;
+    private ?bool $productionInstalled = null;
 
     public function __construct(private PDO $pdo, private TokenSeal $seal, private array $config)
     {
@@ -18,19 +21,33 @@ final class AiReplyStore
 
     public function view(array $actor): array
     {
-        if (!$this->available($actor)) {
-            return ['available' => false, 'enabled' => false, 'can_manage' => false];
-        }
         $actor = $this->member($actor);
-        $row = $this->settings((int) $actor['business_id']);
-        $canManage = $actor['role'] === 'owner' && $actor['user_id'] === $actor['owner_user_id'];
+        $available = $this->available($actor);
+        $row = $this->baseInstalled() ? $this->settings((int) $actor['business_id']) : null;
+        $canManage = $available && $actor['role'] === 'owner' && $actor['user_id'] === $actor['owner_user_id']
+            && $actor['status'] === 'active';
         $connections = $this->pdo->prepare('SELECT id,display_phone,token_state,webhook_state,registration_state FROM whatsapp_connections WHERE business_id = ? AND disconnected_at IS NULL ORDER BY id');
         $connections->execute([$actor['business_id']]);
+        $productionAvailable = $this->productionAvailable();
+        $audience = $row === null ? ($productionAvailable ? 'all' : 'test') : AiReplyPolicy::audienceMode($row);
+        $allowlist = $row === null ? [] : json_decode((string) $row['allowlist_json'], true, 8);
+        if (!is_array($allowlist) || !array_is_list($allowlist)) { $allowlist = []; }
+        $currentApproval = $row !== null && (int) ($row['approved_by'] ?? 0) === (int) $actor['owner_user_id']
+            && $row['approved_at'] !== null;
+        $audienceApproved = $row !== null && $audience === 'all'
+            && AiReplyPolicy::customerConsent($row, (int) $actor['owner_user_id']);
+        $controlsConfigured = $currentApproval && ($audienceApproved
+            || ($audience === 'test' && isset($allowlist[0]) && is_string($allowlist[0])
+                && AiReplyPolicy::recipientAllowed($row, $allowlist[0], (int) $actor['owner_user_id'], false)));
         $view = [
-            'available' => true,
+            'available' => $available,
             'can_manage' => $canManage,
-            'enabled' => $row !== null && (int) $row['enabled'] === 1,
-            'deployment_ready' => $this->deploymentReady(),
+            'enabled' => $available && $row !== null && (int) $row['enabled'] === 1,
+            'deployment_ready' => $available && $this->deploymentReady(),
+            'production_available' => $productionAvailable,
+            'audience_mode' => $audience,
+            'audience_approved' => $audienceApproved,
+            'controls_configured' => $controlsConfigured,
             'revision' => $row === null ? 0 : (int) $row['knowledge_revision'],
             'connection_id' => $row === null ? 0 : (int) $row['connection_id'],
             'daily_limit' => $row === null ? 20 : (int) $row['daily_limit'],
@@ -40,7 +57,7 @@ final class AiReplyStore
         ];
         if ($canManage) {
             $view['knowledge'] = $row !== null && $row['knowledge_ciphertext'] !== null ? $this->open($row, 'knowledge') : '';
-            $view['allowlist'] = $row === null ? [] : (json_decode((string) $row['allowlist_json'], true) ?: []);
+            $view['allowlist'] = $allowlist;
         }
         return $view;
     }
@@ -57,10 +74,13 @@ final class AiReplyStore
             || !is_int($limit) || $limit < 1 || $limit > 1000 || !is_bool($enabled)
             || !is_string($knowledge) || trim($knowledge) === '' || strlen($knowledge) > 8000
             || preg_match('//u', $knowledge) !== 1 || ($input['approved'] ?? false) !== true) {
-            throw new AuthException('Sahkan fakta perniagaan, nombor ujian dan had balasan sebelum menyimpan.', 400);
+            throw new AuthException('Sahkan pengetahuan, skop balasan dan had harian sebelum menyimpan.', 400);
         }
         $knowledge = trim($knowledge);
-        $allowlist = $this->allowlist($input['allowlist'] ?? null);
+        $hasAudience = array_key_exists('audience_mode', $input);
+        if ($hasAudience && !in_array($input['audience_mode'], ['test', 'all'], true)) {
+            throw new AuthException('Pilih skop balasan AI yang sah.', 400);
+        }
         if ($enabled && !$this->deploymentReady()) {
             throw new AuthException('Pengaktifan AI pada pelayan belum tersedia. Fakta boleh disimpan dengan AI dimatikan.', 409);
         }
@@ -69,6 +89,15 @@ final class AiReplyStore
         try {
             $old = $this->settings((int) $actor['business_id'], true);
             $this->lockOwner($actor);
+            // Older clients may edit an existing scope, but cannot grant a broader one implicitly.
+            $audience = $hasAudience ? $input['audience_mode'] : ($old === null ? 'test' : AiReplyPolicy::audienceMode($old));
+            if ($audience === '') { throw new AuthException('Skop balasan AI perlu disahkan semula.', 409); }
+            if ($audience === 'all' && !$this->productionAvailable()) {
+                throw new AuthException('Balasan kepada semua pelanggan belum tersedia pada pelayan.', 409);
+            }
+            $allowlistInput = $input['allowlist'] ?? ($audience === 'all'
+                ? ($old === null ? [] : json_decode((string) $old['allowlist_json'], true, 8)) : null);
+            $allowlist = $this->allowlist($allowlistInput, $audience === 'all');
             $connection = $this->pdo->prepare('SELECT id,display_phone,token_state,webhook_state,registration_state,token_expires_at FROM whatsapp_connections WHERE business_id = ? AND id = ? AND disconnected_at IS NULL FOR UPDATE');
             $connection->execute([$actor['business_id'], $connectionId]);
             $target = $connection->fetch();
@@ -90,23 +119,38 @@ final class AiReplyStore
                 (new KnowledgeCentre($this->pdo, $this->seal))->assertLegacyKnowledge((int) $actor['business_id'], $knowledge);
             }
             $now = gmdate('Y-m-d H:i:s');
+            $audienceBy = $audience === 'all' ? ($hasAudience ? $actor['user_id'] : ($old['audience_approved_by'] ?? null)) : null;
+            $audienceAt = $audience === 'all' ? ($hasAudience ? $now : ($old['audience_approved_at'] ?? null)) : null;
+            if ($enabled && $audience === 'all' && !AiReplyPolicy::customerConsent([
+                'audience_mode' => $audience, 'audience_approved_by' => $audienceBy, 'audience_approved_at' => $audienceAt,
+            ], (int) $actor['owner_user_id'])) {
+                throw new AuthException('Pemilik perniagaan perlu meluluskan balasan kepada semua pelanggan dahulu.', 409);
+            }
             $values = [
                 $connectionId, $enabled ? 1 : 0, bin2hex($sealed['ciphertext']), bin2hex($sealed['nonce']),
                 bin2hex($sealed['tag']), $sealed['version'], $revision + 1, hash('sha256', $knowledge),
                 $actor['user_id'], $now, json_encode($allowlist, JSON_THROW_ON_ERROR), $limit,
                 $enabled ? $now : null, $now,
             ];
+            $hasProductionSchema = $this->productionInstalled();
+            if ($hasProductionSchema) { array_push($values, $audience, $audienceBy, $audienceAt); }
             if ($old === null) {
-                $statement = $this->pdo->prepare('INSERT INTO ai_reply_settings (connection_id,enabled,knowledge_ciphertext,knowledge_nonce,knowledge_tag,knowledge_key_version,knowledge_revision,knowledge_hash,approved_by,approved_at,allowlist_json,daily_limit,activation_at,updated_at,business_id,created_at) VALUES (?,?,UNHEX(?),UNHEX(?),UNHEX(?),?,?,?,?,?,?,?,?,?,?,?)');
+                $statement = $this->pdo->prepare('INSERT INTO ai_reply_settings (connection_id,enabled,knowledge_ciphertext,knowledge_nonce,knowledge_tag,knowledge_key_version,knowledge_revision,knowledge_hash,approved_by,approved_at,allowlist_json,daily_limit,activation_at,updated_at,'
+                    . ($hasProductionSchema ? 'audience_mode,audience_approved_by,audience_approved_at,' : '')
+                    . 'business_id,created_at) VALUES (?,?,UNHEX(?),UNHEX(?),UNHEX(?),?,?,?,?,?,?,?,?,?,'
+                    . ($hasProductionSchema ? '?,?,?,' : '') . '?,?)');
                 $statement->execute(array_merge($values, [$actor['business_id'], $now]));
             } else {
                 // Quota reservations survive edits and off/on toggles during the same day.
-                $statement = $this->pdo->prepare('UPDATE ai_reply_settings SET connection_id=?,enabled=?,knowledge_ciphertext=UNHEX(?),knowledge_nonce=UNHEX(?),knowledge_tag=UNHEX(?),knowledge_key_version=?,knowledge_revision=?,knowledge_hash=?,approved_by=?,approved_at=?,allowlist_json=?,daily_limit=?,activation_at=?,updated_at=? WHERE business_id=?');
+                $statement = $this->pdo->prepare('UPDATE ai_reply_settings SET connection_id=?,enabled=?,knowledge_ciphertext=UNHEX(?),knowledge_nonce=UNHEX(?),knowledge_tag=UNHEX(?),knowledge_key_version=?,knowledge_revision=?,knowledge_hash=?,approved_by=?,approved_at=?,allowlist_json=?,daily_limit=?,activation_at=?,updated_at=?'
+                    . ($hasProductionSchema ? ',audience_mode=?,audience_approved_by=?,audience_approved_at=?' : '') . ' WHERE business_id=?');
                 $statement->execute(array_merge($values, [$actor['business_id']]));
             }
+            $auditMeta = ['revision' => $revision + 1, 'enabled' => $enabled, 'recipients' => count($allowlist)];
+            if ($hasProductionSchema) { $auditMeta['audience_mode'] = $audience; }
             $audit = $this->pdo->prepare("INSERT INTO audit_logs (business_id,actor_user_id,actor_kind,action,entity_type,entity_id,meta_json,created_at) VALUES (?,?,'user','ai_tetapan_disimpan','whatsapp_connection',?,?,UTC_TIMESTAMP())");
             $audit->execute([$actor['business_id'], $actor['user_id'], $connectionId,
-                json_encode(['revision' => $revision + 1, 'enabled' => $enabled, 'recipients' => count($allowlist)], JSON_THROW_ON_ERROR)]);
+                json_encode($auditMeta, JSON_THROW_ON_ERROR)]);
             $this->pdo->commit();
         } catch (\Throwable $error) {
             if ($this->pdo->inTransaction()) { $this->pdo->rollBack(); }
@@ -145,14 +189,20 @@ final class AiReplyStore
         try {
             // Same lock order as settings updates and worker rechecks: settings, conversation.
             $settings = $this->settings((int) $actor['business_id'], true);
-            $statement = $this->pdo->prepare('SELECT id,connection_id,last_inbound_at FROM ai_conversations WHERE id=? AND business_id=? FOR UPDATE');
+            $business = $this->pdo->prepare('SELECT owner_user_id FROM businesses WHERE id=? FOR UPDATE');
+            $business->execute([$actor['business_id']]);
+            $ownerId = (int) $business->fetchColumn();
+            $statement = $this->pdo->prepare('SELECT id,connection_id,recipient,last_inbound_at FROM ai_conversations WHERE id=? AND business_id=? FOR UPDATE');
             $statement->execute([(int) $match[1], $actor['business_id']]);
             $conversation = $statement->fetch();
             if (!is_array($conversation)) { throw new AuthException('Perbualan tidak dijumpai.', 404); }
             if ($mode === 'ai' && (!$this->deploymentReady() || $settings === null || !(bool) $settings['enabled']
-                || (int) $settings['connection_id'] !== (int) $conversation['connection_id'])) {
+                || (int) $settings['connection_id'] !== (int) $conversation['connection_id']
+                || (int) ($settings['approved_by'] ?? 0) !== $ownerId
+                || !AiReplyPolicy::recipientAllowed($settings, (string) $conversation['recipient'], $ownerId, $this->productionAvailable()))) {
                 throw new AuthException('Aktifkan tetapan AI untuk sambungan ini dahulu.', 409);
             }
+            if ($mode === 'ai') { PlatformAccess::assertBusinessActive($this->pdo, (int) $actor['business_id']); }
             $update = $this->pdo->prepare('UPDATE ai_conversations SET mode=?,updated_at=UTC_TIMESTAMP() WHERE id=? AND business_id=?');
             $update->execute([$mode, $conversation['id'], $actor['business_id']]);
             Accounts::audit($this->pdo, $actor['business_id'], $actor['user_id'], $mode === 'ai' ? 'ai_disambung' : 'ai_ambil_alih', 'ai_conversation', (int) $conversation['id']);
@@ -173,16 +223,18 @@ final class AiReplyStore
         $rows = $query->fetchAll();
         if ($rows === []) { return $legacyInbox; }
         $settings = $this->settings((int) $actor['business_id']);
-        $allowlist = json_decode((string) ($settings['allowlist_json'] ?? '[]'), true, 8);
-        if (!is_array($allowlist) || !array_is_list($allowlist) || count($allowlist) > 10) { $allowlist = []; }
+        $audience = $settings === null ? 'test' : AiReplyPolicy::audienceMode($settings);
+        $productionAvailable = $this->productionAvailable();
         $conversations = [];
         $contacts = [];
         $aliases = [];
         foreach ($rows as $row) {
             $id = 'ai-' . $row['id'];
             $aliases['wa-' . $row['phone_number_id'] . '-' . $row['recipient']] = $id;
-            $allowlisted = in_array($row['recipient'], $allowlist, true);
-            $enabled = $allowlisted && $this->deploymentReady() && $settings !== null && (int) $settings['enabled'] === 1
+            $recipientAllowed = $settings !== null && AiReplyPolicy::recipientAllowed($settings,
+                (string) $row['recipient'], (int) $actor['owner_user_id'], $productionAvailable);
+            $enabled = $recipientAllowed && $this->deploymentReady() && $settings !== null && (int) $settings['enabled'] === 1
+                && (int) ($settings['approved_by'] ?? 0) === (int) $actor['owner_user_id']
                 && (int) $settings['connection_id'] === (int) $row['connection_id'] && $actor['status'] === 'active'
                 && $row['disconnected_at'] === null && $row['token_state'] === 'verified'
                 && $row['webhook_state'] === 'subscribed' && $row['registration_state'] === 'registered'
@@ -192,10 +244,11 @@ final class AiReplyStore
                 'id' => $id, 'name' => '+' . $row['recipient'], 'phone' => '+' . $row['recipient'],
                 'mode' => $row['mode'] === 'human' ? 'human_takeover' : ($enabled ? 'ai_active' : 'ai_paused'),
                 'window' => $last > 0 && $last <= time() && time() - $last < 86400 ? 'open' : 'closed',
-                'messages' => [], 'tag' => 'Ujian pemilik', 'assignee' => '', 'unread' => false,
-                'note' => $allowlisted
+                'messages' => [], 'tag' => $audience === 'all' ? 'Pelanggan' : 'Ujian pemilik', 'assignee' => '', 'unread' => false,
+                'note' => $recipientAllowed
                     ? 'Sejarah disimpan pada pelayan. Kawalan ambil alih terpakai kepada balasan AI.'
-                    : 'Nombor ini belum dimasukkan dalam senarai nombor ujian. Semak Pengetahuan.',
+                    : ($audience === 'test' ? 'Nombor ini belum dimasukkan dalam senarai nombor ujian. Semak Pengetahuan.'
+                        : 'Tetapan balasan pelanggan perlu disahkan oleh pemilik perniagaan. Semak Pengetahuan.'),
                 'can_control' => true,
             ];
         }
@@ -245,10 +298,13 @@ final class AiReplyStore
 
     private function available(array $actor): bool
     {
-        $id = $this->config['owner_ai_business_id'] ?? '';
-        if (!is_string($id) || preg_match('/\A[1-9]\d{0,18}\z/', $id) !== 1 || (int) $id !== (int) ($actor['business_id'] ?? 0)) {
-            return false;
-        }
+        if (!AiReplyPolicy::businessAllowed($this->config, (int) ($actor['business_id'] ?? 0))) { return false; }
+        if (AiReplyPolicy::allBusinesses($this->config) && !$this->productionInstalled()) { return false; }
+        return $this->baseInstalled();
+    }
+
+    private function baseInstalled(): bool
+    {
         if ($this->installed === null) {
             $this->installed = (int) $this->pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('ai_reply_settings','ai_conversations','ai_messages','ai_reply_jobs')")->fetchColumn() === 4;
             if ($this->installed) {
@@ -262,9 +318,17 @@ final class AiReplyStore
 
     private function deploymentReady(): bool
     {
-        return ($this->config['owner_ai_enabled'] ?? '') === 'true'
-            && is_string($this->config['gemini_api_key'] ?? null) && $this->config['gemini_api_key'] !== ''
-            && is_string($this->config['gemini_model'] ?? null) && $this->config['gemini_model'] !== '';
+        return AiReplyPolicy::serverReady($this->config);
+    }
+
+    private function productionInstalled(): bool
+    {
+        return $this->productionInstalled ??= AiProductionSchema::available($this->pdo);
+    }
+
+    private function productionAvailable(): bool
+    {
+        return AiReplyPolicy::allBusinesses($this->config) && $this->productionInstalled();
     }
 
     private function member(array $actor): array
@@ -305,9 +369,9 @@ final class AiReplyStore
             (string) $row[$prefix . '_tag'], (int) $row[$prefix . '_key_version']);
     }
 
-    private function allowlist(mixed $value): array
+    private function allowlist(mixed $value, bool $allowEmpty = false): array
     {
-        if (!is_array($value) || !array_is_list($value) || count($value) < 1 || count($value) > 10) {
+        if (!is_array($value) || !array_is_list($value) || (!$allowEmpty && count($value) < 1) || count($value) > 10) {
             throw new AuthException('Tetapkan satu hingga sepuluh nombor ujian.', 400);
         }
         $result = [];

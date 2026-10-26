@@ -60,18 +60,29 @@ if (!is_array($data) || ($data['object'] ?? '') !== 'whatsapp_business_account' 
     exit;
 }
 
-$ownerIntake = \BesharOs\OwnerIntakeBridge::deliver($mentah, $signature, $private);
+require_once dirname(__DIR__) . '/os/src/TenantIntakeBridge.php';
+// The production bridge includes the imported owner through its exact DB
+// binding. Keep the original pilot-only bridge unchanged when rollout is off.
+$ownerIntake = \BesharOs\AiReplyPolicy::allBusinesses($private)
+    ? ['status' => 'disabled', 'owner_slice' => false]
+    : \BesharOs\OwnerIntakeBridge::deliver($mentah, $signature, $private);
 if ($ownerIntake['status'] === 'rejected' || $ownerIntake['status'] === 'failed') {
     http_response_code($ownerIntake['status'] === 'rejected' ? 403 : 503);
     exit('{"ok":false}');
 }
 $ownerIntakeHandled = $ownerIntake['status'] === 'stored' && $ownerIntake['owner_slice'];
+$tenantIntake = \BesharOs\TenantIntakeBridge::deliver($mentah, $signature, $private);
+if ($tenantIntake['status'] === 'rejected' || $tenantIntake['status'] === 'failed') {
+    http_response_code($tenantIntake['status'] === 'rejected' ? 403 : 503);
+    exit('{"ok":false}');
+}
 require_once dirname(__DIR__) . '/whatsapp/meja/lib.php';
 
 // Missing binding must be retryable, never silently acknowledge and drop intake.
 foreach ($data['entry'] as $entry) {
     foreach (is_array($entry) && is_array($entry['changes'] ?? null) ? $entry['changes'] : [] as $change) {
-        if (owner_intake_dikendali($entry, $change, $private, $ownerIntakeHandled)) {
+        if (owner_intake_dikendali($entry, $change, $private, $ownerIntakeHandled)
+            || \BesharOs\TenantIntakeBridge::handles($entry, $change, $tenantIntake)) {
             continue;
         }
         if (is_array($change) && ($change['field'] ?? '') === 'messages'
@@ -91,7 +102,8 @@ foreach ($data['entry'] ?? [] as $entri) {
         continue;
     }
     foreach ($entri['changes'] ?? [] as $perubahan) {
-        if (owner_intake_dikendali($entri, $perubahan, $private, $ownerIntakeHandled)) {
+        if (owner_intake_dikendali($entri, $perubahan, $private, $ownerIntakeHandled)
+            || \BesharOs\TenantIntakeBridge::handles($entri, $perubahan, $tenantIntake)) {
             continue;
         }
         if (!is_array($perubahan) || ($perubahan['field'] ?? '') !== 'messages') {

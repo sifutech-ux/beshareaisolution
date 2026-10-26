@@ -5,9 +5,13 @@ namespace BesharOs;
 
 use PDO;
 
+require_once __DIR__ . '/AiReplyPolicy.php';
+require_once __DIR__ . '/AiProductionSchema.php';
+
 /** Operational metadata only: no tokens, knowledge documents or conversation content. */
 final class PlatformAdminStore
 {
+    private ?bool $productionAvailable = null;
     public function __construct(private PDO $pdo, private array $config = [], private bool $metaAvailable = false) {}
 
     private function base(): string
@@ -179,7 +183,7 @@ final class PlatformAdminStore
             $this->pdo->commit();
         } catch (\Throwable $error) { if($this->pdo->inTransaction()){$this->pdo->rollBack();} throw $error; }
         return ['status'=>$enabled?'enabled':'disabled','message'=>$enabled
-            ? 'AI dihidupkan menggunakan fakta, penerima dan had yang telah diluluskan pelanggan.' : 'AI Auto Reply dihentikan.'];
+            ? 'AI dihidupkan menggunakan pengetahuan, skop balasan dan had yang telah diluluskan pelanggan.' : 'AI Auto Reply dihentikan.'];
     }
 
     public function assertTargetPhone(string $publicId,int $connectionId,string $expectedPhone): void
@@ -198,10 +202,13 @@ final class PlatformAdminStore
             $query->execute([$business['id']]);
             $found = $query->fetch(); $settings = is_array($found)?$found:null;
         }
-        $available = (string)($this->config['owner_ai_business_id']??'')===(string)$business['id'];
+        $productionAvailable = $this->productionAvailable ??= AiReplyPolicy::allBusinesses($this->config)
+            && AiProductionSchema::available($this->pdo);
+        $available = AiReplyPolicy::businessAllowed($this->config, (int) $business['id'])
+            && (!AiReplyPolicy::allBusinesses($this->config) || $productionAvailable);
+        $audience = $settings === null ? ($productionAvailable ? 'all' : 'test') : AiReplyPolicy::audienceMode($settings);
         $reason = '';
-        if (!$available || ($this->config['owner_ai_enabled']??'')!=='true'
-            || empty($this->config['gemini_api_key']) || empty($this->config['gemini_model'])) {
+        if (!$available || !AiReplyPolicy::serverReady($this->config)) {
             $reason = 'AI Auto Reply belum dibuka untuk perniagaan ini.';
         } elseif ($settings===null || $settings['approved_by']===null || $settings['approved_at']===null
             || (int)$settings['approved_by']!==(int)$business['owner_user_id']
@@ -209,13 +216,19 @@ final class PlatformAdminStore
             || $settings['knowledge_tag']===null || $settings['knowledge_key_version']===null) {
             $reason = 'Pemilik pelanggan perlu meluluskan fakta perniagaan dan tetapan AI dahulu.';
         } else {
-            $allowlist = json_decode((string)$settings['allowlist_json'],true);
-            if (!is_array($allowlist)||!array_is_list($allowlist)||count($allowlist)<1||count($allowlist)>10) {
-                $reason = 'Pelanggan perlu menetapkan penerima yang dibenarkan dahulu.';
-            } else {
-                foreach($allowlist as $phone) {
-                    if(!is_string($phone)||preg_match('/\A[0-9]{6,20}\z/',$phone)!==1) { $reason='Tetapan penerima perlu dikemas kini oleh pelanggan.'; break; }
+            if ($audience === 'all') {
+                if (!$productionAvailable || !AiReplyPolicy::customerConsent($settings, (int) $business['owner_user_id'])) {
+                    $reason = 'Pemilik pelanggan perlu meluluskan balasan kepada semua pelanggan dahulu.';
                 }
+            } elseif ($audience === 'test') {
+                $allowlist = json_decode((string) $settings['allowlist_json'], true, 8);
+                if (!is_array($allowlist) || !isset($allowlist[0]) || !is_string($allowlist[0])
+                    || !AiReplyPolicy::recipientAllowed($settings, $allowlist[0], (int) $business['owner_user_id'], false)) {
+                    $reason = $productionAvailable ? 'Pemilik pelanggan perlu menetapkan skop balasan AI dahulu.'
+                        : 'Pelanggan perlu menetapkan penerima yang dibenarkan dahulu.';
+                }
+            } else {
+                $reason = 'Pemilik pelanggan perlu mengesahkan semula skop balasan AI.';
             }
             $query = $this->pdo->prepare("SELECT id FROM whatsapp_connections WHERE business_id=? AND id=? AND disconnected_at IS NULL
                 AND token_state='verified' AND webhook_state='subscribed' AND registration_state='registered'
@@ -227,7 +240,9 @@ final class PlatformAdminStore
             || PlatformAccess::businessStatus($this->pdo,(int)$business['id'])!=='active') {
             $reason='Akses perniagaan perlu aktif sebelum AI boleh dihidupkan.';
         }
-        return ['available'=>$available,'enabled'=>$settings!==null&&(int)$settings['enabled']===1,
+        return ['available'=>$available,'production_available'=>$productionAvailable,'audience_mode'=>$audience,
+            'audience_approved'=>$settings!==null&&$audience==='all'&&AiReplyPolicy::customerConsent($settings,(int)$business['owner_user_id']),
+            'enabled'=>$settings!==null&&(int)$settings['enabled']===1,
             'can_enable'=>$reason==='','reason'=>$reason,'revision'=>$settings===null?0:(int)$settings['knowledge_revision']];
     }
 

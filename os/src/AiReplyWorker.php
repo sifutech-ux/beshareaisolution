@@ -9,9 +9,10 @@ use Throwable;
 
 require_once __DIR__ . '/KnowledgeReply.php';
 require_once __DIR__ . '/PlatformAccess.php';
+require_once __DIR__ . '/AiReplyPolicy.php';
 
 /**
- * A single-attempt owner pilot worker over the already authenticated OS queue.
+ * A single-attempt tenant worker over the already authenticated OS queue.
  *
  * Generation and sending claims are committed before their respective external
  * call. An interrupted claim is handed to a person, never retried externally.
@@ -32,7 +33,8 @@ final class AiReplyWorker
         callable $generate,
         callable $send,
         ?callable $now = null,
-        private ?KnowledgeCentre $knowledgeCentre = null
+        private ?KnowledgeCentre $knowledgeCentre = null,
+        private bool $allCustomerReplies = false
     ) {
         $this->generate = Closure::fromCallable($generate);
         $this->send = Closure::fromCallable($send);
@@ -40,7 +42,7 @@ final class AiReplyWorker
     }
 
     /** @return array<string,int|string> */
-    public function run(int $businessId, int $limit = 10): array
+    public function run(int $businessId, int $limit = 10, ?float $deadline = null): array
     {
         if ($businessId < 1 || $limit < 1 || $limit > 50 || $this->pdo->inTransaction()) {
             throw new AuthException('Pemprosesan AI tidak sah.', 400);
@@ -68,6 +70,9 @@ final class AiReplyWorker
             $query->execute([$businessId]);
             $ids = $query->fetchAll(PDO::FETCH_COLUMN);
             foreach ($ids as $id) {
+                // Finish an in-flight provider call, but never start another event
+                // after the dispatcher's bounded cron budget has elapsed.
+                if ($deadline !== null && microtime(true) >= $deadline) { break; }
                 $claim = $this->claim($businessId, (int) $id);
                 $kind = $claim['kind'];
                 if ($kind !== 'generate') {
@@ -493,7 +498,7 @@ final class AiReplyWorker
     {
         $settings = $this->one('SELECT * FROM ai_reply_settings WHERE business_id = ? FOR UPDATE', [$businessId]);
         $business = $this->one(
-            "SELECT b.status, u.status AS owner_status, bu.role
+            "SELECT b.status, b.owner_user_id, u.status AS owner_status, bu.role
              FROM businesses b JOIN users u ON u.id = b.owner_user_id
              JOIN business_users bu ON bu.business_id = b.id AND bu.user_id = b.owner_user_id
              WHERE b.id = ? FOR UPDATE", [$businessId]
@@ -541,6 +546,7 @@ final class AiReplyWorker
             return 'conversation_human';
         }
         if ($s['approved_by'] === null || $s['approved_at'] === null
+            || (int) $s['approved_by'] !== (int) $b['owner_user_id']
             || $s['knowledge_ciphertext'] === null || $s['knowledge_nonce'] === null
             || $s['knowledge_tag'] === null || $s['knowledge_key_version'] === null
             || !is_string($s['knowledge_hash']) || preg_match('/\A[0-9a-f]{64}\z/', $s['knowledge_hash']) !== 1) {
@@ -549,13 +555,8 @@ final class AiReplyWorker
         if ($revision !== null && (int) $s['knowledge_revision'] !== $revision) {
             return 'knowledge_changed';
         }
-        try {
-            $allowlist = json_decode((string) $s['allowlist_json'], true, 8, JSON_THROW_ON_ERROR);
-        } catch (Throwable) {
-            $allowlist = null;
-        }
-        if (!is_array($allowlist) || !array_is_list($allowlist) || count($allowlist) > 10
-            || !in_array($body['from'] ?? '', $allowlist, true)) {
+        if (!AiReplyPolicy::recipientAllowed($s, (string) ($body['from'] ?? ''),
+            (int) $b['owner_user_id'], $this->allCustomerReplies)) {
             return 'not_allowlisted';
         }
         $original = $this->originalTime($body);
