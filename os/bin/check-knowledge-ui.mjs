@@ -25,6 +25,7 @@ function sessionSeed(business = 'synthetic-business') {
     members: [], memberships: [], audit: [], contacts: [], conversations: [], inbox_ready: true, connection: {},
     ai: {
       available: true, can_manage: true, enabled: true, deployment_ready: true, knowledge: 'Pengetahuan aktif asal.',
+      production_available: false, audience_mode: 'test', audience_approved: false, controls_configured: true,
       revision: 7, connection_id: 2, allowlist: ['60123456789'], daily_limit: 20, quota_used: 0,
       connections: [{ id: 2, display_phone: '+60110000000' }]
     },
@@ -158,10 +159,14 @@ async function fixture(initial = sessionSeed()) {
         return response(server);
       }
       if (action === 'aiconfig') {
-        assert.equal(body.knowledge, server.ai.knowledge, 'pilot controls must send the existing active knowledge');
-        assert.equal(body.approved, true, 'pilot facts approval remains required');
+        assert.equal(body.knowledge, server.ai.knowledge, 'AI controls must send the existing active knowledge');
+        assert.equal(body.approved, true, 'owner approval remains required');
+        assert.ok(['all', 'test'].includes(body.audience_mode));
         server.ai.daily_limit = body.daily_limit;
         server.ai.allowlist = body.allowlist;
+        server.ai.audience_mode = body.audience_mode;
+        server.ai.controls_configured = true;
+        server.ai.audience_approved = body.audience_mode === 'all';
         server.ai.enabled = body.enabled;
         server.ai.revision += 1;
         return response(server);
@@ -175,7 +180,7 @@ async function fixture(initial = sessionSeed()) {
   await settle();
   const readEditor = () => JSON.parse(new Script('JSON.stringify(knowledgeEditor)').runInContext(context));
   return {
-    context, requests, storage, settle, html: () => node('app').innerHTML, editor: readEditor,
+    context, requests, storage, settle, node, html: () => node('app').innerHTML, editor: readEditor,
     server: () => clone(server),
     changeSessionInAnotherTab(payload) { server = clone(payload); },
     async click(action, value = '') {
@@ -193,7 +198,7 @@ async function fixture(initial = sessionSeed()) {
       context.onInput({ target });
     },
     control(field, value) {
-      const target = new Node({ 'data-kc-control': field });
+      const target = new Node({ 'data-kc-control': field, ...(field === 'audience_mode' ? { 'data-ai-audience': '' } : {}) });
       if (typeof value === 'boolean') { target.type = 'checkbox'; target.checked = value; }
       else target.value = value;
       context.onChange({ target });
@@ -218,7 +223,7 @@ async function fixture(initial = sessionSeed()) {
 }
 
 const f = await fixture();
-check('renders all four knowledge-centre sections', ['Fakta & pautan sumber', 'Gambar produk & kombo', 'Maklumat bayaran', 'Ujian & kawalan AI'].every(text => f.html().includes(text)));
+check('renders all four knowledge-centre sections', ['Fakta & pautan sumber', 'Gambar produk & kombo', 'Maklumat bayaran', 'Kawalan AI Auto Reply'].every(text => f.html().includes(text)));
 check('does not expose a second active-knowledge editor', !f.html().includes('name="knowledge"'));
 check('existing approved facts seed the draft', f.editor().document.facts === documentSeed().facts);
 f.input('document', 'facts', 'Fakta draf baharu.');
@@ -321,9 +326,61 @@ const h = await fixture(first);
 await h.click('kc-review');
 await h.submit('knowledge-publish', { approved: 'on' });
 check('first publication is blocked until a connection is explicitly selected', !h.requests.some(request => request.action === 'knowpublish') && h.editor().notice.includes('Pilih nombor perniagaan'));
-h.control('connection', '2');
+h.control('publication_connection', '2');
 await h.submit('knowledge-publish', { approved: 'on' });
 check('first publication includes selected connection and leaves AI off', h.requests.find(request => request.action === 'knowpublish').body.connection_id === 2 && h.server().ai.enabled === false && h.server().ai.allowlist.length === 0);
+
+const unopened = clone(first);
+unopened.ai.available = false;
+unopened.ai.can_manage = false;
+const independent = await fixture(unopened);
+await independent.click('kc-review');
+check('first publication exposes its own number selector without AI control permission', independent.html().includes('data-kc-control="publication_connection"') && !independent.html().includes('id="ai-settings"'));
+await independent.submit('knowledge-publish', { connection: '2', approved: 'on' });
+check('nonpilot owner can publish knowledge through own-tenant connection without enabling AI', independent.requests.find(request => request.action === 'knowpublish').body.connection_id === 2 && independent.server().ai.enabled === false);
+
+const freshProduction = clone(first);
+freshProduction.ai.production_available = true;
+freshProduction.ai.controls_configured = false;
+const production = await fixture(freshProduction);
+check('unconfigured production account defaults to all customers without prechecking consent or activation', production.html().includes('<option value="all" selected') && /id="ai-approved"[^>]*required/.test(production.html()) && !/id="ai-approved"[^>]*checked/.test(production.html()) && !/name="enabled"[^>]*checked/.test(production.html()));
+check('all-customer mode hides test list and does not require a test number', production.html().includes('id="ai-test-recipients" hidden') && !/id="ai-allowlist"[^>]*required/.test(production.html()));
+await production.click('kc-review');
+await production.submit('knowledge-publish', { connection: '2', approved: 'on' });
+check('publication-only settings keep production default all while AI remains off', production.html().includes('<option value="all" selected') && production.server().ai.enabled === false && production.server().ai.controls_configured === false);
+production.input('document', 'facts', 'Draf perniagaan belum diterbitkan.');
+await production.submit('ai-settings', { connection: '2', revision: '1', audience_mode: 'all', allowlist: '', daily_limit: '25', enabled: 'on' });
+check('all-customer save is blocked without explicit owner consent', !production.requests.some(request => request.action === 'aiconfig') && production.editor().notice.includes('Sahkan pengetahuan'));
+await production.submit('ai-settings', { connection: '2', revision: '1', audience_mode: 'all', allowlist: '', daily_limit: '25', approved: 'on', enabled: 'on' });
+const allSave = production.requests.find(request => request.action === 'aiconfig').body;
+check('all-customer save carries explicit audience approval and accepts an empty test list', allSave.audience_mode === 'all' && allSave.approved === true && allSave.allowlist.length === 0 && allSave.enabled === true);
+check('all-customer settings preserve unsaved knowledge and use only published facts', production.editor().document.facts === 'Draf perniagaan belum diterbitkan.' && allSave.knowledge === 'Versi diterbitkan daripada fixture.');
+check('production inbox banner does not claim knowledge is disconnected or replies are test-only', !production.html().includes('Pengetahuan, automasi') && !production.html().includes('Ujian AI hanya membalas'));
+
+const savedTest = sessionSeed('saved-test-business');
+savedTest.ai.production_available = true;
+const preserved = await fixture(savedTest);
+check('opening production controls preserves a saved test-only audience', preserved.html().includes('<option value="test" selected') && /id="ai-allowlist"[^>]*required/.test(preserved.html()));
+preserved.control('approved', true);
+preserved.node('ai-approved').checked = true;
+preserved.control('audience_mode', 'all');
+check('expanding audience clears previous consent and updates requirement and copy immediately', preserved.editor().controls.approved === false && preserved.node('ai-approved').checked === false && preserved.node('ai-test-recipients').hidden === true && preserved.node('ai-allowlist').required === false && preserved.node('ai-consent-copy').textContent.includes('semua pelanggan'));
+check('changing recipient mode retains existing test numbers for later reuse', preserved.editor().controls.allowlist === '60123456789');
+await preserved.refresh();
+check('session refresh preserves unsaved audience choice without granting consent', preserved.html().includes('<option value="all" selected') && !/id="ai-approved"[^>]*checked/.test(preserved.html()));
+preserved.control('audience_mode', 'test');
+check('returning to test mode restores number requirement and test consent copy', preserved.node('ai-test-recipients').hidden === false && preserved.node('ai-allowlist').required === true && preserved.node('ai-consent-copy').textContent.includes('nombor ujian'));
+
+const unavailable = await fixture();
+await unavailable.submit('ai-settings', { connection: '2', revision: '7', audience_mode: 'all', allowlist: '', daily_limit: '20', approved: 'on', enabled: 'on' });
+check('an unavailable all-customer mode cannot be submitted through the UI', !unavailable.requests.some(request => request.action === 'aiconfig'));
+const ownershipChanged = sessionSeed('new-business-owner');
+ownershipChanged.ai.production_available = true;
+ownershipChanged.ai.audience_mode = 'all';
+ownershipChanged.ai.audience_approved = false;
+ownershipChanged.ai.controls_configured = false;
+const reapproval = await fixture(ownershipChanged);
+check('enabled all-customer settings without current-owner consent are displayed as paused', reapproval.html().includes('AI Auto Reply dijeda') && !reapproval.html().includes('AI Auto Reply aktif') && reapproval.html().includes('Pemilik semasa perlu'));
 
 const stale = await fixture();
 stale.input('document', 'facts', 'Private draft from the original business.');

@@ -66,8 +66,11 @@ final class WhatsAppWebhook
         return $this->ingest($raw);
     }
 
-    /** @return array{stored:int,replayed:int} */
-    public function ingest(string $raw): array
+    /**
+     * @param array<string,array{id:int,business_id:int}>|null $expectedBindings
+     * @return array{stored:int,replayed:int}
+     */
+    public function ingest(string $raw, ?array $expectedBindings = null): array
     {
         $payload = json_decode($raw, true, 512, JSON_BIGINT_AS_STRING);
         if (!is_array($payload) || ($payload['object'] ?? '') !== 'whatsapp_business_account') {
@@ -75,8 +78,13 @@ final class WhatsAppWebhook
         }
         $stored = 0;
         $replayed = 0;
-        foreach ($this->events($payload) as $event) {
-            $result = $this->store($event);
+        $events = $this->events($payload);
+        if ($expectedBindings !== null) {
+            foreach ($events as $event) { $this->expectedBinding($event, $expectedBindings); }
+        }
+        foreach ($events as $event) {
+            $expected = $expectedBindings === null ? null : $this->expectedBinding($event, $expectedBindings);
+            $result = $this->store($event, $expected);
             $stored += $result === 'stored' ? 1 : 0;
             $replayed += $result === 'replayed' ? 1 : 0;
         }
@@ -188,7 +196,7 @@ final class WhatsAppWebhook
     }
 
     /** @param array{kind:string,key:string,phone:string,body:array<string,mixed>} $event */
-    private function store(array $event): string
+    private function store(array $event, ?array $expectedBinding = null): string
     {
         $json = json_encode($event['body'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         if (!is_string($json)) {
@@ -197,7 +205,7 @@ final class WhatsAppWebhook
         $wide = in_array($event['kind'], ['history', 'smb_app_state_sync', 'smb_message_echoes', 'account_update'], true);
         $sealed = $this->sealBody($event['body'], $wide);
         $json = $sealed['json'];
-        $connection = $this->route($event);
+        $connection = $expectedBinding ?? $this->route($event);
         // An unscoped event must not consume a known tenant's dedupe key.
         $dedupeKey = $event['key'];
         if ($connection === null && in_array($event['kind'], ['message', 'status'], true)) {
@@ -207,6 +215,27 @@ final class WhatsAppWebhook
         $connectionId = $connection['id'] ?? null;
         $this->pdo->beginTransaction();
         try {
+            if ($expectedBinding !== null) {
+                // Match the worker lock order: current business/owner before its
+                // connection. A reassigned or disconnected asset cannot receive
+                // a previously selected customer's event or messaging metadata.
+                $message = $event['kind'] === 'message';
+                $owner = $this->pdo->prepare($message ? "SELECT b.id FROM businesses b
+                    JOIN users u ON u.id=b.owner_user_id AND u.status='active'
+                    JOIN business_users bu ON bu.business_id=b.id AND bu.user_id=b.owner_user_id AND bu.role='owner'
+                    WHERE b.id=? AND b.status='active' FOR UPDATE" : 'SELECT id FROM businesses WHERE id=? FOR UPDATE');
+                $owner->execute([$businessId]);
+                if ($owner->fetchColumn() === false) {
+                    throw new AuthException('Perniagaan penerima telah berubah.', 409);
+                }
+                $bound = $this->pdo->prepare('SELECT id FROM whatsapp_connections
+                    WHERE id=? AND business_id=? AND waba_id=? AND phone_number_id=?'
+                    . ($message ? " AND disconnected_at IS NULL AND token_state='verified'" : '') . ' FOR UPDATE');
+                $bound->execute([$connectionId, $businessId, $event['body']['waba_id'] ?? '', $event['phone']]);
+                if ($bound->fetchColumn() === false) {
+                    throw new AuthException('Sambungan penerima telah berubah.', 409);
+                }
+            }
             $insert = $this->pdo->prepare(
                 'INSERT INTO webhook_events (
                     business_id, connection_id, dedupe_key, event_kind, status, attempt_count, max_attempts,
@@ -250,6 +279,18 @@ final class WhatsAppWebhook
             throw $error;
         }
         return 'stored';
+    }
+
+    private function expectedBinding(array $event, array $bindings): array
+    {
+        $key = ($event['body']['waba_id'] ?? '') . ':' . $event['phone'];
+        $binding = $bindings[$key] ?? null;
+        if (!in_array($event['kind'], ['message', 'status'], true) || !is_array($binding)
+            || !is_int($binding['id'] ?? null) || $binding['id'] < 1
+            || !is_int($binding['business_id'] ?? null) || $binding['business_id'] < 1) {
+            throw new AuthException('Skop penerima webhook tidak sah.', 409);
+        }
+        return ['id' => $binding['id'], 'business_id' => $binding['business_id']];
     }
 
     /**

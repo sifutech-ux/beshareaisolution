@@ -247,6 +247,8 @@ function renderDetail(data) {
     : knownAccess ? 'Akses platform dibenarkan untuk perniagaan ini.' : 'Status akses belum dapat dipastikan.';
   const enabled = ai.enabled === true;
   const canEnable = ai.available === true && ai.can_enable === true;
+  const audience = ai.audience_mode === 'all' ? 'Semua pelanggan yang menghubungi nombor perniagaan'
+    : ai.audience_mode === 'test' ? 'Nombor ujian yang disenaraikan' : '';
   const aiButton = enabled
     ? '<button type="button" class="button button-quiet" data-action="ai">Matikan AI Auto Reply</button>'
     : canEnable ? '<button type="button" class="button button-quiet" data-action="ai">Hidupkan AI Auto Reply</button>' : '';
@@ -255,7 +257,7 @@ function renderDetail(data) {
   byId('detailSubtitle').textContent = owner || 'Pemilik belum direkodkan';
   byId('detailContent').innerHTML = `<div class="detail-grid">
     <section class="detail-card"><h3><span aria-hidden="true">▤</span> Akses BeShare</h3>${accessLabel}<p>${h(accessMessage)}</p>${businessStatus ? '<p class="access-caveat">' + h(businessStatus) + '</p>' : ''}${knownAccess ? '<button type="button" class="button ' + (suspended ? 'button-quiet' : 'button-danger') + '" data-action="access">' + (suspended ? 'Aktifkan akses BeShare' : 'Gantung akses BeShare') + '</button>' : ''}</section>
-    <section class="detail-card"><h3><span aria-hidden="true">✧</span> AI Auto Reply</h3>${enabled ? badge('Dihidupkan', 'violet') : badge('Dimatikan')}<p>${h(ai.reason || (enabled ? 'AI dihidupkan mengikut tetapan dan persetujuan yang tersimpan.' : canEnable ? 'Tetapan pelanggan tersedia untuk pengaktifan AI.' : 'Tetapan AI pelanggan belum tersedia untuk pengaktifan.'))}</p>${aiButton}</section>
+    <section class="detail-card"><h3><span aria-hidden="true">✧</span> AI Auto Reply</h3>${enabled ? canEnable ? badge('Dihidupkan', 'violet') : badge('Dijeda', 'amber') : badge('Dimatikan')}<p>${h(ai.reason || (enabled ? 'AI dihidupkan mengikut tetapan dan persetujuan yang tersimpan.' : canEnable ? 'Tetapan pelanggan tersedia untuk pengaktifan AI.' : 'Tetapan AI pelanggan belum tersedia untuk pengaktifan.'))}</p>${audience ? '<p class="muted">Penerima: ' + h(audience) + '.</p>' : ''}${aiButton}</section>
   </div>
   <h3 class="section-title">Sambungan WhatsApp <span>${formatCount(connections.length)} nombor</span></h3>
   ${connections.length ? connections.map(connectionCard).join('') : '<div class="detail-empty">Pelanggan belum menyambungkan nombor WhatsApp.</div>'}
@@ -328,8 +330,10 @@ function requestAction(action, connectionId = null) {
     if (!Number.isSafeInteger(ai.revision) || ai.revision < 0) return;
     body = { public_id: customer.public_id, enabled: !enabled, expected_revision: ai.revision, confirmed: true };
     title = enabled ? 'Matikan AI Auto Reply?' : 'Hidupkan AI Auto Reply?';
-    message = enabled ? 'Balasan AI automatik untuk perniagaan ini akan dihentikan.' : 'AI akan dibenarkan membalas mengikut tetapan dan persetujuan pelanggan yang telah disimpan.';
-    note = enabled ? 'Sambungan nombor WhatsApp kekal tersimpan.' : 'Had penggunaan dan penerima yang dibenarkan kekal mengikut tetapan pelanggan.';
+    message = enabled ? 'Balasan AI automatik untuk perniagaan ini akan dihentikan.' : ai.audience_mode === 'all'
+      ? 'AI akan membalas mesej baharu daripada semua pelanggan yang menghubungi nombor perniagaan, mengikut pengetahuan dan persetujuan pemilik yang telah disimpan.'
+      : 'AI akan membalas mesej baharu mengikut penerima, pengetahuan dan persetujuan pemilik yang telah disimpan.';
+    note = enabled ? 'Sambungan nombor WhatsApp kekal tersimpan.' : 'Had harian dan pilihan penerima menggunakan tetapan yang telah diluluskan pemilik perniagaan.';
     label = enabled ? 'Matikan AI' : 'Hidupkan AI';
   } else return;
   state.pending = { action, body, publicId: customer.public_id };
