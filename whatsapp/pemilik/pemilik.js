@@ -249,15 +249,20 @@ function renderDetail(data) {
   const canEnable = ai.available === true && ai.can_enable === true;
   const audience = ai.audience_mode === 'all' ? 'Semua pelanggan yang menghubungi nombor perniagaan'
     : ai.audience_mode === 'test' ? 'Nombor ujian yang disenaraikan' : '';
+  const needsPreparation = !enabled && ai.available === true && !canEnable && knowledge.published !== true
+    && ai.reason === 'Pemilik pelanggan perlu meluluskan fakta perniagaan dan tetapan AI dahulu.';
+  const aiReason = ai.reason || (enabled ? 'AI dihidupkan mengikut tetapan dan persetujuan yang tersimpan.'
+    : canEnable ? 'Tetapan pelanggan tersedia untuk pengaktifan AI.' : 'Tetapan AI pelanggan belum tersedia untuk pengaktifan.');
   const aiButton = enabled
     ? '<button type="button" class="button button-quiet" data-action="ai">Matikan AI Auto Reply</button>'
-    : canEnable ? '<button type="button" class="button button-quiet" data-action="ai">Hidupkan AI Auto Reply</button>' : '';
+    : '<button id="enableCustomerAi" type="button" class="button button-quiet" aria-describedby="aiReadinessReason'
+      + (needsPreparation ? ' aiPreparationHelp' : '') + '"' + (canEnable ? ' data-action="ai"' : ' disabled') + '>Hidupkan AI Auto Reply</button>';
   const owner = [customer.owner_name, customer.owner_email].filter(Boolean).join(' · ');
   byId('detailTitle').textContent = customer.name;
   byId('detailSubtitle').textContent = owner || 'Pemilik belum direkodkan';
   byId('detailContent').innerHTML = `<div class="detail-grid">
     <section class="detail-card"><h3><span aria-hidden="true">▤</span> Akses BeShare</h3>${accessLabel}<p>${h(accessMessage)}</p>${businessStatus ? '<p class="access-caveat">' + h(businessStatus) + '</p>' : ''}${knownAccess ? '<button type="button" class="button ' + (suspended ? 'button-quiet' : 'button-danger') + '" data-action="access">' + (suspended ? 'Aktifkan akses BeShare' : 'Gantung akses BeShare') + '</button>' : ''}</section>
-    <section class="detail-card"><h3><span aria-hidden="true">✧</span> AI Auto Reply</h3>${enabled ? canEnable ? badge('Dihidupkan', 'violet') : badge('Dijeda', 'amber') : badge('Dimatikan')}<p>${h(ai.reason || (enabled ? 'AI dihidupkan mengikut tetapan dan persetujuan yang tersimpan.' : canEnable ? 'Tetapan pelanggan tersedia untuk pengaktifan AI.' : 'Tetapan AI pelanggan belum tersedia untuk pengaktifan.'))}</p>${audience ? '<p class="muted">Penerima: ' + h(audience) + '.</p>' : ''}${aiButton}</section>
+    <section class="detail-card"><h3><span aria-hidden="true">✧</span> AI Auto Reply</h3>${enabled ? canEnable ? badge('Dihidupkan', 'violet') : badge('Dijeda', 'amber') : badge('Dimatikan')}<p id="aiReadinessReason">${h(aiReason)}</p>${needsPreparation ? '<p id="aiPreparationHelp" class="muted">Pemilik perniagaan pelanggan perlu membuka Pengetahuan dalam akaun mereka, melengkapkan maklumat, memilih “Semak &amp; terbitkan”, kemudian menyimpan tetapan AI dengan pengesahan pemilik. AI boleh kekal dimatikan semasa tetapan disimpan. Selepas itu, muat semula butiran ini untuk menghidupkan AI melalui panel pemilik.</p>' : ''}${audience ? '<p class="muted">Penerima: ' + h(audience) + '.</p>' : ''}${aiButton}<p><button type="button" class="button button-quiet" data-action="reload-detail">Muat semula butiran</button></p></section>
   </div>
   <h3 class="section-title">Sambungan WhatsApp <span>${formatCount(connections.length)} nombor</span></h3>
   ${connections.length ? connections.map(connectionCard).join('') : '<div class="detail-empty">Pelanggan belum menyambungkan nombor WhatsApp.</div>'}
@@ -297,6 +302,12 @@ async function openDetail(publicId) {
   notice('', '', 'detailNotice');
   showDialog(byId('detailDialog'));
   await loadDetail(publicId);
+}
+
+function refreshDetail() {
+  if (!state.admin || state.writing || state.pending || !state.detail
+      || state.detail.customer.public_id !== state.selected) return;
+  return openDetail(state.selected);
 }
 
 function requestAction(action, connectionId = null) {
@@ -441,7 +452,12 @@ document.querySelectorAll('[data-filter]').forEach(node => node.addEventListener
 byId('previousPage').addEventListener('click', () => { if (state.page > 1 && !state.writing) { state.page -= 1; loadCustomers(); } });
 byId('nextPage').addEventListener('click', () => { if (state.page < state.pages && !state.writing) { state.page += 1; loadCustomers(); } });
 byId('customerRows').addEventListener('click', event => { const button = event.target.closest('[data-open]'); if (button) openDetail(button.dataset.open); });
-byId('detailContent').addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (button && !button.disabled) requestAction(button.dataset.action, button.dataset.connection); });
+byId('detailContent').addEventListener('click', event => {
+  const button = event.target.closest('[data-action]');
+  if (!button || button.disabled) return;
+  if (button.dataset.action === 'reload-detail') refreshDetail();
+  else requestAction(button.dataset.action, button.dataset.connection);
+});
 byId('closeDetail').addEventListener('click', closeDetail);
 byId('detailDialog').addEventListener('cancel', event => { event.preventDefault(); closeDetail(); });
 byId('cancelConfirm').addEventListener('click', cancelConfirm);
