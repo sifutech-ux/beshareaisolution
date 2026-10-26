@@ -5,6 +5,8 @@ namespace BesharOs;
 
 use PDO;
 
+require_once __DIR__ . '/PlatformAccess.php';
+
 /** Tenant-bound settings and durable conversation view for the owner's pilot. */
 final class AiReplyStore
 {
@@ -274,6 +276,7 @@ final class AiReplyStore
     {
         if (!$this->available($actor)) { throw new AuthException('Tetapan AI belum tersedia.', 409); }
         $actor = $this->member($actor);
+        PlatformAccess::assertBusinessAccess($this->pdo, (int) $actor['business_id']);
         if ($actor['role'] !== 'owner' || $actor['user_id'] !== $actor['owner_user_id'] || $actor['status'] !== 'active') {
             throw new AuthException('Hanya pemilik perniagaan aktif boleh mengubah tetapan AI.', 403);
         }
@@ -282,6 +285,7 @@ final class AiReplyStore
 
     private function lockOwner(array $actor): void
     {
+        PlatformAccess::assertBusinessAccess($this->pdo, (int) $actor['business_id']);
         $statement = $this->pdo->prepare("SELECT b.id FROM businesses b INNER JOIN business_users bu ON bu.business_id=b.id AND bu.user_id=b.owner_user_id INNER JOIN users u ON u.id=bu.user_id WHERE b.id=? AND b.owner_user_id=? AND b.status='active' AND bu.role='owner' AND u.status='active' FOR UPDATE");
         $statement->execute([$actor['business_id'], $actor['user_id']]);
         if (!$statement->fetch()) { throw new AuthException('Pemilikan perniagaan telah berubah.', 403); }

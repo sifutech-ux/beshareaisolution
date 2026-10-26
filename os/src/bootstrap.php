@@ -7,6 +7,7 @@ require __DIR__ . '/Password.php';
 require __DIR__ . '/Identifiers.php';
 require __DIR__ . '/RateLimit.php';
 require __DIR__ . '/Db.php';
+require_once __DIR__ . '/PlatformAccess.php';
 require __DIR__ . '/Csrf.php';
 require __DIR__ . '/SessionCookie.php';
 require __DIR__ . '/SqlGuard.php';

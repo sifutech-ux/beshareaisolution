@@ -60,6 +60,7 @@ try {
     }
     $pdo = Db::connect();
     $actor = Membership::require($pdo, $userId, $businessId);
+    \BesharOs\PlatformAccess::assertBusinessAccess($pdo, $businessId);
     $private = PrivateConfig::load();
     $seal = TokenSeal::tryFrom(is_array($private) ? $private : null);
     if (!$seal instanceof TokenSeal) { throw new AuthException('Pusat Pengetahuan belum tersedia.', 503); }

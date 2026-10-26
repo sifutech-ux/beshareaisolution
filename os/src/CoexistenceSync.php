@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace BesharOs;
 
+require_once __DIR__ . '/PlatformAccess.php';
+
 use PDO;
 
 /**
@@ -578,6 +580,9 @@ final class CoexistenceSync
     /** @param array<string,mixed> $job */
     private function blockedReason(array $job): string
     {
+        if (PlatformAccess::businessStatus($this->pdo, (int) $job['business_id']) !== 'active') {
+            return 'platform_suspended';
+        }
         if (!$this->processorAllows()) {
             return 'processor';
         }

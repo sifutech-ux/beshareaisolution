@@ -5,12 +5,15 @@ namespace BesharOs;
 
 use PDO;
 
+require_once __DIR__ . '/PlatformAccess.php';
+
 /** The legacy JSON store belongs to exactly one explicitly configured business. */
 final class LegacyDesk
 {
     public static function authorize(PDO $pdo, array $session, array $config, string $method, array $body, array $actions): array
     {
         $actor = Membership::require($pdo, (int) ($session['user_id'] ?? 0), (int) ($session['business_id'] ?? 0));
+        PlatformAccess::assertBusinessAccess($pdo, (int) $actor['business_id']);
         $business = $config['legacy_business_id'] ?? '';
         if (!is_string($business) || preg_match('/\A[1-9][0-9]*\z/', $business) !== 1) {
             throw new AuthException('Unavailable', 503);
