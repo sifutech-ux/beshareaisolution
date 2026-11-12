@@ -3,7 +3,7 @@ const perkhidmatan = (typeof BeshareAsal !== 'undefined' && BeshareAsal && typeo
   : null
 const AKAUN = perkhidmatan ? perkhidmatan.akaun : null
 const NASIHAT = perkhidmatan ? perkhidmatan.nasihat : null
-const NASIHAT_API = NASIHAT ? `${NASIHAT}/api/copilot/nasihat` : null
+const NASIHAT_API = NASIHAT ? `${NASIHAT}/api/copilot/bijak` : null
 const DENGAR_API = NASIHAT ? `${NASIHAT}/api/penasihat-dengar` : null
 const SUARA_API = NASIHAT ? `${NASIHAT}/api/penasihat-suara` : null
 const AKAUN_KUNCI = 'beshare-akaun'
@@ -67,13 +67,15 @@ const SUARA_GAGAL = 'Suara belum dapat didengar. Tekan Dengar sekali lagi, atau 
 function mesejSah(item) {
   if (!item || (item.dari !== 'klien' && item.dari !== 'penasihat')) return null
   if (typeof item.teks !== 'string') return null
-  const teks = item.teks.replace(/\s+/g, ' ').trim()
+  const teks = item.teks.trim()
   if (!teks) return null
   const bersih = { dari: item.dari, teks }
   if (Array.isArray(item.langkah)) {
-    const langkah = item.langkah.filter((baris) => typeof baris === 'string' && baris.trim()).slice(0, 3)
-    if (langkah.length === 3) bersih.langkah = langkah
+    const langkah = item.langkah.filter((baris) => typeof baris === 'string' && baris.trim()).slice(0, 5)
+    if (langkah.length > 0) bersih.langkah = langkah
   }
+  if (typeof item.format === 'string') bersih.format = item.format
+  if (/^[a-f0-9]{32}$/.test(item.cadangan_id || '')) bersih.cadangan_id = item.cadangan_id
   return bersih
 }
 
@@ -122,7 +124,7 @@ function langkahTerkini() {
   if (!keadaan) return null
   for (let i = keadaan.mesej.length - 1; i >= 0; i -= 1) {
     const item = keadaan.mesej[i]
-    if (item.dari === 'penasihat' && Array.isArray(item.langkah) && item.langkah.length === 3) return item.langkah
+    if (item.dari === 'penasihat') return item.langkah
   }
   return null
 }
@@ -135,7 +137,7 @@ function bacaPelan() {
     if (!data || !Array.isArray(data.tugasan)) return []
     return data.tugasan.map((item) => {
       if (!item || typeof item.teks !== 'string' || typeof item.id !== 'string') return null
-      const teks = item.teks.replace(/\s+/g, ' ').trim().slice(0, 160)
+      const teks = item.teks.trim().slice(0, 160)
       if (!teks) return null
       return { id: item.id.slice(0, 40), teks, siap: Boolean(item.siap) }
     }).filter(Boolean).slice(0, 30)
@@ -302,7 +304,7 @@ function wawasanTerkini() {
   if (!keadaan) return null
   for (let i = keadaan.mesej.length - 1; i >= 0; i -= 1) {
     const item = keadaan.mesej[i]
-    if (item.dari === 'penasihat' && Array.isArray(item.langkah) && item.langkah.length === 3) return item
+    if (item.dari === 'penasihat') return item
   }
   return null
 }
@@ -323,10 +325,10 @@ function lukisUtama() {
   wawasan.append(ayat)
   const bekas = document.getElementById('langkah-utama')
   bekas.replaceChildren()
-  const langkah = nasihat?.langkah || null
+  const langkah = nasihat?.langkah?.length ? nasihat.langkah : null
   if (!langkah) {
     const kosong = document.createElement('p')
-    kosong.textContent = 'Belum ada cadangan. Tanya Copilot untuk tiga langkah minggu ini.'
+    kosong.textContent = 'Belum ada cadangan tindakan. Tanya Copilot untuk merancang langkah minggu ini.'
     bekas.append(kosong)
   } else {
     const senarai = document.createElement('ul')
@@ -530,7 +532,7 @@ function lukis() {
       tanda.textContent = 'Penasihat'
       balon.prepend(tanda)
     }
-    if (Array.isArray(item.langkah) && item.langkah.length === 3) {
+    if (Array.isArray(item.langkah) && item.langkah.length > 0) {
       const senarai = document.createElement('ol')
       senarai.className = 'langkah'
       const tajuk = document.createElement('p')
@@ -555,7 +557,7 @@ function lukis() {
         mainSuara(item, butang)
       })
       aksi.append(butang)
-      if (Array.isArray(item.langkah) && item.langkah.length === 3) {
+      if (Array.isArray(item.langkah) && item.langkah.length > 0) {
         const salin = document.createElement('button')
         salin.type = 'button'
         salin.className = 'salin-pelan'
@@ -566,6 +568,7 @@ function lukis() {
         })
         aksi.append(salin)
       }
+      BeshareBijak.decorate(item, balon, aksi)
       balon.append(aksi)
     }
     log.append(balon)
@@ -576,6 +579,7 @@ function lukis() {
 }
 
 function lupusSesi() {
+  BeshareBijak.reset()
   try { localStorage.removeItem(AKAUN_KUNCI) } catch { /* sesi sudah tiada */ }
   keadaan = null
   akaunId = null
@@ -664,12 +668,14 @@ async function simpanAkaun() {
     jalurAkaun('Versi akaun belum disahkan. Muat semula sebelum menyimpan.')
     return false
   }
+  const pemilikSimpanan = akaunId
   const balas = await fetch(`${AKAUN}/api/akaun/penasihat`, {
     method: 'POST',
     headers: kepalaAkaun(),
     body: JSON.stringify(badan),
   })
   const data = await balas.json().catch(() => ({}))
+  if (pemilikSimpanan !== akaunId) return false
   if (balas.status === 401) {
     lupusSesi()
     tunjukPintu()
@@ -769,7 +775,7 @@ function giliranNasihat() {
   const giliran = []
   for (const item of keadaan.mesej) {
     if (!item || (item.dari !== 'klien' && item.dari !== 'penasihat') || typeof item.teks !== 'string') continue
-    const teks = item.teks.replace(/\s+/g, ' ').trim().slice(0, 600)
+    const teks = item.teks.trim().slice(0, 4000)
     if (!teks) continue
     giliran.push({ dari: item.dari, teks })
   }
@@ -830,6 +836,7 @@ function tunjukUlang(boleh) {
 
 async function hantarTeks(teks, mainkan, ulang = false) {
   if ((!teks && !ulang) || sibuk || !keadaan) return
+  const pemilikPermintaan = akaunId
   if (konflikVersi) {
     tunjukKonflik(BeshareDraf.ekorBelum(keadaan, salinanKonflik && salinanKonflik.profil), [], Boolean(salinanKonflik))
     return
@@ -845,6 +852,7 @@ async function hantarTeks(teks, mainkan, ulang = false) {
   status.dataset.nasihat = ''
   try {
     const tersimpan = await simpan()
+    if (akaunId !== pemilikPermintaan) return
     lukis()
     if (!sesiAkaun() || konflikVersi) return
     if (!tersimpan) {
@@ -883,22 +891,23 @@ async function hantarTeks(teks, mainkan, ulang = false) {
       body: JSON.stringify({ giliran }),
     })
     const data = await balas.json().catch(() => ({}))
+    if (akaunId !== pemilikPermintaan) return
     status.classList.remove('sedang')
     if (balas.status === 401) {
       lupusSesi()
       tunjukPintu()
       return
     }
-    const langkah = Array.isArray(data.langkah) ? data.langkah.filter((baris) => typeof baris === 'string').slice(0, 3) : []
+    const langkah = Array.isArray(data.langkah) ? data.langkah.filter((baris) => typeof baris === 'string').slice(0, 5) : []
     const modelSah = balas.ok
       && data.ok === true
       && (data.sumber === 'gemini' || data.sumber === 'openai' || (data.sumber === 'tersimpan' && data.main_semula === true))
       && data.bukan_model === false
       && typeof data.jawapan === 'string'
-      && langkah.length === 3
+      && langkah.length <= 5
     if (modelSah) {
       const baharu = !jawapanSama(data.jawapan, langkah)
-      if (baharu) keadaan.mesej.push({ dari: 'penasihat', teks: data.jawapan, langkah })
+      if (baharu) keadaan.mesej.push({ dari: 'penasihat', teks: data.jawapan, langkah, format: data.format, cadangan_id: data.cadangan_id })
       const jawapanTersimpan = baharu ? await simpan() : true
       if (baharu && !jawapanTersimpan) {
         keadaan.mesej.pop()
@@ -1140,6 +1149,7 @@ function usangMuat() {
 
 async function muatMeja() {
   if (!sesiAkaun() || !BeshareDraf.idAkaunSah(akaunId)) return
+  BeshareBijak.refresh()
   const cap = ++capMeja
   const minggu = mingguSemasa()
   const dari = MejaAkaun.tolakHari(minggu.hari, 90)
@@ -1184,6 +1194,7 @@ function lukisMeja() {
 }
 
 function gunaPelan(pelan) {
+  BeshareBijak.refresh()
   usangMuat()
   pelanAkaun = { id: pelan.id, minggu: pelan.minggu_mula, versi: pelan.versi, tugasan: pelan.tugasan || [] }
   pelanDimuat = true
@@ -1819,7 +1830,8 @@ document.getElementById('keluar-profil').addEventListener('click', () => keluarA
 document.getElementById('konflik-muat').addEventListener('click', () => muatSalinanPelayan())
 cakap.addEventListener('click', () => {
   bukaAudio()
-  togolCakap()
+  document.getElementById('suara-panel').open = true
+  BeshareBijak.startVoice()
 })
 document.getElementById('mesej').addEventListener('submit', (event) => {
   event.preventDefault()
@@ -1960,5 +1972,6 @@ gunaTema(localStorage.getItem(TEMA) || 'sistem')
 window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
   if ((localStorage.getItem(TEMA) || 'sistem') === 'sistem') gunaTema('sistem')
 })
+BeshareBijak.init()
 mula()
 
