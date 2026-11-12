@@ -8,7 +8,7 @@
       name="description"
       content="Meja penasihat perniagaan BeShare. Susun minggu ini dalam Bahasa Melayu, pada telefon atau desktop."
     />
-    <title>Penasihat Perniagaan — BeShare AI Solution</title>
+    <title>Business Copilot — BeShare AI Solution</title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <script>
       try {
@@ -19,7 +19,7 @@
       } catch (e) {}
     </script>
     <link rel="stylesheet" href="../styles.css?v=20260929" />
-    <link rel="stylesheet" href="penasihat.css?v=20261014neon3" />
+    <link rel="stylesheet" href="penasihat.css?v=20261112aurora1" />
   </head>
   <body class="meja" data-skrin="muat">
     <a class="lompat" href="#kandungan">Langkau ke kandungan</a>
@@ -32,6 +32,7 @@
           <span class="jenama__ayat"><strong>BeShare AI</strong><small>Business Copilot</small></span>
         </a>
         <p class="sisi__nama" id="nama-sisi" hidden></p>
+        <p class="sisi__label" aria-hidden="true">RUANG KERJA</p>
         <nav class="senarai-sisi" aria-label="Skrin meja">
           <button type="button" data-pergi="utama"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/></svg><span>Utama</span></button>
           <button type="button" data-pergi="nasihat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9l-4 3v-3H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/></svg><span>Nasihat</span></button>
@@ -56,7 +57,7 @@
             <img src="../favicon.svg" alt="" width="28" height="28" />
             <span>BeShare AI</span>
           </a>
-          <p class="palang__tajuk" id="tajuk-skrin">Membuka</p>
+          <div class="palang__laluan"><span class="palang__produk">Business Copilot</span><p class="palang__tajuk" id="tajuk-skrin">Membuka</p></div>
           <button type="button" class="tema-pantas" id="tema-pantas" aria-pressed="false" aria-label="Tukar tema">Tema</button>
         </header>
 
@@ -140,13 +141,13 @@
 
           <section class="layar" data-layar="utama">
             <div class="sapa">
-              <div>
+              <div class="sapa__teks">
                 <p class="eyebrow" id="salam-utama">Selamat datang</p>
                 <h1 id="nama-utama">Meja anda</h1>
                 <p class="lead" id="ayat-utama">Teruskan langkah seterusnya untuk capai matlamat perniagaan anda.</p>
                 <p class="ingat" id="emel-utama"></p>
               </div>
-              <button type="button" class="butang butang-utama" data-pergi="nasihat">Tanya Copilot</button>
+              <button type="button" class="butang butang-utama" data-pergi="nasihat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.3 6.7L21 12l-6.7 2.3L12 21l-2.3-6.7L3 12l6.7-2.3z"/></svg>Tanya Copilot</button>
             </div>
             <div class="papan">
               <article class="kad kad-matlamat">
@@ -159,13 +160,12 @@
                 <p id="peringkat-utama"></p>
                 <p class="ingat">Daripada profil akaun anda, bukan sasaran yang dijana.</p>
               </article>
-              <article class="kad kad-wawasan">
-                <div class="kad-kepala">
-                  <span class="cip ikon-ungu" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5 13.6 8.4 18.5 10 13.6 11.6 12 16.5 10.4 11.6 5.5 10 10.4 8.4z"/></svg></span>
-                  <p class="kad__label">Wawasan penasihat</p>
-                </div>
-                <div id="wawasan-utama"><p>Belum ada wawasan. Mulakan dengan satu soalan.</p></div>
-                <button type="button" class="butang butang-senyap" data-pergi="nasihat">Buka nasihat</button>
+              <article class="kad kad-kemajuan">
+                <p class="kad__label">Kemajuan minggu ini</p>
+                <div class="cincin cincin-kosong" id="cincin-utama" style="--sudah: 0"><span>—</span></div>
+                <p id="kira-draf">Pelan akaun belum dimuat</p>
+                <p class="ingat">Kemajuan ini hanya daripada tugasan yang disimpan dalam akaun.</p>
+                <button type="button" class="pautan-kecil" data-pergi="pelan">Lihat semua</button>
               </article>
               <article class="kad kad-tindakan">
                 <div class="kad-kepala">
@@ -175,12 +175,13 @@
                 <div id="langkah-utama"></div>
                 <p class="ingat">Cadangan penasihat. Bukan tugasan yang disimpan dalam akaun.</p>
               </article>
-              <article class="kad kad-kemajuan">
-                <p class="kad__label">Kemajuan minggu ini</p>
-                <div class="cincin cincin-kosong" id="cincin-utama" style="--sudah: 0"><span>—</span></div>
-                <p id="kira-draf">Pelan akaun belum dimuat</p>
-                <p class="ingat">Kemajuan ini hanya daripada tugasan yang disimpan dalam akaun.</p>
-                <button type="button" class="pautan-kecil" data-pergi="pelan">Lihat semua</button>
+              <article class="kad kad-wawasan">
+                <div class="kad-kepala">
+                  <span class="cip ikon-ungu" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5 13.6 8.4 18.5 10 13.6 11.6 12 16.5 10.4 11.6 5.5 10 10.4 8.4z"/></svg></span>
+                  <p class="kad__label">Wawasan penasihat</p>
+                </div>
+                <div id="wawasan-utama"><p>Belum ada wawasan. Mulakan dengan satu soalan.</p></div>
+                <button type="button" class="butang butang-senyap" data-pergi="nasihat">Buka nasihat</button>
               </article>
               <article class="kad kad-angka kad-lebar">
                 <div class="kad-kepala">
@@ -357,3 +358,4 @@
     <script src="penasihat.js?v=20261013nebula3" defer></script>
   </body>
 </html>
+
