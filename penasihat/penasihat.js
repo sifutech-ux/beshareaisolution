@@ -549,7 +549,7 @@ function lukis() {
       const butang = document.createElement('button')
       butang.type = 'button'
       butang.className = 'dengar'
-      butang.textContent = 'Dengar'
+      butang.textContent = 'Dengar suara AI'
       butang.addEventListener('click', () => {
         bukaAudio()
         mainSuara(item, butang)
@@ -892,7 +892,7 @@ async function hantarTeks(teks, mainkan, ulang = false) {
     const langkah = Array.isArray(data.langkah) ? data.langkah.filter((baris) => typeof baris === 'string').slice(0, 3) : []
     const modelSah = balas.ok
       && data.ok === true
-      && data.sumber === 'gemini'
+      && (data.sumber === 'gemini' || data.sumber === 'openai' || (data.sumber === 'tersimpan' && data.main_semula === true))
       && data.bukan_model === false
       && typeof data.jawapan === 'string'
       && langkah.length === 3
@@ -943,6 +943,10 @@ async function hantarTeks(teks, mainkan, ulang = false) {
 }
 
 async function mainSuara(item, butang) {
+  if (!sesi) {
+    status.textContent = 'Sila masuk akaun untuk mendengar jawapan.'
+    return
+  }
   if (butang) butang.disabled = true
   status.textContent = 'Menyediakan suara…'
   if (!SUARA_API) {
@@ -953,7 +957,7 @@ async function mainSuara(item, butang) {
   try {
     const balas = await fetch(SUARA_API, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sesi.token}` },
       body: JSON.stringify({ jawapan: item.teks, langkah: item.langkah || [] }),
     })
     const data = await balas.json()
@@ -975,7 +979,10 @@ async function mainSuara(item, butang) {
     sumber.buffer = buffer
     sumber.connect(ctx.destination)
     sumber.start()
-    status.textContent = ''
+    status.textContent = 'Suara AI sedang dimainkan.'
+    sumber.onended = () => {
+      if (status.textContent === 'Suara AI sedang dimainkan.') status.textContent = ''
+    }
   } catch (error) {
     status.textContent = ayatPelayar(error, SUARA_GAGAL)
   }
@@ -1953,3 +1960,4 @@ window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', ()
   if ((localStorage.getItem(TEMA) || 'sistem') === 'sistem') gunaTema('sistem')
 })
 mula()
+
