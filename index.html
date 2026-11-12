@@ -3,15 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#070a16" />
+    <meta name="theme-color" content="#080719" />
     <meta name="facebook-domain-verification" content="wnkp8vhncdwxsbtj6tls907xx1e1bq" />
-    <meta
-      name="description"
-      content="BeShare AI — Intelligent Business Ecosystem. Terokai penyelesaian AI untuk perancangan perniagaan, operasi dan pemasaran."
-    />
+    <meta name="description" content="BeShare AI — Intelligent Business Ecosystem. Terokai penyelesaian AI untuk perancangan perniagaan, operasi dan pemasaran." />
     <title>BeShare AI — Intelligent Business Ecosystem</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-    <link rel="stylesheet" href="home.css?v=20261013v4" />
+    <link rel="stylesheet" href="home.css?v=20261112aurora-signature1" />
   </head>
   <body class="laman laman--aurora">
     <a class="lompat" href="#kandungan">Langkau ke kandungan</a>
@@ -21,14 +18,8 @@
     <header class="nav">
       <a class="jenama" href="./">
         <svg class="jenama__tanda" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true">
-          <defs>
-            <linearGradient id="tanda" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#7c9cff" />
-              <stop offset="1" stop-color="#b28bff" />
-            </linearGradient>
-          </defs>
-          <rect width="32" height="32" rx="7" fill="#0f1220" />
-          <path d="M8 9h16l-8 15z" fill="url(#tanda)" />
+          <defs><linearGradient id="tanda" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e0b7ff" /><stop offset="1" stop-color="#9753f4" /></linearGradient></defs>
+          <path id="tanda-beshare" d="M3 5h26L16 28z" fill="url(#tanda)" />
         </svg>
         <span>BeShare AI</span>
       </a>
@@ -39,128 +30,156 @@
         <a class="nav__masuk" href="akaun/">Masuk</a>
       </nav>
       <details class="nav__menu">
-        <summary>Menu</summary>
-        <div class="nav__panel">
+        <summary>Menu <span aria-hidden="true">☰</span></summary>
+        <nav class="nav__panel" aria-label="Utama telefon">
           <a href="penasihat/">Copilot</a>
           <a href="whatsapp/">WhatsApp OS</a>
           <a href="https://video.beshareaisolution.com" target="_blank" rel="noopener noreferrer">Video</a>
           <a href="akaun/">Masuk</a>
-        </div>
+        </nav>
       </details>
     </header>
 
     <main id="kandungan">
-      <section class="hero hero--aurora">
+      <section class="hero" aria-labelledby="tajuk-utama">
         <div class="hero__atmosfera" aria-hidden="true">
-          <div class="hero__orbit hero__orbit--satu"></div>
-          <div class="hero__orbit hero__orbit--dua"></div>
-          <div class="hero__bintang"></div>
+          <div class="hero__kabut"></div>
+          <div class="hero__orbit"></div>
+          <div class="hero__sinar hero__sinar--kiri"></div>
+          <div class="hero__sinar hero__sinar--kanan"></div>
         </div>
         <div class="hero__salinan">
-        <p class="ekosistem-nama">BeShare AI — Intelligent Business Ecosystem</p>
-        <h1>Bina Perniagaan<br /><span>Lebih Bijak dengan AI.</span></h1>
-        <p class="sub">Daripada idea dan strategi hingga operasi dan pemasaran — BeShare AI membantu anda mengambil langkah perniagaan dengan lebih terancang.</p>
-        <div class="tindakan">
-          <a class="butang" href="penasihat/">Terokai Business Copilot</a>
-          <a class="butang butang--senyap" href="akaun/">Masuk akaun</a>
-        </div>
-        <p class="beta">Copilot dalam penyediaan beta. Pendaftaran awam belum diisytiharkan dibuka.</p>
-
-        </div>
-        <figure class="pentas pentas--aurora">
-          <div class="pentas__lapis">
-            <div class="pentas__aura" aria-hidden="true"></div>
-            <div class="pentas__plat" aria-hidden="true"></div>
-            <div class="pentas__cahaya" aria-hidden="true"></div>
-            <div class="pentas__bingkai">
-              <div class="pentas__bar">
-                <span class="pentas__lampu" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span>BeShare AI / Business Copilot</span>
-                <span class="pentas__demo">Paparan contoh</span>
-              </div>
-              <img
-                src="assets/copilot-dashboard-1440.webp"
-                srcset="assets/copilot-dashboard-960.webp 960w, assets/copilot-dashboard-1440.webp 1440w"
-                sizes="(max-width: 480px) calc(100vw - 36px), (max-width: 859px) calc(100vw - 52px), (max-width: 1220px) calc(100vw - 124px), 1096px"
-                width="1440"
-                height="900"
-                alt="Dashboard Business Copilot bertema gelap ungu: fokus perniagaan, wawasan penasihat, tindakan dan kemajuan Kedai Kopi Aurora. Semua data ialah demonstrasi sintetik."
-                fetchpriority="high"
-              />
-            </div>
+          <p class="ekosistem-nama">EKOSISTEM AI UNTUK PERNIAGAAN</p>
+          <h1 id="tajuk-utama">Bina Perniagaan<br />
+            <span>Lebih Bijak dengan AI.</span></h1>
+          <p class="sub">Daripada idea kepada tindakan. Satu ekosistem AI untuk membantu anda merancang, mengurus dan mengembangkan perniagaan.</p>
+          <div class="tindakan">
+            <a class="butang" href="penasihat/">Terokai Business Copilot <span aria-hidden="true">↗</span></a>
+            <a class="butang butang--senyap" href="akaun/">Masuk akaun</a>
           </div>
-          <figcaption>Paparan meja Business Copilot. Nama, tugasan, dan angka pada skrin ialah data contoh, bukan pelanggan sebenar.</figcaption>
+          <p class="beta"><span class="beta__titik" aria-hidden="true"></span> Akses awal untuk kumpulan jemputan</p>
+        </div>
+
+        <figure class="pentas">
+          <div class="pentas__bingkai">
+            <div class="pentas__bar"><span>BeShare AI <span class="pentas__pemisah">/</span> Business Copilot</span><span class="pentas__demo"><span aria-hidden="true">▣</span> Paparan contoh</span></div>
+            <img src="assets/copilot-dashboard-1440.webp"
+              srcset="assets/copilot-dashboard-960.webp 960w, assets/copilot-dashboard-1440.webp 1440w"
+              sizes="(max-width: 739px) calc(100vw - 42px), (max-width: 1140px) calc(100vw - 82px), 1058px"
+              width="1440" height="900" fetchpriority="high"
+              alt="Paparan Business Copilot: modul Utama, Nasihat, Pelan, Angka dan Profil, dengan fokus perniagaan, wawasan penasihat serta tindakan Kedai Kopi Aurora. Semua data ialah contoh." />
+          </div>
+          <figcaption>Paparan Business Copilot dengan data contoh. Tiada data pelanggan sebenar.</figcaption>
         </figure>
       </section>
 
-      <section class="bahagian" aria-labelledby="tajuk-eko">
-        <p class="bahagian__label">01 / EKOSISTEM BESHARE AI</p>
-        <h2 id="tajuk-eko">Penyelesaian AI untuk Perniagaan Anda</h2>
-        <p class="bahagian__ayat">Daripada merancang langkah pertama hingga menyusun operasi dan menghasilkan kandungan pemasaran, terokai penyelesaian BeShare AI mengikut keperluan anda. Semak status setiap produk sebelum bermula.</p>
-        <div class="papan">
-          <a class="kad kad--utama" href="penasihat/">
-            <span class="lencana">Beta disediakan</span>
-            <span class="kad__ikon" aria-hidden="true">✦</span>
-            <h3>Business Copilot</h3>
-            <p>Rancang langkah perniagaan, susun tugasan mingguan dan fahami angka perniagaan dalam Bahasa Melayu.</p>
-            <p class="kad__status">Dalam penyediaan beta. Pendaftaran awam belum diisytiharkan dibuka.</p>
-            <span class="kad__pergi">Terokai Business Copilot</span>
-          </a>
+      <div class="aurora-bawah">
+        <section class="bahagian bahagian--ekosistem" id="ekosistem" aria-labelledby="tajuk-eko">
+          <p class="bahagian__label">DIREKA UNTUK LANGKAH SETERUSNYA</p>
+          <h2 id="tajuk-eko">Idea. Operasi. <span>Kandungan.</span></h2>
+          <p class="bahagian__ayat">Pilih ruang yang anda perlukan. Mulakan dengan satu langkah.</p>
 
-          <a class="kad kad--whatsapp" href="whatsapp/">
-            <span class="lencana">Prototip</span>
-            <span class="kad__ikon" aria-hidden="true">↗</span>
-            <h3>BeShare AI OS</h3>
-            <p>Terokai ruang kerja WhatsApp untuk menyusun perbualan dan pengetahuan perniagaan melalui paparan demo.</p>
-            <p class="kad__status">Menggunakan data demo. Sambungan Meta sebenar belum dihidupkan. Pemindahan nombor WhatsApp sedia ada belum tersedia.</p>
-            <span class="kad__pergi">Terokai BeShare AI OS</span>
-          </a>
+          <div class="papan">
+            <a class="kad kad--utama" href="penasihat/">
+              <div class="pratonton pratonton--copilot" aria-hidden="true">
+                <div class="mini-tugas">
+                  <div class="mini-tugas__tajuk"><span>☷</span> Tindakan hari ini <span class="mini-label">CONTOH</span></div>
+                  <div class="mini-tugas__baris mini-tugas__baris--siap"><i>✓</i><span>Tetapkan fokus mingguan</span></div>
+                  <div class="mini-tugas__baris"><i></i><span>Sediakan draf kempen</span></div>
+                  <div class="mini-tugas__baris"><i></i><span>Semak kemajuan perniagaan</span></div>
+                  <div class="mini-tugas__bawah"><span>Pelan yang lebih teratur</span><span>✦</span></div>
+                </div>
+              </div>
+              <div class="kad__isi">
+                <div class="kad__kepala"><h3>Business Copilot</h3><span class="lencana">Beta</span></div>
+                <p>Rancang dengan lebih jelas. Susun tugasan dan fahami angka perniagaan dalam Bahasa Melayu.</p>
+                <span class="kad__pergi">Terokai Copilot <span aria-hidden="true">↗</span></span>
+              </div>
+              <p class="kad__status">Akses beta untuk kumpulan jemputan. Pendaftaran awam belum diisytiharkan dibuka.</p>
+            </a>
 
-          <a class="kad" href="https://video.beshareaisolution.com" target="_blank" rel="noopener noreferrer">
-            <span class="lencana">Studio dalaman</span>
-            <span class="kad__ikon" aria-hidden="true">▷</span>
-            <h3>AI Video Studio</h3>
-            <p>Rancang drama pendek dan video produk, arahkan babak, serta gabungkan rakaman suara dengan visual AI. Akses untuk pasukan BeShare; penjanaan berbayar dijeda.</p>
-            <span class="kad__pergi">Terokai AI Video Studio</span>
-          </a>
-        </div>
-      </section>
+            <a class="kad kad--whatsapp" href="whatsapp/">
+              <div class="pratonton pratonton--whatsapp" aria-hidden="true">
+                <div class="mini-inbox">
+                  <div class="mini-inbox__senarai">
+                    <div class="mini-inbox__tajuk"><span>▤</span> Peti masuk</div>
+                    <div class="mini-inbox__item mini-inbox__item--aktif"><i>H</i><span>Pelanggan baharu<small>Pertanyaan produk</small></span><b>1</b></div>
+                    <div class="mini-inbox__item"><i>A</i><span>Tempahan<small>Maklumat pesanan</small></span></div>
+                    <div class="mini-inbox__item"><i>N</i><span>Susulan<small>Perbualan pelanggan</small></span></div>
+                  </div>
+                  <div class="mini-chat">
+                    <span class="mini-label">PAPARAN DEMO</span>
+                    <div class="mini-chat__gelembung">Hai, boleh saya tahu lebih lanjut?</div>
+                    <div class="mini-chat__gelembung mini-chat__gelembung--balas">Boleh, apa yang boleh kami bantu?</div>
+                    <div class="mini-chat__taip"><i></i><i></i><i></i></div>
+                  </div>
+                </div>
+              </div>
+              <div class="kad__isi">
+                <div class="kad__kepala"><h3>BeShare AI OS</h3><span class="lencana">Demo</span></div>
+                <p>Susun operasi perniagaan. Terokai ruang perbualan dan pengetahuan melalui demo WhatsApp.</p>
+                <span class="kad__pergi">Terokai AI OS <span aria-hidden="true">↗</span></span>
+              </div>
+              <p class="kad__status">Prototip dengan data demo. Sambungan Meta sebenar dan pemindahan nombor sedia ada belum tersedia.</p>
+            </a>
 
-      <section class="bahagian bahagian--laluan" aria-labelledby="tajuk-laluan">
-        <p class="bahagian__label">02 / LANGKAH SETERUSNYA</p>
-        <h2 id="tajuk-laluan">Dari Perancangan ke Tindakan</h2>
-        <div class="laluan">
-          <a href="penasihat/">
-            <span class="laluan__nombor" aria-hidden="true">01</span><h3>Rancang</h3>
-            <p>Tentukan fokus dan susun tugasan mingguan dengan Business Copilot. Dalam penyediaan beta; pendaftaran awam belum diisytiharkan dibuka.</p>
-          </a>
-          <a href="whatsapp/">
-            <span class="laluan__nombor" aria-hidden="true">02</span><h3>Operasi</h3>
-            <p>Terokai cara menyusun perbualan dan pengetahuan perniagaan melalui demo BeShare AI OS. Masih prototip; sambungan Meta sebenar belum dihidupkan.</p>
-          </a>
-          <a href="https://video.beshareaisolution.com" target="_blank" rel="noopener noreferrer">
-            <span class="laluan__nombor" aria-hidden="true">03</span><h3>Pemasaran</h3>
-            <p>Susun cerita, rakaman suara dan visual melalui AI Video Studio. Ruang kerja dalaman BeShare; penjanaan berbayar dijeda.</p>
-          </a>
-        </div>
-      </section>
-      <section class="penutup" aria-labelledby="tajuk-penutup">
-        <p class="bahagian__label">BERSAMA BESHARE AI</p>
-        <h2 id="tajuk-penutup">Langkah Perniagaan Seterusnya Bermula di Sini.</h2>
-        <p class="penutup__ayat">Terokai penyelesaian AI BeShare yang direka untuk membantu anda merancang, mengurus dan mengembangkan perniagaan dengan lebih teratur.</p>
-        <div class="penutup__tindakan">
-          <a class="butang" href="penasihat/">Terokai Business Copilot</a>
-          <a class="butang butang--senyap" href="akaun/">Masuk akaun</a>
-        </div>
-        <p class="beta">Copilot dalam penyediaan beta. Pendaftaran awam belum diisytiharkan dibuka.</p>
-      </section>
+            <a class="kad kad--studio" href="https://video.beshareaisolution.com" target="_blank" rel="noopener noreferrer">
+              <div class="pratonton pratonton--studio" aria-hidden="true">
+                <div class="mini-studio">
+                  <div class="mini-studio__alat"><span>▥</span><span>▧</span><span>♫</span><span>T</span></div>
+                  <div class="mini-studio__ruang">
+                    <div class="mini-studio__visual">
+                      <span class="mini-studio__label">PAPAN CERITA · CONTOH</span>
+                      <span class="mini-studio__bukit mini-studio__bukit--jauh"></span>
+                      <span class="mini-studio__bukit"></span>
+                      <div class="mini-studio__kawalan"><span>▷</span><i></i><small>00:00 / 00:15</small></div>
+                    </div>
+                    <div class="mini-studio__timeline"><span></span><span></span><span></span><span></span><i></i></div>
+                    <div class="mini-studio__audio"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                  </div>
+                </div>
+              </div>
+              <div class="kad__isi">
+                <div class="kad__kepala"><h3>AI Video Studio</h3><span class="lencana">Studio dalaman</span></div>
+                <p>Bina cerita yang bermakna. Rancang skrip, babak, rakaman suara dan visual dalam satu ruang.</p>
+                <span class="kad__pergi">Terokai Video Studio <span aria-hidden="true">↗</span></span>
+              </div>
+              <p class="kad__status">Ruang kerja dalaman pasukan BeShare. Penjanaan berbayar dijeda.</p>
+            </a>
+          </div>
+          <p class="nota-pratonton">Pratonton ringkas menggunakan data contoh. Status akses setiap produk dinyatakan pada kad.</p>
+        </section>
+
+        <section class="bahagian bahagian--laluan" aria-labelledby="tajuk-laluan">
+          <h2 id="tajuk-laluan">Dari perancangan ke tindakan</h2>
+          <div class="laluan">
+            <a href="penasihat/"><div class="laluan__tajuk"><span class="laluan__nombor" aria-hidden="true">01</span><h3>Rancang</h3></div><p>Tentukan fokus, idea dan keutamaan perniagaan anda.</p></a>
+            <a href="whatsapp/"><div class="laluan__tajuk"><span class="laluan__nombor" aria-hidden="true">02</span><h3>Susun</h3></div><p>Terokai cara menyusun operasi dan perbualan melalui demo AI OS.</p></a>
+            <a href="https://video.beshareaisolution.com" target="_blank" rel="noopener noreferrer"><div class="laluan__tajuk"><span class="laluan__nombor" aria-hidden="true">03</span><h3>Laksanakan</h3></div><p>Rancang kandungan dan cerita untuk langkah pemasaran seterusnya.</p></a>
+          </div>
+        </section>
+
+        <section class="penutup" aria-labelledby="tajuk-penutup">
+          <div class="penutup__aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+          <p class="bahagian__label">BERSAMA BESHARE AI</p>
+          <h2 id="tajuk-penutup">Langkah besar bermula<br />dengan <span>satu idea.</span></h2>
+          <div class="penutup__tindakan"><a class="butang" href="#ekosistem">Terokai BeShare AI <span aria-hidden="true">↑</span></a></div>
+          <p class="beta">Perjalanan perniagaan anda, selangkah lebih jelas.</p>
+        </section>
+      </div>
     </main>
 
     <footer class="kaki">
-      <p>&copy; <span id="year"></span> BeShare AI Solution. <a href="privasi/">Dasar privasi</a> yang diterbitkan meliputi WhatsApp, bukan Copilot.</p>
-      <p class="kaki__senyap"><a href="meja-grup/">Meja Grup</a> · <a href="admin/">Dashboard admin</a></p>
+      <div class="kaki__utama">
+        <a class="jenama" href="./"><svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><use href="#tanda-beshare" /></svg><span>BeShare AI</span></a>
+        <p>&copy; <span id="year"></span> BeShare AI Solution</p>
+        <a href="privasi/">Dasar privasi</a>
+      </div>
+      <div class="kaki__maklumat">
+        <p>Dasar privasi yang diterbitkan meliputi WhatsApp, bukan Copilot.</p>
+        <p><a href="meja-grup/">Meja Grup</a><span aria-hidden="true"> · </span><a href="admin/">Dashboard admin</a></p>
+      </div>
     </footer>
-
     <script src="main.js" defer></script>
   </body>
 </html>
