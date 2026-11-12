@@ -1,0 +1,31 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BeShare Aurora responsive QA</title>
+<style>body{margin:20px;background:#efedf4;color:#21162c;font:14px system-ui}h1{font-size:26px}section{margin:28px 0}pre{white-space:pre-wrap;background:white;border:1px solid #cbc1d8;padding:14px;max-width:1400px;font:12px monospace}iframe{display:block;border:0;outline:1px solid #9982b2;margin-top:14px}button{min-height:40px;margin:4px 6px 4px 0;padding:8px 14px}p{max-width:1100px}.row{display:flex;gap:24px;flex-wrap:wrap}</style>
+<h1>BeShare Aurora — exact-commit responsive QA</h1>
+<p>This is a test harness, not the website. Each iframe renders the unchanged homepage at its labeled CSS viewport. Measurements below are read from the rendered iframe document. Product links are not functional on this static host. Do not sign in or follow them.</p>
+<pre id="summary">Waiting for homepage frames…</pre>
+<div class="row">
+<section><h2>PHONE · 390 × 844</h2><div data-frame="phone"><button data-section="hero">Phone: Hero</button><button data-section="products">Phone: Products</button><button data-section="steps">Phone: Steps</button><button data-section="closing">Phone: Closing</button></div><iframe id="phone" title="Phone homepage at 390 by 844" width="390" height="844" src="https://raw.githack.com/sifutech-ux/beshareaisolution/efc59b17fdba3c9146bf7a928a308edfd947a46b/index.html"></iframe></section>
+<section><h2>TABLET · 768 × 1024</h2><div data-frame="tablet"><button data-section="hero">Tablet: Hero</button><button data-section="products">Tablet: Products</button><button data-section="closing">Tablet: Closing</button></div><iframe id="tablet" title="Tablet homepage at 768 by 1024" width="768" height="1024" src="https://raw.githack.com/sifutech-ux/beshareaisolution/efc59b17fdba3c9146bf7a928a308edfd947a46b/index.html"></iframe></section>
+</div>
+<section><h2>DESKTOP · 1440 × 1000</h2><div data-frame="desktop"><button data-section="hero">Desktop: Hero</button><button data-section="products">Desktop: Products</button><button data-section="steps">Desktop: Steps</button><button data-section="closing">Desktop: Closing</button></div><iframe id="desktop" title="Desktop homepage at 1440 by 1000" width="1440" height="1000" src="https://raw.githack.com/sifutech-ux/beshareaisolution/efc59b17fdba3c9146bf7a928a308edfd947a46b/index.html"></iframe></section>
+<script>
+const frames = [...document.querySelectorAll('iframe')];
+function collect(frame) {
+  try {
+    const w=frame.contentWindow,d=frame.contentDocument,img=d.querySelector('.pentas img'),cards=d.querySelector('.papan'),menu=d.querySelector('.nav__menu'),hero=d.querySelector('h1');
+    if(!img||!cards||!hero)return {frame:frame.id,status:'waiting',title:d.title};
+    const rect=img.getBoundingClientRect();
+    const out=[...d.querySelectorAll('h1,h2,h3,.kad__kepala,.butang,.nav')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&(r.left<-.5||r.right>w.innerWidth+.5);}).map(e=>e.className||e.tagName);
+    return {frame:frame.id,viewport:[w.innerWidth,w.innerHeight],scrollWidth:d.documentElement.scrollWidth,noHorizontalOverflow:d.documentElement.scrollWidth<=w.innerWidth,heading:hero.textContent,gridColumns:w.getComputedStyle(cards).gridTemplateColumns,copilotImage:{loaded:img.complete&&img.naturalWidth>0,natural:[img.naturalWidth,img.naturalHeight],rendered:[Math.round(rect.width),Math.round(rect.height)],display:w.getComputedStyle(img).display,positionY:Math.round(rect.top)},menuVisible:w.getComputedStyle(menu).display!=='none',menuOpen:menu.open,sectionOverflow:out,hash:w.location.hash,stylesheet:[...d.querySelectorAll('link[rel=stylesheet]')].map(e=>e.href)};
+  } catch(e) { return {frame:frame.id,error:e.message}; }
+}
+function report(){document.querySelector('#summary').textContent=JSON.stringify(frames.map(collect),null,2)}
+frames.forEach(f=>f.addEventListener('load',report));
+document.querySelectorAll('button[data-section]').forEach(button=>button.addEventListener('click',()=>{
+ const frame=document.getElementById(button.parentElement.dataset.frame),w=frame.contentWindow,d=frame.contentDocument,key=button.dataset.section;
+ if(key==='hero')w.scrollTo({top:0,behavior:'instant'});
+ else {const sel={products:'#ekosistem',steps:'.bahagian--laluan',closing:'.penutup'}[key];d.querySelector(sel).scrollIntoView({block:'start',behavior:'instant'});}
+ report();
+}));
+setInterval(report,1000);
+</script></html>
