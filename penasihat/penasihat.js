@@ -943,6 +943,7 @@ async function hantarTeks(teks, mainkan, ulang = false) {
 }
 
 async function mainSuara(item, butang) {
+  const sesi = sesiAkaun()
   if (!sesi) {
     status.textContent = 'Sila masuk akaun untuk mendengar jawapan.'
     return
