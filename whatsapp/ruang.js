@@ -306,6 +306,7 @@ function route() {
   const state = load();
   applyTheme(state);
   const hash = location.hash.replace("#", "") || (state ? "papan" : "masuk");
+  const changedPage = Boolean(paintedHash && paintedHash !== hash);
   if (state && paintedHash && paintedHash !== hash && state.notice) {
     state.notice = "";
     save(state);
@@ -335,6 +336,10 @@ function route() {
   };
   place();
   requestAnimationFrame(place);
+  if (changedPage) {
+    window.scrollTo?.({ top: 0, behavior: "instant" });
+    document.getElementById("os-main")?.focus?.({ preventScroll: true });
+  }
   if (hash === "sambungan" && state && state.business.accessStatus !== "suspended") prepareSignup();
   if (state && state.business.accessStatus !== "suspended" && (hash === "peti" || hash === "kenalan" || hash === "papan" || hash === "sambungan" || hash === "pengetahuan") && inboxLoad !== hash) {
     const requested = hash;
@@ -363,111 +368,112 @@ const views = {
   pengendali: operator
 };
 
+
+// Presentation helpers: server state remains the source of truth.
+function osIcon(name) {
+  const paths = {
+    papan: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
+    peti: '<path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H5l-3 2V11.5a9.5 9.5 0 0 1 19 0Z"/><path d="M7 9h9M7 13h6"/>',
+    kenalan: '<circle cx="9" cy="8" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-3-5"/>',
+    pengetahuan: '<path d="m12 3 2.6 6.4L21 12l-6.4 2.6L12 21l-2.6-6.4L3 12l6.4-2.6L12 3Z"/><path d="M20 3v4M18 5h4"/>',
+    automasi: '<path d="m13 2-9 12h7l-1 8 10-13h-7l1-7Z"/>',
+    analitik: '<path d="M4 3v17h17M8 15v-4M13 15V7M18 15v-7"/>',
+    pasukan: '<circle cx="9" cy="8" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M19 8v6M16 11h6"/>',
+    sambungan: '<path d="m9 15 6-6M8 17l-1 1a4 4 0 0 1-6-6l5-5a4 4 0 0 1 6 0M16 7l1-1a4 4 0 0 1 6 6l-5 5a4 4 0 0 1-6 0" transform="translate(0 0) scale(.95)"/>',
+    bil: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h3"/>',
+    tetapan: '<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/>',
+    audit: '<path d="M12 3 4 6v6c0 4 8 9 8 9s8-5 8-9V6l-8-3Z"/><path d="m8 12 3 3 5-6"/>',
+    pengendali: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 8h8M8 12h8M8 16h4"/>',
+    arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
+    theme: '<path d="M20 15.4A9 9 0 0 1 8.6 4 9 9 0 1 0 20 15.4Z"/>',
+    logout: '<path d="M9 4H4v16h5M8 12h13m-4-4 4 4-4 4"/>',
+    menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+    refresh: '<path d="M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 13 3M18 18A8 8 0 0 1 5 15"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    check: '<path d="m5 12 4 4L19 6"/>'
+  };
+  return `<svg class="os-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.pengetahuan}</svg>`;
+}
+
+function osBrand() {
+  return '<span class="os-brand-mark" aria-hidden="true">b<span>·</span></span><span class="os-brand-word">BeShare <b>AI OS</b><small>RUANG KERJA PERNIAGAAN</small></span>';
+}
+
+function osInitial(name) {
+  return esc(String(name || 'B').trim().slice(0, 1).toUpperCase());
+}
+
+function connectionCards(state) {
+  const values = [
+    ['01', 'Token', state.connection.token, 'Kebenaran akses akaun'],
+    ['02', 'Webhook', state.connection.webhook, 'Saluran mesej masuk'],
+    ['03', 'Pendaftaran', state.connection.registration, 'Pengaktifan nombor'],
+    ['04', 'Mesej', state.connection.messaging, 'Bukti aliran mesej']
+  ];
+  return `<div class="states os-connection-steps">${values.map(([number, name, value, help]) =>
+    `<article class="state"><div class="os-step-head"><span class="os-step-number">${number}</span><strong>${name}</strong></div><span class="os-step-value">${esc(value)}</span><small>${help}</small></article>`
+  ).join('')}</div>`;
+}
+
 function authView(kind) {
-  const title = { daftar: "Daftar", masuk: "Masuk", lupa: "Lupa kata laluan" }[kind];
-  const extra = kind === "daftar"
-    ? `<label class="field">Sahkan kata laluan<input name="password2" type="password" required minlength="10" autocomplete="new-password"></label>`
-    : "";
-  const nameField = kind === "daftar"
-    ? `<label class="field">Nama<input name="name" required autocomplete="name"></label>
-       <label class="field">Nama perniagaan<input name="business" required autocomplete="organization"></label>`
-    : "";
-  const fields = kind === "lupa"
-    ? `<label class="field">E-mel<input name="email" type="email" required autocomplete="username"></label>`
-    : `${nameField}
-       <label class="field">E-mel<input name="email" type="email" required placeholder="nama@kedai.com" autocomplete="username"></label>
-       <label class="field">Kata laluan<input name="password" type="password" required minlength="10" maxlength="72" autocomplete="${kind === "daftar" ? "new-password" : "current-password"}"></label>
-       ${extra}`;
-  return `<main class="page"><section class="panel" style="max-width:480px;margin:2rem auto;">
-    <p class="demo-banner">Akaun disimpan di pelayan. Kata laluan tidak disimpan dalam pelayar.</p>
-    <h1>${title}</h1>
-    <form id="auth" data-kind="${kind}">
-      ${fields}
-      <p class="error" id="form-error" hidden></p>
-      <button class="btn" type="submit">${title}</button>
-    </form>
-    <p class="muted"><a href="#daftar">Daftar</a> · <a href="#masuk">Masuk</a> · <a href="#lupa">Lupa kata laluan</a></p>
-  </section></main>`;
+  const title = { daftar: "Cipta ruang perniagaan.", masuk: "Selamat kembali.", lupa: "Bantuan akaun." }[kind];
+  const subtitle = { daftar: "Mulakan dengan akaun anda dan nama perniagaan.", masuk: "Masuk untuk mengurus pelanggan dan pembantu AI anda.", lupa: "Masukkan e-mel akaun untuk menyemak pilihan pemulihan." }[kind];
+  const extra = kind === "daftar" ? `<label class="field">Sahkan kata laluan<input name="password2" type="password" required minlength="10" autocomplete="new-password"></label>` : "";
+  const nameField = kind === "daftar" ? `<label class="field">Nama<input name="name" required autocomplete="name" placeholder="Nama anda"></label><label class="field">Nama perniagaan<input name="business" required autocomplete="organization" placeholder="Nama perniagaan anda"></label>` : "";
+  const fields = kind === "lupa" ? `<label class="field">E-mel<input name="email" type="email" required autocomplete="username" placeholder="nama@perniagaan.com"></label>`
+    : `${nameField}<label class="field">E-mel<input name="email" type="email" required placeholder="nama@perniagaan.com" autocomplete="username"></label><label class="field">Kata laluan<input name="password" type="password" required minlength="10" maxlength="72" placeholder="Sekurang-kurangnya 10 aksara" autocomplete="${kind === "daftar" ? "new-password" : "current-password"}"></label>${extra}`;
+  return `<main class="os-auth" id="os-main" tabindex="-1">
+    <section class="os-auth-story"><p class="os-eyebrow">BISNES ANDA. LEBIH TERATUR.</p><h2>Satu ruang.<br>Lebih banyak<br><span>kemungkinan.</span></h2><p>Satukan perbualan pelanggan, pengetahuan perniagaan dan kawalan AI dalam satu tempat.</p><div class="os-auth-orbit" aria-hidden="true"><span class="os-orbit-ring"></span><span class="os-orbit-core">${osIcon('pengetahuan')}</span><span class="os-orbit-tag os-orbit-tag--one">${osIcon('peti')} Perbualan</span><span class="os-orbit-tag os-orbit-tag--two">${osIcon('pengetahuan')} Pengetahuan AI</span></div><div class="os-story-foot"><span class="os-dot"></span> Dibina untuk cara anda berniaga.</div></section>
+    <section class="panel os-auth-card"><span class="os-auth-symbol">${osIcon(kind === 'masuk' ? 'papan' : 'audit')}</span><p class="os-eyebrow">BESHARE AI OS</p><h1>${title}</h1><p class="muted">${subtitle}</p>
+      <form id="auth" data-kind="${kind}">${fields}<p class="error" id="form-error" role="alert" hidden></p><button class="btn" type="submit">${{ daftar: 'Cipta akaun', masuk: 'Masuk ke ruang kerja', lupa: 'Semak pemulihan' }[kind]} ${osIcon('arrow')}</button></form>
+      <div class="os-auth-links">${kind === 'masuk' ? '<a href="#lupa">Lupa kata laluan?</a><span>Belum ada akaun? <a href="#daftar">Daftar sekarang</a></span>' : '<a href="#masuk">Kembali ke log masuk</a>'}</div>
+      <p class="os-auth-note">${osIcon('audit')} Gunakan kata laluan yang unik untuk akaun perniagaan anda.</p>
+    </section></main>`;
 }
 
 function shell(state, hash, body) {
-  const links = NAV.filter((item) => allow(state, item[2])).map(([id, name]) =>
-    `<a class="${hash === id ? "is-on" : ""}" href="#${id}" ${hash === id ? 'aria-current="page"' : ""}>${esc(name)}</a>`
-  ).join("");
-  const modal = state.modal === "release" ? `<div class="modal"><div class="panel">
-      <h2>Pulangkan kepada AI?</h2>
-      <p class="muted">Balasan automatik akan hidup semula. Staf dan AI tidak membalas serentak.</p>
-      <p class="actions"><button class="btn" type="button" data-act="release-yes">Ya, pulangkan</button>
-      <button class="btn btn--ghost" type="button" data-act="modal-close">Batal</button></p>
-    </div></div>` : "";
+  const available = NAV.filter((item) => allow(state, item[2]));
+  const navLink = ([id, name]) => `<a class="${hash === id ? "is-on" : ""}" href="#${id}" ${hash === id ? 'aria-current="page"' : ""}>${osIcon(id)}<span>${esc(name)}</span>${id === 'peti' && metrics(state).unanswered ? `<span class="os-nav-count">${metrics(state).unanswered}</span>` : ''}</a>`;
+  const groups = [['RUANG KERJA', ['papan', 'peti', 'kenalan', 'analitik']], ['PEMBANTU AI', ['pengetahuan', 'automasi', 'sambungan']], ['PENGURUSAN', ['pasukan', 'bil', 'tetapan', 'audit', 'pengendali']]];
+  const links = groups.map(([title, ids]) => {
+    const items = available.filter(([id]) => ids.includes(id));
+    return items.length ? `<div class="os-nav-group"><p class="os-nav-label">${title}</p>${items.map(navLink).join('')}</div>` : '';
+  }).join('');
+  const businessPicker = (state.memberships || []).length > 1 ? `<label class="os-business-picker">Perniagaan<select data-act="pilih" aria-label="Perniagaan">${state.memberships.map((item) => `<option value="${esc(item.public_id)}" ${item.public_id === state.business.public_id ? "selected" : ""}>${esc(item.name)}</option>`).join('')}</select></label>` : '';
+  const tools = `${state.platformAdmin ? '<a class="os-owner-link" href="/whatsapp/pemilik/">Panel Pemilik <span aria-hidden="true">↗</span></a>' : ''}${businessPicker}<div class="os-user"><span class="os-avatar">${osInitial(state.user.name)}</span><span><strong>${esc(state.user.name)}</strong><small>${esc(roleLabel(role(state)))}</small></span></div><div class="os-user-actions"><button type="button" data-act="theme">${osIcon('theme')}${state.theme === 'cerah' ? 'Mod gelap' : 'Mod cerah'}</button><button type="button" data-act="logout">${osIcon('logout')}Keluar</button></div>`;
+  const modal = state.modal === "release" ? `<div class="modal"><div class="panel" role="dialog" aria-modal="true" aria-labelledby="release-title"><h2 id="release-title">Pulangkan kepada AI?</h2><p class="muted">Balasan automatik akan hidup semula. Staf dan AI tidak membalas serentak.</p><p class="actions"><button class="btn" type="button" data-act="release-yes">Ya, pulangkan</button><button class="btn btn--ghost" type="button" data-act="modal-close">Batal</button></p></div></div>` : '';
   return `<div class="shell">
-    <aside class="nav">
-      <div class="nav-brand">
-        <strong>BeShare AI OS</strong>
-        <p class="muted">${esc(state.business.name)}</p>
-      </div>
-      <div class="nav-links">${links}</div>
-      <div class="nav-tools">
-        ${state.platformAdmin ? '<a class="btn btn--ghost" href="/whatsapp/pemilik/">Panel Pemilik</a>' : ""}
-        ${(state.memberships || []).length > 1 ? `<label class="muted">Perniagaan
-          <select data-act="pilih" aria-label="Perniagaan">
-            ${state.memberships.map((item) => `<option value="${esc(item.public_id)}" ${item.public_id === state.business.public_id ? "selected" : ""}>${esc(item.name)}</option>`).join("")}
-          </select>
-        </label>` : ""}
-        <button class="btn btn--ghost" type="button" data-act="theme">${state.theme === "cerah" ? "Mod gelap" : "Mod cerah"}</button>
-        <button class="btn btn--ghost" type="button" data-act="logout">Keluar</button>
-      </div>
-    </aside>
-    <section${hash === "peti" || hash === "pengetahuan" ? ' class="workspace-bounded"' : ""}>
-      <p class="demo-banner">${state.ai.available ? "Urus mesej, pengetahuan dan balasan AI untuk perniagaan ini. Pilih penerima dan had balasan dalam Pengetahuan; ambil alih perbualan melalui Peti masuk." : state.knowledgeCentre.available ? "Sediakan dan terbitkan maklumat perniagaan dalam Pengetahuan. Status nombor WhatsApp boleh disemak dalam Sambungan." : state.inboxReady ? "Peti masuk memaparkan mesej WhatsApp yang diterima melalui sambungan perniagaan ini." : "Lengkapkan sambungan WhatsApp untuk mula menerima mesej pelanggan."}</p>
-      ${state.notice ? `<p class="error">${esc(state.notice)}</p>` : ""}
-      ${body}
-    </section>
+    <aside class="nav"><a class="os-brand" href="#papan">${osBrand()}</a><div class="os-business"><span class="os-business-icon">${osIcon('papan')}</span><span><strong>${esc(state.business.name)}</strong><small>Ruang perniagaan</small></span></div><nav class="nav-links" aria-label="Navigasi utama">${links}</nav><div class="nav-tools">${tools}</div></aside>
+    <div class="os-workspace"><header class="os-workspace-bar"><a class="os-mobile-brand" href="#papan">${osBrand()}</a><div class="os-breadcrumb">Ruang kerja <span>/</span> <strong>${esc(NAV.find(([id]) => id === hash)?.[1] || 'Papan')}</strong></div><span class="os-workspace-tag">${osIcon('audit')}${esc(roleLabel(role(state)))}</span><details class="os-mobile-menu"><summary aria-label="Buka menu ruang kerja">${osIcon('menu')}<span>Menu</span></summary><div class="os-mobile-menu-panel"><strong class="os-menu-business">${esc(state.business.name)}</strong><nav aria-label="Semua bahagian">${available.map(navLink).join('')}</nav><div class="os-mobile-tools">${tools}</div></div></details></header>
+      <main class="os-content${hash === 'peti' || hash === 'pengetahuan' ? ' workspace-bounded' : ''}" id="os-main" tabindex="-1">${state.notice ? `<p class="os-notice" role="status">${esc(state.notice)}</p>` : ''}${body}<footer class="os-content-footer"><span>BeShare AI Solution</span><span>Ruang untuk bisnes berkembang.</span></footer></main>
+    </div><nav class="os-bottom-nav" aria-label="Navigasi pantas">${available.filter(([id]) => ['papan', 'peti', 'pengetahuan', 'sambungan'].includes(id)).map(navLink).join('')}</nav>
   </div>${modal}`;
 }
 
 function board(state) {
   const count = metrics(state);
-  const enabled = state.rules.filter((item) => item.enabled).length;
-  return `<article class="panel">
-    <h1>Papan ${esc(state.business.name)}</h1>
-    <p class="muted">Status: ${esc(businessStatus(state.business.status))}. Peranan: ${esc(roleLabel(role(state)))}. Automasi hidup: ${enabled}. ${state.inboxReady ? "Peti masuk memaparkan mesej webhook yang disahkan." : "Peti masuk belum disambung."}</p>
-    <div class="states">
-      ${Object.entries({ Token: state.connection.token, Webhook: state.connection.webhook, Pendaftaran: state.connection.registration, Mesej: state.connection.messaging }).map(([name, value]) =>
-        `<article class="state"><strong>${esc(name)}</strong><span>${esc(value)}</span></article>`).join("")}
-    </div>
-    <div class="os-kpis">
-      <article class="state os-kpi"><strong>${count.incoming}</strong><span>${state.inboxReady ? "Perbualan daripada webhook yang disahkan." : "Perbualan masuk. Belum disambung ke pelayan."}</span></article>
-      <article class="state os-kpi"><strong>${count.aiReplied}</strong><span>Perbualan dengan balasan AI diterima Meta. Semak status sampai dalam Peti masuk.</span></article>
-      <article class="state os-kpi"><strong>${count.human}</strong><span>Sedang dipegang manusia.</span></article>
-      <article class="state os-kpi"><strong>${count.unanswered}</strong><span>Mesej terakhir daripada pelanggan, belum selesai.</span></article>
-    </div>
-    <h2>Aktiviti terkini</h2>
-    <ul>${state.audit.slice(0, 5).map((item) => `<li>${esc(item.at)} · ${esc(item.actor)} · ${esc(item.action)}</li>`).join("")}</ul>
-    <p><a class="btn" href="#peti">Buka peti masuk</a></p>
-  </article>`;
+  const activeAi = state.ai.enabled && state.ai.deployment_ready && state.ai.controls_configured !== false && (state.ai.audience_mode !== 'all' || state.ai.audience_approved === true);
+  const aiLabel = !state.ai.available ? 'Belum tersedia' : activeAi ? 'AI dihidupkan' : state.ai.enabled ? 'AI dijeda' : 'AI dimatikan';
+  const stats = [[count.incoming, 'Perbualan', 'Perbualan dalam peti masuk', 'peti', 'violet'], [count.aiReplied, 'Dibalas oleh AI', 'Balasan diterima Meta', 'pengetahuan', 'teal'], [count.human, 'Diambil alih', 'Dikendalikan oleh manusia', 'kenalan', 'blue'], [count.unanswered, 'Menunggu balasan', 'Mesej terakhir daripada pelanggan', 'clock', 'amber']];
+  const quick = [['peti', 'Buka peti masuk', 'Lihat mesej dan urus perbualan pelanggan.', 'workspace'], ['pengetahuan', 'Kenalkan bisnes kepada AI', 'Sediakan fakta, produk dan cara bayaran.', 'knowledge'], ['sambungan', 'Urus sambungan WhatsApp', 'Semak nombor dan status sambungan.', 'connection']].filter((item) => allow(state, item[3]));
+  return `<section class="os-welcome"><div><p class="os-eyebrow">RUANG KERJA ANDA</p><h1>Selamat datang, <span>${esc(state.user.name)}.</span></h1><p>Urus perbualan. Bimbing AI.<br class="os-mobile-break"> Bawa bisnes anda lebih jauh.</p><a class="btn" href="#peti">${osIcon('peti')} Buka peti masuk ${osIcon('arrow')}</a></div><div class="os-welcome-art" aria-hidden="true"><span class="os-welcome-ring"></span><span class="os-welcome-core">${osIcon('pengetahuan')}</span><span class="os-art-spark os-art-spark--one">✦</span><span class="os-art-spark os-art-spark--two">✧</span></div></section>
+    <section class="os-kpis os-dashboard-kpis" aria-label="Ringkasan perbualan">${stats.map(([value, name, note, icon, tone]) => `<article class="os-stat"><span class="os-stat-icon os-tone-${tone}">${osIcon(icon)}</span><span class="os-stat-label">${name}</span><strong>${value}</strong><small>${note}</small></article>`).join('')}</section>
+    <div class="os-dashboard-grid"><section class="panel os-quick-panel"><div class="os-section-heading"><div><p class="os-eyebrow">MULA DI SINI</p><h2>Langkah seterusnya</h2></div>${osIcon('arrow')}</div><div class="os-quick-links">${quick.map(([id, title, desc]) => `<a href="#${id}"><span class="os-quick-icon">${osIcon(id)}</span><span><strong>${title}</strong><small>${desc}</small></span>${osIcon('arrow')}</a>`).join('')}</div></section>
+    <section class="panel os-ai-card"><div class="os-ai-card-top"><span class="os-ai-symbol">${osIcon('pengetahuan')}</span><span class="os-status-tag">${aiLabel}</span></div><p class="os-eyebrow">PEMBANTU PERNIAGAAN</p><h2>AI yang mengenali<br>bisnes anda.</h2><p class="muted">${state.knowledgeCentre.published_revision ? 'Pengetahuan telah diterbitkan. Semak dan kemas kini apabila maklumat perniagaan berubah.' : 'Lengkapkan pengetahuan supaya AI mempunyai maklumat yang tepat untuk membantu pelanggan.'}</p>${allow(state, 'knowledge') ? '<a href="#pengetahuan">Urus pengetahuan AI <span aria-hidden="true">↗</span></a>' : '<p class="muted">Pengetahuan diurus oleh pemilik perniagaan.</p>'}</section></div>
+    <section class="panel os-connection-panel"><div class="os-section-heading"><div><p class="os-eyebrow">WHATSAPP PERNIAGAAN</p><h2>Status sambungan</h2></div>${allow(state, 'connection') ? '<a class="os-text-link" href="#sambungan">Lihat butiran <span aria-hidden="true">↗</span></a>' : ''}</div>${connectionCards(state)}<p class="os-panel-note">${state.connection.phone ? esc(state.connection.phone) + ' · ' : ''}Status setiap langkah dipaparkan berasingan. Token disahkan sahaja belum mengesahkan penghantaran mesej.</p></section>
+    <section class="panel os-activity-panel"><div class="os-section-heading"><div><p class="os-eyebrow">REKOD RUANG KERJA</p><h2>Aktiviti terkini</h2></div>${allow(state, 'audit') ? '<a class="os-text-link" href="#audit">Lihat semua <span aria-hidden="true">↗</span></a>' : ''}</div><ul class="os-activity-list">${state.audit.slice(0, 5).map((item) => `<li><span class="os-activity-dot"></span><div><strong>${esc(item.action)}</strong><small>${esc(item.actor)}</small></div><time>${esc(item.at)}</time></li>`).join('') || '<li class="os-empty-inline">Aktiviti perniagaan anda akan dipaparkan di sini.</li>'}</ul></section>`;
+}
+
+function inboxThreads(state, list = visibleConversations(state)) {
+  return list.map((item) => `<button class="thread-item ${item.id === state.active ? 'is-on' : ''}" type="button" data-act="open" data-value="${esc(item.id)}"><span class="os-avatar">${osInitial(item.name)}</span><span class="os-thread-copy"><strong>${esc(item.name)}</strong><small>${esc(label(item.mode))}${item.unread ? ' · belum dibaca' : ''}</small></span>${item.unread ? '<span class="os-unread" aria-hidden="true"></span>' : ''}</button>`).join('') || `<div class="os-empty">${osIcon('peti')}<h2>${state.conversations.length ? 'Tiada hasil carian' : 'Belum ada perbualan'}</h2><p>${state.conversations.length ? 'Cuba nama atau penapis yang lain.' : state.inboxReady ? 'Mesej pelanggan yang diterima akan muncul di sini.' : 'Lengkapkan sambungan WhatsApp untuk menerima mesej pelanggan.'}</p>${!state.inboxReady && allow(state, 'connection') ? '<a href="#sambungan">Urus sambungan</a>' : ''}</div>`;
 }
 
 function inbox(state) {
   const list = visibleConversations(state);
   const current = list.find((item) => item.id === state.active) || null;
-  const buttons = list.map((item) =>
-    `<button class="thread-item ${item.id === state.active ? "is-on" : ""}" type="button" data-act="open" data-value="${esc(item.id)}"><span>${esc(item.name)}</span><small>${esc(label(item.mode))}${item.unread ? " · belum dibaca" : ""}</small></button>`
-  ).join("") || `<p class="muted">${state.conversations.length ? "Tiada hasil." : (state.inboxReady ? "Belum ada mesej webhook yang disahkan." : "Peti masuk belum disambung ke pelayan.")}</p>`;
-  const filters = [["semua", "Semua"], ["belum", "Belum dibaca"], ["saya", "Tugasan saya"], ["ai", "AI"], ["manusia", "Manusia"], ["selesai", "Selesai"]];
-  return `<article class="panel inbox-screen" data-screen="${esc(state.inboxPane || "list")}">
-    <h1>Peti masuk</h1>
-    <p><button class="btn btn--ghost" type="button" data-act="refresh-inbox">Muat semula mesej</button></p>
-    <div class="inbox-find">
-    <label class="field">Cari<input name="q" value="${esc(state.inboxQuery || "")}" placeholder="Nama atau tag"></label>
-    <div class="chips">${filters.map(([id, name]) => `<button class="btn btn--ghost ${state.inboxFilter === id ? "is-on" : ""}" type="button" data-act="filter" data-value="${id}">${name}</button>`).join("")}</div>
-    </div>
-    <div class="inbox" data-pane="${esc(state.inboxPane || "list")}">
-      <div class="pane-list thread" id="thread">${buttons}</div>
-      <div class="pane-talk">${talk(state, current)}</div>
-      <aside class="pane-profile">${profile(state, current)}</aside>
-    </div>
-  </article>`;
+  const buttons = inboxThreads(state, list);
+  const filters = [['semua', 'Semua'], ['belum', 'Belum dibaca'], ['saya', 'Tugasan saya'], ['ai', 'AI'], ['manusia', 'Manusia'], ['selesai', 'Selesai']];
+  return `<article class="panel inbox-screen" data-screen="${esc(state.inboxPane || 'list')}"><header class="os-inbox-heading"><div><p class="os-eyebrow">PERBUALAN PELANGGAN</p><h1>Peti masuk<span class="os-total">${state.conversations.length}</span></h1></div><button class="btn btn--ghost" type="button" data-act="refresh-inbox">${osIcon('refresh')}<span>Muat semula mesej</span></button></header><div class="inbox-find"><label class="field"><span class="os-sr-only">Cari perbualan</span><input name="q" value="${esc(state.inboxQuery || '')}" placeholder="Cari nama atau tag…"></label><div class="chips">${filters.map(([id, name]) => `<button class="btn btn--ghost ${state.inboxFilter === id ? 'is-on' : ''}" type="button" data-act="filter" data-value="${id}" aria-pressed="${state.inboxFilter === id}">${name}</button>`).join('')}</div></div><div class="inbox" data-pane="${esc(state.inboxPane || 'list')}"><div class="pane-list thread" id="thread">${buttons}</div><div class="pane-talk">${talk(state, current)}</div><aside class="pane-profile">${profile(state, current)}</aside></div></article>`;
 }
 
 function messageDelivery(status) {
@@ -501,7 +507,7 @@ function messageBubble(item) {
   const code = failed && Number.isSafeInteger(item.error_code) && item.error_code > 0 ? item.error_code : null;
   const subcode = code !== null && Number.isSafeInteger(item.error_subcode) && item.error_subcode >= 0 ? item.error_subcode : null;
   const media = knowledgeMediaUrl(item.media_url);
-  return `<div class="msg${item.from === "staff" ? " msg--staff" : ""}${failed ? " msg--failed" : ""}">
+  return `<div class="msg msg--${esc(item.from)}${item.from === "staff" ? " msg--staff" : ""}${failed ? " msg--failed" : ""}">
     <div class="msg-heading"><strong>${esc(who[item.from] || item.from)}</strong>${delivery ? `<span class="msg-status msg-status--${delivery.tone}">${esc(delivery.label)}</span>` : ""}</div>
     ${media ? `<a class="msg-image" href="${esc(media)}" target="_blank" rel="noopener"><img src="${esc(media)}" alt="Gambar dalam balasan" loading="lazy"></a>` : ""}
     <p>${esc(item.text)}</p>
@@ -512,7 +518,7 @@ function messageBubble(item) {
 }
 
 function talk(state, current) {
-  if (!current) return `<p class="muted">Pilih perbualan.</p><p><button class="btn btn--ghost" type="button" data-act="pane" data-value="list">Senarai</button></p>`;
+  if (!current) return `<div class="os-empty os-empty-talk">${osIcon("peti")}<h2>Setiap perbualan, satu peluang.</h2><p>Pilih pelanggan untuk melihat mesej dan mengurus balasan.</p><button class="btn btn--ghost" type="button" data-act="pane" data-value="list">Lihat senarai</button></div>`;
   const messages = current.messages.map(messageBubble).join("");
   const back = `<div class="phone-bar"><button class="btn btn--ghost" type="button" data-act="pane" data-value="list">Senarai</button><strong>${esc(current.name)}</strong><button class="btn btn--ghost" type="button" data-act="pane" data-value="profile">Profil</button></div>`;
   if (current.mode === "resolved") {
@@ -1299,18 +1305,14 @@ function automation(state) {
 function analytics(state) {
   const count = metrics(state);
   const cards = [
-    [String(count.incoming), "Perbualan masuk", "Belum disambung ke pelayan."],
-    [String(count.aiReplied), "Balasan AI diterima Meta", "Semak status sampai dalam Peti masuk."],
-    [String(count.human), "Dipegang manusia", "Belum disambung ke pelayan."],
-    [String(count.unanswered), "Belum dibalas", "Belum disambung ke pelayan."],
-    [count.sent + " diterima Meta · " + count.failed + " gagal", "Hasil penghantaran", "Diterima Meta belum semestinya sampai kepada pelanggan."],
-    [count.handover + "%", "Kadar serahan", "Belum disambung ke pelayan."]
+    [String(count.incoming), "Perbualan masuk", "Perbualan yang dimuatkan."],
+    [String(count.aiReplied), "Dibalas oleh AI", "Balasan diterima Meta; semak status sampai dalam Peti masuk."],
+    [String(count.human), "Diambil alih", "Perbualan dalam kawalan manusia."],
+    [String(count.unanswered), "Menunggu balasan", "Mesej terakhir daripada pelanggan, belum selesai."],
+    [String(count.sent), "Mesej diterima Meta", "Penghantaran kepada pelanggan disahkan secara berasingan."],
+    [String(count.failed), "Gagal dihantar", "Semak butiran ralat pada perbualan berkaitan."]
   ];
-  return `<article class="panel">
-    <h1>Analitik</h1>
-    <p class="muted">Analitik belum disambung ke pelayan. Kadar konversi tidak dipaparkan.</p>
-    <div class="os-kpis">${cards.map(([value, name, note]) => `<article class="state os-kpi"><strong>${esc(value)}</strong><span>${esc(name)}. ${esc(note)}</span></article>`).join("")}</div>
-  </article>`;
+  return `<article class="panel"><header class="os-page-heading"><p class="os-eyebrow">GAMBARAN PERBUALAN</p><h1>Analitik</h1><p class="muted">Ringkasan daripada perbualan yang dimuatkan dalam sesi ini. Laporan mengikut tempoh dan kadar konversi belum tersedia.</p></header><div class="os-kpis os-dashboard-kpis">${cards.map(([value, name, note]) => `<article class="os-stat"><span class="os-stat-label">${esc(name)}</span><strong>${esc(value)}</strong><small>${esc(note)}</small></article>`).join("")}</div><a class="btn btn--ghost" href="#peti">Buka peti masuk ${osIcon('arrow')}</a></article>`;
 }
 
 function team(state) {
@@ -1335,57 +1337,14 @@ function team(state) {
 }
 
 function connection(state) {
-  const draft = state.templateDraft || { name: "", language: "ms", body: "", savedAt: "" };
-  const saved = draft.savedAt
-    ? `Draf disimpan dalam pelayar pada ${esc(draft.savedAt)}. Tidak dihantar ke Meta.`
-    : "Draf belum disimpan.";
-  return `<article class="panel record-screen">
-    <h1>Sambungan WhatsApp</h1>
-    <p>Kebenaran <strong>whatsapp_business_management</strong> digunakan selepas perniagaan selesai Embedded Signup. Aplikasi kemudian boleh mengurus akaun WhatsApp Business itu: nombor telefon, templat mesej, kod QR, dan langganan webhook. Ini penggunaan Cloud API rasmi, bukan status rakan kongsi Meta.</p>
-    <h2>Langkah pada skrin</h2>
-    <ol class="record-steps">
-      <li>Log masuk ke workspace.</li>
-      <li>Buka halaman ini dan baca empat keadaan di bawah.</li>
-      <li>Untuk nombor sedia ada dalam WhatsApp Business App, pilih Sambung WhatsApp Business App. Buka tetingkap Meta ialah aliran biasa.</li>
-      <li>Semak hasil sambungan selepas aliran Meta. Token tersimpan sahaja belum mengesahkan nombor boleh digunakan.</li>
-    </ol>
-    <h2>Empat keadaan</h2>
-    <p class="muted">Keadaan ini datang dari pelayan. Token yang tersimpan belum bermaksud nombor sudah boleh menghantar mesej. Pendaftaran nombor tidak dijalankan dari skrin ini.</p>
-    <div class="states">
-      <article class="state"><strong>Token</strong><span>${esc(state.connection.token)}</span></article>
-      <article class="state"><strong>Webhook</strong><span>${esc(state.connection.webhook)}</span></article>
-      <article class="state"><strong>Pendaftaran</strong><span>${esc(state.connection.registration)}</span></article>
-      <article class="state"><strong>Mesej</strong><span>${esc(state.connection.messaging)}</span></article>
-    </div>
-    ${state.connection.phone ? `<p>Nombor paparan: ${esc(state.connection.phone)}</p>` : ""}
-    <p>Ralat terakhir: ${esc(state.connection.note || "Tiada.")}</p>
-    ${state.ai.available || state.knowledgeCentre.available ? '<p><a class="btn" href="#pengetahuan">Tetapkan pengetahuan dan AI Auto Reply</a></p>' : ""}
-    <div class="record-actions">
-      <button class="btn" type="button" data-act="connect">Buka tetingkap Meta</button>
-      ${role(state) === "owner" ? `<button class="btn btn--ghost" type="button" data-act="connect-app">Sambung WhatsApp Business App</button>` : ""}
-      <a class="btn btn--ghost" href="panduan-rakaman.html">Skrip rakaman</a>
-    </div>
-    <p class="muted" id="signup-hint">Butang ini membuka tetingkap Facebook untuk kebenaran whatsapp_business_management dan whatsapp_business_messaging. Kod ditukar pada pelayan. Token tidak disimpan dalam pelayar.</p>
-    ${role(state) === "owner" ? `<p class="muted" id="signup-app-hint">Sambung WhatsApp Business App membuka aliran rasmi untuk nombor yang sudah ada pada WhatsApp Business App. Ia tidak mendaftarkan nombor baharu dan tidak melanggan webhook.</p>` : ""}
-    <h2>Draf templat</h2>
-    <p class="muted">Borang ini menyimpan nama, bahasa, dan isi dalam pelayar sahaja. Ia tidak dihantar ke Meta dan tidak mencipta templat sebenar.</p>
-    <form id="template-draft">
-      <p class="error" id="form-error" hidden></p>
-      <label class="field">Nama templat<input name="name" required maxlength="512" autocomplete="off" value="${esc(draft.name)}" placeholder="sambutan_kedai"></label>
-      <label class="field">Bahasa
-        <select name="language">
-          <option value="ms" ${draft.language === "ms" ? "selected" : ""}>Bahasa Melayu</option>
-          <option value="en" ${draft.language === "en" ? "selected" : ""}>English</option>
-        </select>
-      </label>
-      <label class="field">Isi templat<textarea name="body" required maxlength="1024" rows="4">${esc(draft.body)}</textarea></label>
-      <button class="btn" type="submit">Simpan draf dalam pelayar</button>
-    </form>
-    <p class="muted">${saved}</p>
-    <h2>Laluan webhook baharu</h2>
-    <p>URL calon: <code>https://beshareaisolution.com/whatsapp/sambungan/webhook.php</code></p>
-    <p class="muted">Laluan ini berasingan daripada callback yang sedang hidup. Jangan tukar callback aplikasi Meta yang sedang berkhidmat. URL ini belum didaftarkan.</p>
-  </article>`;
+  const draft = state.templateDraft || { name: '', language: 'ms', body: '', savedAt: '' };
+  const saved = draft.savedAt ? `Draf disimpan dalam pelayar pada ${esc(draft.savedAt)}. Tidak dihantar ke Meta.` : 'Draf belum disimpan.';
+  return `<article class="panel record-screen os-connect"><header class="os-page-heading"><span class="os-heading-icon">${osIcon('sambungan')}</span><p class="os-eyebrow">HUBUNGKAN PERNIAGAAN</p><h1>Sambungan WhatsApp</h1><p class="muted">Sambungkan nombor perniagaan dan lihat setiap langkah pengaktifannya di sini.</p></header>
+    <div class="os-section-heading"><h2>Keadaan sambungan anda</h2>${state.connection.phone ? `<span class="os-phone-number">${esc(state.connection.phone)}</span>` : ''}</div>${connectionCards(state)}<p class="os-panel-note">Token tersimpan sahaja belum mengesahkan nombor boleh menghantar mesej. Pendaftaran nombor diurus melalui pengaktifan sambungan oleh pemilik sistem.</p>${state.connection.note ? `<p class="os-notice" role="status">${esc(state.connection.note)}</p>` : ''}
+    <div class="os-connect-options"><section><span class="os-connect-option-icon">${osIcon('sambungan')}</span><h2>Sambung melalui Meta</h2><p class="muted">Pilih atau sediakan akaun WhatsApp Business melalui aliran rasmi Meta.</p><button class="btn" type="button" data-act="connect"><span>Buka tetingkap Meta</span> ${osIcon('arrow')}</button><p class="muted os-small" id="signup-hint">Log masuk ke Facebook untuk memberikan kebenaran kepada akaun WhatsApp perniagaan anda.</p></section>${role(state) === 'owner' ? `<section><span class="os-connect-option-icon os-tone-teal">${osIcon('peti')}</span><h2>Guna WhatsApp Business App</h2><p class="muted">Untuk nombor yang sudah digunakan dalam aplikasi WhatsApp Business.</p><button class="btn btn--ghost" type="button" data-act="connect-app">Sambung WhatsApp Business App</button><p class="muted os-small" id="signup-app-hint">Gunakan aliran ini bagi nombor sedia ada. Kelayakan sambungan ditentukan oleh Meta.</p></section>` : ''}</div>
+    ${state.ai.available || state.knowledgeCentre.available ? `<a class="os-connection-next" href="#pengetahuan">${osIcon('pengetahuan')}<span><strong>Sediakan pengetahuan dan balasan AI</strong><small>Lengkapkan maklumat perniagaan sebelum mengaktifkan AI.</small></span>${osIcon('arrow')}</a>` : ''}
+    <details class="os-disclosure"><summary>Draf templat mesej <span>Disimpan dalam pelayar</span></summary><div class="os-disclosure-body"><p class="muted">Sediakan nama, bahasa dan isi templat. Draf ini tidak dihantar ke Meta dan belum menjadi templat yang diluluskan.</p><form id="template-draft"><p class="error" id="form-error" hidden></p><div class="pair"><label class="field">Nama templat<input name="name" required maxlength="512" autocomplete="off" value="${esc(draft.name)}" placeholder="sambutan_kedai"></label><label class="field">Bahasa<select name="language"><option value="ms" ${draft.language === 'ms' ? 'selected' : ''}>Bahasa Melayu</option><option value="en" ${draft.language === 'en' ? 'selected' : ''}>English</option></select></label></div><label class="field">Isi templat<textarea name="body" required maxlength="1024" rows="4">${esc(draft.body)}</textarea></label><button class="btn btn--ghost" type="submit">Simpan draf dalam pelayar</button></form><p class="muted os-small">${saved}</p></div></details>
+    <details class="os-disclosure"><summary>Butiran teknikal & panduan</summary><div class="os-disclosure-body"><p class="muted">Sambungan menggunakan WhatsApp Cloud API rasmi. BeShare tidak mendakwa status rakan kongsi Meta.</p><p class="muted">Kebenaran <code>whatsapp_business_management</code> dan <code>whatsapp_business_messaging</code> diurus melalui Meta. Token disimpan pada pelayan, bukan dalam pelayar.</p><p><a class="os-text-link" href="panduan-rakaman.html">Buka panduan rakaman ${osIcon('arrow')}</a></p></div></details></article>`;
 }
 
 function billing() {
@@ -1829,9 +1788,7 @@ function onInput(event) {
   if (event.target.name === "q") {
     state.inboxQuery = event.target.value;
     save(state);
-    const list = visibleConversations(state).map((item) =>
-      `<button class="thread-item ${item.id === state.active ? "is-on" : ""}" type="button" data-act="open" data-value="${esc(item.id)}"><span>${esc(item.name)}</span><small>${esc(label(item.mode))}${item.unread ? " · belum dibaca" : ""}</small></button>`
-    ).join("") || `<p class="muted">${state.conversations.length ? "Tiada hasil." : (state.inboxReady ? "Belum ada mesej webhook yang disahkan." : "Peti masuk belum disambung ke pelayan.")}</p>`;
+    const list = inboxThreads(state);
     const thread = document.getElementById("thread");
     if (thread) thread.innerHTML = list;
     return;
@@ -1925,7 +1882,7 @@ function prepareSignup() {
       }
       signupReady = { appId: data.appId, configId: data.configId, version: data.version || "v26.0" };
       const hint = document.getElementById("signup-hint");
-      if (hint) hint.textContent = "App ID dan Configuration ID sedia. Tetingkap Meta dibuka dari butang. Rahsia aplikasi tidak berada dalam pelayar.";
+      if (hint) hint.textContent = "Sambungan Meta sedia dibuka. Tekan butang di atas untuk meneruskan.";
       loadFacebookSdk(signupReady);
     })
     .catch(() => {
@@ -2300,7 +2257,7 @@ async function boot() {
   const returned = consumeRedirectResult();
   if (returned.code) rememberSignupCode(returned.code);
   const root = document.getElementById("app");
-  if (root) root.innerHTML = `<main class="page"><p class="muted">Memuatkan sesi…</p></main>`;
+  if (root) root.innerHTML = `<main class="os-loading"><span class="os-loading-orb" aria-hidden="true"></span><h1>Menyediakan ruang kerja anda</h1><p class="muted" role="status">Memuatkan sesi…</p></main>`;
   try {
     applyLive(await callApi("sesi"));
     if (openOwnerPanel()) return;
@@ -2341,3 +2298,16 @@ window.addEventListener("beforeunload", (event) => {
   event.returnValue = "";
 });
 window.addEventListener("hashchange", route);
+document.querySelector(".os-skip-link")?.addEventListener("click", (event) => {
+  event.preventDefault();
+  const main = document.getElementById("os-main");
+  main?.focus();
+  main?.scrollIntoView({ block: "start" });
+});
+app.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  const menu = app.querySelector(".os-mobile-menu[open]");
+  if (!menu) return;
+  menu.open = false;
+  menu.querySelector("summary")?.focus();
+});

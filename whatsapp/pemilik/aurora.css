@@ -1,0 +1,71 @@
+/* Align the owner panel with the customer workspace without changing its controls. */
+:root { --bg: #0b1020; --line: rgba(174,186,222,.13); --muted: #a6b0c8; }
+body { background: #0b1020; color: #f2f1fa; }
+.sidebar { background: #0e1423; }
+.brand { font-size: 22px; }
+.brand-mark { color: #b69af3; }
+.brand-mark > span { color: #86ddce; }
+.sidebar-section { font-size: 9px; letter-spacing: .16em; }
+.nav-item { font-size: 12px; min-height: 44px; }
+.nav-item.is-active { background: linear-gradient(100deg,#9f79f120,#9f79f108); color: #baa4ff; border-color: #ad85f226; }
+.page-header { padding: 29px 30px; border: 1px solid #b291ef29; border-radius: 21px; background: radial-gradient(at 100% 0%,#256a752b,transparent 65%),linear-gradient(115deg,#272040,#1d1933 70%,#152837); }
+.page-header h1 { font-size: clamp(27px,2.8vw,36px); font-weight: 600; letter-spacing: -.045em; }
+.subtitle { font-size: 13px; color: #c0b9d3; }
+.eyebrow { font-size: 9px; color: #bea7ec; }
+.updated { color: #b5abc9; font-size: 10px; }
+.panel, .metric { background: #131a2c; border-color: var(--line); border-radius: 17px; }
+.metric-label { font-size: 11px; }
+.metric small { font-size: 10px; }
+.metric strong { font-size: 33px; }
+.metric-icon { border-radius: 10px; }
+.button { min-height: 42px; font-size: 12px; border-radius: 11px; }
+.button-primary { background: linear-gradient(115deg,#9669df,#7554bd); border-color: #b394f93d; color: #fff; }
+.button-quiet { background: #192237; color: #ddd9ed; border-color: var(--line); }
+.search { min-height: 46px; border-radius: 11px; background: #0f1728; }
+.search input { font-size: 13px; }
+.filters button { min-height: 40px; font-size: 11px; }
+.section-heading h2 { font-size: 22px; }
+.customer-table th { font-size: 10px; }
+.customer-table td { font-size: 12px; }
+.customer-name strong { font-size: 13px; }
+.customer-name small { font-size: 11px; }
+.badge { font-size: 10px; }
+.business-state { font-size: 10px; }
+.workspace-link { font-size: 12px; }
+.admin-identity strong { font-size: 12px; }
+.admin-identity small { font-size: 10px; }
+.detail-dialog, .confirm-dialog { background: #131a2c; border-color: #b49adc38; border-radius: 21px; }
+.detail-card, .connection-card { border-color: var(--line); border-radius: 14px; }
+.connection-statuses dt { font-size: 10px; }
+.connection-statuses dd { font-size: 12px; }
+.detail-heading p, .detail-card p, .connection-card p { font-size: 12px; line-height: 1.75; }
+.audit-list strong { font-size: 12px; }
+.audit-list small { font-size: 10px; }
+.confirm-dialog > p { font-size: 13px; }
+.confirm-actions .button, .connection-actions .button { min-height: 44px; }
+:focus-visible { outline: 3px solid #86ddce; outline-offset: 4px; }
+@media(max-width:900px) { .page-header { padding: 25px; } }
+@media(max-width:680px) {
+  .main { padding: 20px 16px; }
+  .page-header { padding: 23px 20px; gap: 20px; border-radius: 18px; }
+  .page-header h1 { font-size: 28px; }
+  .subtitle { font-size: 12px; }
+  .header-actions .button { min-height: 42px; font-size: 11px; }
+  .updated { font-size: 9px; }
+  .metric { padding: 17px 14px; min-height: 136px; }
+  .metric-label { font-size: 10px; }
+  .metric small { font-size: 9px; line-height: 1.6; }
+  .metric strong { font-size: 30px; }
+  .section-heading h2 { font-size: 20px; }
+  .section-heading .eyebrow { font-size: 8px; }
+  .filters button { font-size: 9px; min-height: 44px; }
+  .search input { font-size: 16px; }
+  .customer-name small { font-size: 11px; }
+  .customer-table td:nth-child(2)::before, .customer-table td:nth-child(3)::before, .customer-table td:nth-child(4)::before { font-size: 9px; }
+  .manage-button { min-width: 44px; min-height: 44px; }
+  .badge { font-size: 10px; }
+  .dashboard-note { font-size: 10px; }
+  .connection-actions .button { font-size: 12px; }
+  .detail-card p, .connection-card p { font-size: 12px; }
+  .workspace-link { font-size: 11px; }
+}
