@@ -97,7 +97,12 @@ try {
             $preview = new \BesharOs\AiReplyPreview($knowledge, [$generator, 'reply'], new RateLimit(RateLimit::resolveDirectory(),12,900), $rollout);
         } catch (Throwable) { $preview = null; }
     }
-    $http = new AuthHttp($pdo, new RateLimit(RateLimit::resolveDirectory()), $gateway, $ai, $knowledge, $recovery, $preview);
+    $billing = null;
+    $billingConfig = \BesharOs\StripeBilling::config();
+    if (is_array($billingConfig)) {
+        try { $billing = new \BesharOs\StripeBilling($pdo, $billingConfig); } catch (AuthException) { $billing = null; }
+    }
+    $http = new AuthHttp($pdo, new RateLimit(RateLimit::resolveDirectory()), $gateway, $ai, $knowledge, $recovery, $preview, $billing);
     $result = $http->handle($method, $action, $_SESSION, $body, $headers, $remote, $host, session_id());
     if ($result['regenerate']) {
         session_regenerate_id(true);

@@ -36,6 +36,7 @@ require_once __DIR__ . '/KnowledgeCentre.php';
 require_once __DIR__ . '/KnowledgeSource.php';
 require_once __DIR__ . '/AiReplyStore.php';
 require_once __DIR__ . '/AiReplyWorker.php';
+require_once __DIR__ . '/StripeBilling.php';
 require __DIR__ . '/AuthHttp.php';
 
 require_once __DIR__ . '/CredentialSession.php';

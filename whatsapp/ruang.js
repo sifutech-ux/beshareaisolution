@@ -1421,11 +1421,29 @@ function connection(state) {
 }
 
 function billing() {
-  return `<article class="panel">
-    <h1>Bil</h1>
-    <p>Standard: pemasangan RM1,200 dan RM800 sebulan. Ultimate: pemasangan RM1,800 dan RM1,000 sebulan. Fungsi sama sehingga had diluluskan.</p>
-    <p class="muted">Bil kedai ini belum disambung ke pelayan. Tiada invois. Kos mesej Meta dan caj payment gateway tidak termasuk.</p>
-  </article>`;
+  const b = live && live.billing;
+  if (!b || b.available !== true) return `<article class="panel"><p class="eyebrow">Langganan</p><h1>BeShare AI OS</h1><h2>RM199 <small>/ bulan</small></h2><p>Persediaan sekali sahaja RM299. Jumlah pertama RM498.</p><p class="muted">Pembayaran dibuka selepas nombor WhatsApp anda lulus ujian terima mesej dan balasan AI. Kos mesej Meta berasingan.</p><p id="billing-note" role="status">Pembayaran sedang disediakan untuk akaun ini.</p></article>`;
+  const labels = { none: 'Belum melanggan', active: 'Aktif', past_due: 'Bayaran perlu dikemas kini', canceled: 'Dibatalkan', unpaid: 'Belum dibayar', incomplete: 'Menunggu bayaran', incomplete_expired: 'Checkout tamat', paused: 'Dijeda' };
+  const canStart = ['none', 'canceled', 'incomplete_expired'].includes(b.status);
+  return `<article class="panel"><p class="eyebrow">Langganan anda</p><h1>BeShare AI OS</h1>${b.mode === 'test' ? '<p class="kc-notice">Mod ujian — tiada caj sebenar.</p>' : ''}<h2>RM199 <small>/ bulan</small></h2><p>${b.setup_amount ? 'Persediaan sekali RM299 · Jumlah pertama RM498' : 'Yuran persediaan sudah dibayar.'}</p><p><strong>${esc(b.status === 'active' && !b.active ? 'Bayaran sedang disahkan atau tempoh sudah tamat' : labels[b.status] || 'Sedang disahkan')}</strong>${b.cancel_at_period_end ? ' · Pembatalan dijadualkan pada akhir tempoh.' : ''}</p>${b.access_until ? `<p class="muted">Tempoh dibayar sehingga ${esc(new Date(b.access_until * 1000).toLocaleDateString('ms-MY'))}.</p>` : ''}<p class="muted">Kos mesej Meta berasingan. Status dikemas kini selepas pengesahan Stripe.</p>${!b.ready ? '<p class="kc-notice">Selesaikan ujian terima mesej dan balasan AI pada nombor WhatsApp anda sebelum membuat bayaran.</p>' : ''}<div class="kc-actions">${canStart ? `<button class="btn" data-act="bill-checkout" ${!b.ready ? 'disabled' : ''}>${b.mode === 'test' ? 'Buka checkout ujian' : 'Mulakan langganan'}</button>` : ''}${b.has_customer ? '<button class="btn btn--ghost" data-act="bill-portal">Urus langganan & invois</button>' : ''}<button class="btn btn--ghost" data-act="bill-refresh">Muat semula status</button></div><p id="billing-note" role="status"></p></article>`;
+}
+
+async function billingAction(action, button) {
+  const scope = live && live.business && live.business.public_id;
+  if (!scope || button.disabled) return;
+  button.disabled = true;
+  const note = document.getElementById('billing-note');
+  if (note) note.textContent = 'Sebentar, sedang menyemak…';
+  try {
+    const data = action === 'bill-refresh' ? await callApi('bil') : await callApi(action === 'bill-checkout' ? 'bilcheckout' : 'bilportal', { expected_business_public_id: scope });
+    if (!live || live.business.public_id !== scope) return;
+    if (!data.ok) throw new Error(data.error || 'Pembayaran belum dapat dibuka.');
+    if (action === 'bill-refresh') { live.billing = data.billing; route(); return; }
+    const url = new URL(data.url);
+    if (url.protocol !== 'https:' || !['checkout.stripe.com', 'billing.stripe.com'].includes(url.hostname) || url.username || url.password || url.port) throw new Error('Pautan pembayaran tidak sah.');
+    location.assign(url.href);
+  } catch (error) { if (note) note.textContent = error.message || 'Cuba semula sebentar lagi.'; }
+  finally { button.disabled = false; }
 }
 
 function settings(state) {
@@ -1498,6 +1516,7 @@ function onClick(event) {
   const button = event.target.closest("[data-act]");
   if (!button || button.tagName === "SELECT") return;
   const act = button.getAttribute("data-act");
+  if (["bill-checkout", "bill-portal", "bill-refresh"].includes(act)) { billingAction(act, button); return; }
   const value = button.getAttribute("data-value") || "";
   const state = load();
   if (act === "verify" || act === "resend") {

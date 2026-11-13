@@ -1,0 +1,120 @@
+{
+  "status": "sandbox_application_integration_prepared",
+  "verified_on": "2026-11-13",
+  "timezone": "Asia/Kuala_Lumpur",
+  "account_id": "acct_1UA7000wYRAO6pPk",
+  "currency": "myr",
+  "prices": {
+    "copilot_early": {
+      "product": "prod_VcWkXIvgE7drDy",
+      "price": "price_1UbHgx0wYRAO6pPkfAGkFHH7",
+      "unit_amount": 2900,
+      "interval": "month"
+    },
+    "copilot_standard": {
+      "product": "prod_VcWopZlHTkZR07",
+      "price": "price_1UbHkS0wYRAO6pPkHbdCz420",
+      "unit_amount": 4900,
+      "interval": "month"
+    },
+    "os_early": {
+      "product": "prod_VcWmmgQz4XHD3I",
+      "price": "price_1UbHiX0wYRAO6pPkiSHtb0sl",
+      "unit_amount": 19900,
+      "interval": "month"
+    },
+    "os_setup": {
+      "product": "prod_VcWm2k2z4WNq7G",
+      "price": "price_1UbHiy0wYRAO6pPkVk0t3Pc2",
+      "unit_amount": 29900,
+      "interval": null
+    },
+    "os_topup_500": {
+      "product": "prod_VcWnlvfjI1FGhp",
+      "price": "price_1UbHjT0wYRAO6pPkQz9PkIPU",
+      "unit_amount": 4900,
+      "interval": null
+    }
+  },
+  "checkout_fixtures": {
+    "copilot": {
+      "id": "plink_1UbHn30wYRAO6pPkmJHdIsOG",
+      "url": "https://buy.stripe.com/test_3cIaEP9jT7rD5D0gUD8EM00",
+      "trial_days": 7,
+      "payment_method_required": false,
+      "missing_payment_method_end_behavior": "pause",
+      "verified": "synthetic_trial_registration_succeeded"
+    },
+    "os": {
+      "id": "plink_1UbHpE0wYRAO6pPkFxB1vC5y",
+      "url": "https://buy.stripe.com/test_4gMdR167H7rD9Tg9sb8EM01",
+      "initial_total": 49800,
+      "renewal_amount": 19900,
+      "verified": "synthetic_4242_payment_confirmation_succeeded"
+    }
+  },
+  "portal": {
+    "configuration": "bpc_1UbHub0wYRAO6pPkrhJX2XWi",
+    "login_url": "https://billing.stripe.com/p/login/test_3cIaEP9jT7rD5D0gUD8EM00",
+    "cancellation": "period_end",
+    "invoice_history": true,
+    "payment_method_update": true,
+    "plan_switching": false,
+    "quantity_changes": false
+  },
+  "pending": [
+    "Register and configure signed sandbox webhook destinations",
+    "Deploy, migrate and verify authenticated sandbox checkout end to end",
+    "Paid customer cohort limits, trial quotas and monthly usage enforcement",
+    "Real Stripe renewal/failure/cancellation lifecycle tests",
+    "Separate live catalogue, configuration and controlled launch"
+  ],
+  "note": "Sandbox Payment Links are isolated checkout fixtures only. They are not authenticated BeShare checkout entrypoints and must not be linked in the production application. Sandbox price IDs must never be used with live keys. No provider keys or webhook signing secrets are stored in this file.",
+  "backend_credential": {
+    "name": "BeShare Billing - Sandbox Backend",
+    "created": true,
+    "confirmation_required": false,
+    "write": [
+      "Customers",
+      "Checkout Sessions",
+      "Customer Portal"
+    ],
+    "read": [
+      "Charges and Refunds",
+      "Events",
+      "Products",
+      "Invoices",
+      "Prices",
+      "Subscriptions"
+    ],
+    "connect_permissions": "None",
+    "all_other_permissions": "None",
+    "approved_by_owner": true,
+    "server": "srv2061175.hstgr.cloud",
+    "private_config": "/etc/beshare/billing-sandbox.env",
+    "file_mode": "0600",
+    "verified_via_api": true
+  },
+  "api_version": "2026-08-26.dahlia",
+  "backend_probe": {
+    "verified_on": "2026-11-13",
+    "prices_verified": 5,
+    "synthetic_customer_creation": "passed",
+    "copilot_checkout": "passed_7_day_trial_total_0",
+    "os_checkout": "passed_initial_total_49800_myr_minor_units",
+    "customer_portal_creation": "passed",
+    "application_access": false,
+    "production_billing_enabled": false,
+    "server_results": "/etc/beshare/billing-sandbox-probe.json",
+    "scope": "Standalone API smoke test; no application endpoint or webhook deployed"
+  },
+  "application_implementation": {
+    "checkout": "server-authenticated account/business; explicit sandbox allowlist",
+    "webhook": "raw-body HMAC, event deduplication and current Stripe state reconciliation",
+    "os_first_charge_gate": "same connection must have verified token, subscribed webhook and received/successfully sent messages",
+    "setup_fee": "remembered after paid invoice, omitted on resubscription",
+    "tests": "19 Python checks and 26 PHP checks passed locally; PostgreSQL and MySQL CI prepared",
+    "deployed": false,
+    "usage_enforcement": false
+  }
+}
