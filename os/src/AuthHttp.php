@@ -11,7 +11,7 @@ require_once __DIR__ . '/PlatformAccess.php';
 
 final class AuthHttp
 {
-    public function __construct(private PDO $pdo, private RateLimit $rates, private ?WhatsAppGateway $whatsapp = null, private ?AiReplyStore $ai = null, private ?KnowledgeCentre $knowledge = null, private ?PasswordRecovery $recovery = null, private ?AiReplyPreview $preview = null)
+    public function __construct(private PDO $pdo, private RateLimit $rates, private ?WhatsAppGateway $whatsapp = null, private ?AiReplyStore $ai = null, private ?KnowledgeCentre $knowledge = null, private ?PasswordRecovery $recovery = null, private ?AiReplyPreview $preview = null, private ?StripeBilling $billing = null)
     {
     }
 
@@ -50,6 +50,12 @@ final class AuthHttp
             PlatformAccess::assertBusinessAccess($this->pdo, $actor['business_id']);
             return $this->respond($session, false, $this->withInbox($actor));
         }
+        if ($method === 'GET' && $action === 'bil') {
+            $actor = $this->actor($session);
+            PlatformAccess::assertBusinessAccess($this->pdo, $actor['business_id']);
+            if (!$this->billing instanceof StripeBilling) { throw new AuthException('Pembayaran sedang disediakan.', 503); }
+            return $this->respond($session, false, ['ok'=>true,'billing'=>$this->billing->view($actor)]);
+        }
         if ($method !== 'POST') {
             throw new AuthException('Kaedah tidak dibenarkan.', 405);
         }
@@ -83,6 +89,15 @@ final class AuthHttp
         // Platform restrictions are separate from the customer's own business status.
         // Switching to another membership and signing out remain available.
         if ($action !== 'pilih') { PlatformAccess::assertBusinessAccess($this->pdo, $actor['business_id']); }
+        if (in_array($action, ['bilcheckout','bilportal'], true)) {
+            if (!$this->billing instanceof StripeBilling) { throw new AuthException('Pembayaran sedang disediakan.', 503); }
+            $key = 'billing|' . $actor['business_id'] . '|' . $actor['user_id'];
+            if ($this->rates->tooMany($key)) { throw new AuthException('Terlalu banyak percubaan. Cuba lagi sebentar lagi.', 429); }
+            $this->rates->hit($key);
+            $expected = $this->text($body, 'expected_business_public_id');
+            $result = $action === 'bilcheckout' ? $this->billing->checkout($actor,$expected) : $this->billing->portal($actor,$expected);
+            return $this->respond($session, false, $result);
+        }
         if ($action === 'knowtest') {
             if (!$this->preview instanceof AiReplyPreview) { throw new AuthException('Ujian AI belum tersedia sekarang.', 503); }
             return $this->respond($session, false, ['ok'=>true,'preview'=>$this->preview->reply($actor,$body)]);
@@ -308,6 +323,11 @@ final class AuthHttp
         if ($access === 'active' && $context['role'] === 'owner' && $context['user_id'] === $context['owner_user_id']) {
             $payload['knowledge_centre'] = $this->knowledge instanceof KnowledgeCentre
                 ? $this->knowledge->view($context) : ['available' => false, 'can_manage' => false];
+        }
+        $payload['billing'] = ['available'=>false];
+        if ($this->billing instanceof StripeBilling && $context['role'] === 'owner') {
+            try { $payload['billing'] = $this->billing->view($context); }
+            catch (\Throwable) { /* Billing rollout must not block existing workspace access. */ }
         }
         return $payload;
     }

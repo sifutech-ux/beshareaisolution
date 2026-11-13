@@ -1,0 +1,67 @@
+name: Stripe sandbox billing boundaries
+on:
+  pull_request:
+    paths:
+      - 'billing/**'
+      - 'os/src/StripeBilling*'
+      - 'os/src/AuthHttp.php'
+      - 'os/tests/check-stripe-billing.php'
+      - 'os/migrations/0009*'
+      - 'whatsapp/bil/**'
+      - 'penasihat/bil.js'
+      - '.github/workflows/stripe-billing.yml'
+permissions:
+  contents: read
+jobs:
+  isolated-databases:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: beshare_billing_test
+          POSTGRES_USER: billing_qa
+          POSTGRES_PASSWORD: synthetic-billing-ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U billing_qa -d beshare_billing_test"
+          --health-interval=3s --health-timeout=3s --health-retries=20
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: beshare_billing_test
+          MYSQL_ROOT_PASSWORD: synthetic-billing-ci-only
+          MYSQL_ROOT_HOST: '%'
+        ports: ['33306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -psynthetic-billing-ci-only --silent"
+          --health-interval=3s --health-timeout=3s --health-retries=30
+    steps:
+      - name: Fetch exact proposed source
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git init .
+          git remote add origin https://github.com/sifutech-ux/beshareaisolution.git
+          git fetch --depth=1 origin "$SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, pdo_sqlite, curl
+          coverage: none
+          tools: none
+      - run: python3 -m pip install psycopg2-binary
+      - name: SQLite and PostgreSQL lifecycle, retries and concurrent checkout
+        env:
+          BESHARE_BILLING_TEST_POSTGRES: '1'
+        run: python3 -m unittest discover -s billing/copilot -p test_billing.py -v
+      - name: HTTP signature and body limits
+        run: python3 -m unittest discover -s billing/copilot -p test_http_billing.py -v
+      - name: SQLite and MySQL migration and tenant isolation
+        run: |
+          php os/tests/check-stripe-billing.php
+          BESHARE_BILLING_TEST_MYSQL=1 php os/tests/check-stripe-billing.php
+          node --check penasihat/bil.js
+          node --check whatsapp/ruang.js
