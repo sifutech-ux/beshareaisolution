@@ -36,7 +36,8 @@
       if (['none', 'canceled', 'incomplete_expired'].includes(data.status)) button(data.trial_available ? 'Cuba 7 hari' : 'Mulakan langganan', 'checkout')
       if (data.has_customer) button('Urus langganan & invois', 'portal')
       button('Muat semula status', 'refresh')
-      note.textContent = data.cancel_at_period_end ? 'Pembatalan dijadualkan pada akhir tempoh.' : data.access_until ? `Akses sehingga ${new Date(data.access_until * 1000).toLocaleDateString('ms-MY')}.` : 'Status dikemas kini selepas pengesahan Stripe.'
+      const accessNote = data.access_until ? `Akses sehingga ${new Date(data.access_until * 1000).toLocaleDateString('ms-MY')}.` : ''
+      note.textContent = data.cancel_at_period_end ? `Pembatalan dijadualkan. ${accessNote}`.trim() : accessNote || 'Status dikemas kini selepas pengesahan Stripe.'
     } catch (error) {
       if (action === 'refresh') {
         document.getElementById('copilot-billing-summary').textContent = 'Status langganan belum tersedia.'

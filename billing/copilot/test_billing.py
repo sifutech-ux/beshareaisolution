@@ -156,6 +156,28 @@ class BillingTests(unittest.TestCase):
         self.service.webhook(event)
         self.assertFalse(self.service.view('ownerA')['active'])
 
+    def test_timestamp_cancellation_caps_trial_and_expires_without_another_event(self):
+        self.service.checkout('ownerA');event=self.stripe.complete(self.service,trial=True)
+        self.stripe.objects['subscriptions/sub_ownerA']['cancel_at']=NOW+86400
+        self.service.webhook(event)
+        view=self.service.view('ownerA')
+        self.assertTrue(view['cancel_at_period_end'])
+        self.assertTrue(view['active'])
+        self.assertEqual(view['access_until'],NOW+86400)
+        self.service.now=NOW+86400
+        self.assertFalse(self.service.view('ownerA')['active'])
+
+    def test_timestamp_cancellation_caps_paid_access_and_can_be_undone(self):
+        self.service.checkout('ownerA');event=self.stripe.complete(self.service)
+        self.stripe.objects['subscriptions/sub_ownerA']['cancel_at']=NOW+86400
+        self.service.webhook(event)
+        self.assertTrue(self.service.view('ownerA')['cancel_at_period_end'])
+        self.assertEqual(self.service.view('ownerA')['access_until'],NOW+86400)
+        self.stripe.objects['subscriptions/sub_ownerA']['cancel_at']=None
+        event['id']='evt_cancel_undone';self.service.webhook(event)
+        self.assertFalse(self.service.view('ownerA')['cancel_at_period_end'])
+        self.assertEqual(self.service.view('ownerA')['access_until'],NOW+30*86400)
+
     def test_portal_uses_current_owner_only(self):
         self.service.checkout('ownerA');self.service.checkout('ownerB')
         self.service.portal('ownerB')

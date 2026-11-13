@@ -1,8 +1,9 @@
 # Stripe sandbox integration
 
 Application billing is disabled by default. No live payment is enabled.
-The restricted test credential exists only on the approved Hostinger VPS in
-`/etc/beshare/billing-sandbox.env` (root-owned 0600). No credential belongs in Git.
+The approved restricted test credential is stored in `/etc/beshare/billing-sandbox.env`
+on the Hostinger VPS and sibling `private/beshare-billing.json` on shared hosting,
+both 0600 outside the public web root. No credential belongs in Git.
 Catalogue IDs and API smoke-test evidence: `../os/docs/stripe-sandbox-catalogue.json`.
 
 ## Implemented
@@ -53,7 +54,7 @@ release. Keep the additive billing tables and event history for reconciliation.
 ## Verification
 
 Local: 19 Python billing/HTTP tests and 26 PHP billing checks passed.
-GitHub CI: all five suites passed at commit 487b8bf, including 33 Python tests,
+GitHub CI: all five suites passed at commit 38b5a9f, including 33 Python tests,
 26 SQLite PHP checks and 30 MySQL checks (actual migration included). The existing
 account suite passed 41 tests, with 32 PostgreSQL tests skipped locally. Existing
 Copilot audio/intelligence UI checks passed (12 tests). No real card charge.
@@ -66,9 +67,35 @@ The standalone `stripe_sandbox_probe.py` verified all five test prices, syntheti
 customers, both checkout totals and portal creation from the VPS. Those are API
 smoke tests, not proof of the authenticated application flow.
 
+## Deployed sandbox state — 13 November 2026
+
+The account image and shared-hosting code are deployed. Migration 0009 installed
+only `os_billing` and `os_billing_events`. Both Stripe test destinations are active
+and their signing secrets are configured privately. Copilot permits one synthetic
+QA account; the OS business allowlist is empty. Live billing remains disabled.
+
+Both public webhook endpoints reject unsigned requests with 400 and accept a valid
+signed test event for an unknown customer with 200/ignored. Shared-hosting PHP
+verified the RM199 and RM299 test prices directly against Stripe. Its temporary
+probe cron was removed after success.
+
+The actual Copilot account API created a checkout and reused it on a repeated
+request. Stripe Checkout completed a seven-day trial without collecting a payment
+method. Stripe's webhook updated the account to `trialing`, active, with the first
+trial consumed. The authenticated portal opened and displayed the zero-value paid
+trial invoice. Stripe Portal schedules the tested trial cancellation with `cancel_at` while
+`cancel_at_period_end` is false. Reconciliation now reads both, caps the access
+date and restores the paid invoice period if the cancellation is undone.
+This does not yet verify renewal or failed-payment behavior.
+
+Evidence is stored privately on the VPS under
+`/etc/beshare/billing-release-20261113/webhook-and-checkout.json` and on shared
+hosting as `private/billing-sandbox-check-20261113.json`. These summaries contain
+no credentials. The catalogue records endpoint identifiers and non-secret results.
+
 ## Still required before commercial launch
 
-- Register/deploy signed webhook destinations and pass authenticated sandbox E2E.
+- Pass AI OS authenticated sandbox checkout using verified WhatsApp evidence.
 - Enforce the paid cohorts, 12-month early pricing rules, trial usage and paid quotas.
 - Integrate billing entitlements with AI text/voice and OS successfully-sent usage.
 - Implement the OS top-up credit ledger before selling top-ups.

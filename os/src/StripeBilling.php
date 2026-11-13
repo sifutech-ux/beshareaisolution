@@ -202,8 +202,11 @@ final class StripeBilling
                 }
             }
         }
+        // Stripe Portal may schedule cancellation with cancel_at instead of the boolean.
+        $cancelAt=(int)($sub['cancel_at']??0);
+        if($cancelAt>0){$paid=min($paid,$cancelAt);}
         $this->update($id,['subscription'=>$subscription,'status'=>$status,'paid_until'=>$paid,'period_start'=>$start,
-            'setup_paid'=>$setup,'cancel_at_end'=>(int)(($sub['cancel_at_period_end']??false)===true)]);
+            'setup_paid'=>$setup,'cancel_at_end'=>(int)(($sub['cancel_at_period_end']??false)===true || $cancelAt>0)]);
     }
     public function webhook(array $event): array
     {

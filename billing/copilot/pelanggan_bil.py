@@ -281,9 +281,14 @@ class Billing:
                 if matching and period_end > paid_until:
                     paid_until, start = period_end, period_start
         trial_end = int(sub.get('trial_end') or 0)
+        # Portal cancellation can use a timestamp while cancel_at_period_end is false.
+        cancel_at = int(sub.get('cancel_at') or 0)
+        if cancel_at > 0:
+            paid_until = min(paid_until, cancel_at)
+            trial_end = min(trial_end, cancel_at)
         self.update(owner, subscription=subscription,status=status,paid_until=paid_until,
             period_start=start,trial_end=trial_end,trial_used=int(bool(row['trial_used'] or trial_end)),
-            cancel_at_end=int(sub.get('cancel_at_period_end') is True))
+            cancel_at_end=int(sub.get('cancel_at_period_end') is True or cancel_at > 0))
 
     def webhook(self, event):
         if event.get('type') not in EVENTS:
