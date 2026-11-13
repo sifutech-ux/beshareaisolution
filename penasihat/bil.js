@@ -8,7 +8,7 @@
   const labels = { none: 'Belum melanggan', trialing: 'Percubaan aktif', active: 'Aktif', paused: 'Percubaan tamat — tambah kaedah bayaran', past_due: 'Bayaran perlu dikemas kini', canceled: 'Dibatalkan', unpaid: 'Belum dibayar', incomplete: 'Menunggu bayaran', incomplete_expired: 'Checkout tamat' }
   const button = (label, action) => {
     const b = document.createElement('button')
-    b.type = 'button'; b.className = 'butang butang-senyap'; b.dataset.bill = action; b.textContent = label
+    b.type = 'button'; b.className = 'butang ' + (action === 'checkout' ? 'butang-utama' : 'butang-senyap'); b.dataset.bill = action; b.textContent = label
     actions.appendChild(b)
   }
   async function request(action) {
@@ -37,7 +37,14 @@
       if (data.has_customer) button('Urus langganan & invois', 'portal')
       button('Muat semula status', 'refresh')
       note.textContent = data.cancel_at_period_end ? 'Pembatalan dijadualkan pada akhir tempoh.' : data.access_until ? `Akses sehingga ${new Date(data.access_until * 1000).toLocaleDateString('ms-MY')}.` : 'Status dikemas kini selepas pengesahan Stripe.'
-    } catch (error) { note.textContent = error.message || 'Cuba semula sebentar lagi.' }
+    } catch (error) {
+      if (action === 'refresh') {
+        document.getElementById('copilot-billing-summary').textContent = 'Status langganan belum tersedia.'
+        document.getElementById('copilot-billing-mode').textContent = ''
+        actions.replaceChildren(); button('Semak langganan', 'refresh')
+      }
+      note.textContent = error.message || 'Cuba semula sebentar lagi.'
+    }
     finally { busy = false; actions.querySelectorAll('button').forEach(b => { b.disabled = false }) }
   }
   card.addEventListener('click', event => {
@@ -45,5 +52,9 @@
     if (['refresh', 'checkout', 'portal'].includes(action)) request(action)
   })
   window.addEventListener('hashchange', () => { if (location.hash === '#profil') request('refresh') })
+  // Existing navigation uses history.replaceState, which emits no hashchange.
+  document.addEventListener('click', event => {
+    if (event.target.closest('[data-pergi="profil"]')) request('refresh')
+  })
   if (location.hash === '#profil') request('refresh')
 })()

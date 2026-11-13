@@ -52,7 +52,9 @@ release. Keep the additive billing tables and event history for reconciliation.
 
 ## Verification
 
-Local: 19 Python billing/HTTP tests and 26 PHP billing checks passed. The existing
+Local: 19 Python billing/HTTP tests and 26 PHP billing checks passed.
+GitHub CI: all five suites passed at commit 487b8bf, including 33 Python tests,
+26 SQLite PHP checks and 30 MySQL checks (actual migration included). The existing
 account suite passed 41 tests, with 32 PostgreSQL tests skipped locally. Existing
 Copilot audio/intelligence UI checks passed (12 tests). No real card charge.
 

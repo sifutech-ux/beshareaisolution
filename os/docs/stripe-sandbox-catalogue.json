@@ -113,8 +113,9 @@
     "webhook": "raw-body HMAC, event deduplication and current Stripe state reconciliation",
     "os_first_charge_gate": "same connection must have verified token, subscribed webhook and received/successfully sent messages",
     "setup_fee": "remembered after paid invoice, omitted on resubscription",
-    "tests": "19 Python checks and 26 PHP checks passed locally; PostgreSQL and MySQL CI prepared",
+    "tests": "All five GitHub suites passed at 487b8bf: 33 Python billing/HTTP tests, 26 SQLite and 30 MySQL billing checks, including concurrency and exact migration",
     "deployed": false,
-    "usage_enforcement": false
+    "usage_enforcement": false,
+    "account_image": "copilot-account:billing-487b8bf built on VPS; not activated"
   }
 }
