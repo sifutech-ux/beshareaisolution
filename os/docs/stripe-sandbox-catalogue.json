@@ -1,5 +1,5 @@
 {
-  "status": "sandbox_application_integration_prepared",
+  "status": "sandbox_webhooks_connected_copilot_trial_verified",
   "verified_on": "2026-11-13",
   "timezone": "Asia/Kuala_Lumpur",
   "account_id": "acct_1UA7000wYRAO6pPk",
@@ -63,10 +63,9 @@
     "quantity_changes": false
   },
   "pending": [
-    "Register and configure signed sandbox webhook destinations",
-    "Deploy, migrate and verify authenticated sandbox checkout end to end",
+    "AI OS authenticated checkout with verified WhatsApp send/receive evidence",
     "Paid customer cohort limits, trial quotas and monthly usage enforcement",
-    "Real Stripe renewal/failure/cancellation lifecycle tests",
+    "Real Stripe renewal and payment-failure lifecycle tests",
     "Separate live catalogue, configuration and controlled launch"
   ],
   "note": "Sandbox Payment Links are isolated checkout fixtures only. They are not authenticated BeShare checkout entrypoints and must not be linked in the production application. Sandbox price IDs must never be used with live keys. No provider keys or webhook signing secrets are stored in this file.",
@@ -93,7 +92,8 @@
     "server": "srv2061175.hstgr.cloud",
     "private_config": "/etc/beshare/billing-sandbox.env",
     "file_mode": "0600",
-    "verified_via_api": true
+    "verified_via_api": true,
+    "shared_hosting_private_config": "/home/u879723783/domains/beshareaisolution.com/private/beshare-billing.json"
   },
   "api_version": "2026-08-26.dahlia",
   "backend_probe": {
@@ -106,16 +106,54 @@
     "application_access": false,
     "production_billing_enabled": false,
     "server_results": "/etc/beshare/billing-sandbox-probe.json",
-    "scope": "Standalone API smoke test; no application endpoint or webhook deployed"
+    "scope": "Historical standalone API smoke test, performed before application deployment; see application_verification for current results."
   },
   "application_implementation": {
     "checkout": "server-authenticated account/business; explicit sandbox allowlist",
     "webhook": "raw-body HMAC, event deduplication and current Stripe state reconciliation",
     "os_first_charge_gate": "same connection must have verified token, subscribed webhook and received/successfully sent messages",
     "setup_fee": "remembered after paid invoice, omitted on resubscription",
-    "tests": "All five GitHub suites passed at 487b8bf: 33 Python billing/HTTP tests, 26 SQLite and 30 MySQL billing checks, including concurrency and exact migration",
-    "deployed": false,
+    "tests": "All five GitHub suites passed at 38b5a9f: 33 Python billing/HTTP tests, 26 SQLite and 30 MySQL billing checks, including concurrency and exact migration",
+    "deployed": true,
     "usage_enforcement": false,
-    "account_image": "copilot-account:billing-487b8bf built on VPS; not activated"
+    "account_image": "copilot-account:billing-487b8bf; healthy; sandbox enabled for one synthetic QA account"
+  },
+  "webhooks": {
+    "copilot": {
+      "id": "we_1UbJQW0wYRAO6pPklZ2Qpao8",
+      "endpoint": "https://akaun.beshareaisolution.com/api/akaun/bil/webhook"
+    },
+    "os": {
+      "id": "we_1UbJVN0wYRAO6pPkmtb19kLx",
+      "endpoint": "https://beshareaisolution.com/whatsapp/bil/webhook.php"
+    },
+    "mode": "test",
+    "payload": "snapshot",
+    "event_count": 10,
+    "signing_secrets": "stored privately, never in Git"
+  },
+  "application_verification": {
+    "verified_on": "2026-11-13",
+    "live_billing_enabled": false,
+    "copilot_qa_allowlist_count": 1,
+    "os_business_allowlist_count": 0,
+    "both_unsigned_webhooks_http": 400,
+    "both_valid_signed_unknown_customer_webhooks_http": 200,
+    "unknown_customer_ignored": true,
+    "os_shared_hosting_price_checks": {
+      "monthly_amount": 19900,
+      "setup_amount": 29900,
+      "currency": "myr",
+      "passed": true
+    },
+    "private_config_permissions": "0600",
+    "copilot_authenticated_checkout": "passed; repeat checkout returned the same session",
+    "copilot_actual_stripe_checkout": "completed seven-day trial without a payment method",
+    "copilot_webhook_reconciliation": "trialing, active, trial_used after actual Stripe delivery",
+    "copilot_authenticated_portal": "created and opened; zero-value paid trial invoice visible",
+    "os_authenticated_checkout": "pending; readiness gate remains enforced",
+    "temporary_shared_hosting_cron": "removed after successful probe",
+    "cancellation_fix": "Handle cancel_at timestamps as well as cancel_at_period_end; cap access and support undo. Regressions pass locally.",
+    "actual_stripe_delivery": "Created/completed/updated test events report zero pending webhook deliveries; AI OS destination showed four delivered, zero failed."
   }
 }
