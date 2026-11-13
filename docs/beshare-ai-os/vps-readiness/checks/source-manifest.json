@@ -1,0 +1,33 @@
+{
+  "purpose": "Source reconciliation only; not a built/deployed release or review approval",
+  "main": "69e4d3fb7693db6d199dce7005eed73d65f60069",
+  "security_p0": "c955270cf393c435bc51356ce9f261eda4ceb2fb",
+  "security_tree": "2935151e2b165f493f27f282bbabfa11c9d4a3d6",
+  "readiness_before": "9cafde2cdc1737b2ea9a68e574c37b101861df4f",
+  "files": {
+    "os/bin/check-lifecycle.php": "b9db39f59ade62660799f2e8b44cdbea2708f9a9cf964f1babb4cc68ca2d744d",
+    "os/bin/check-meta.php": "e7b057e355ae01d47b52af0114956a2796fbfc01647d4cac0f78e1f4d856387f",
+    "os/bin/check-worker.php": "7fda137e292b1c950b65a203d4aaaf330704ed15fb6adf4935c9183911d4a381",
+    "os/migrations/0001_foundation.down.sql": "dbdc41220d66921fc52a219b626354068f903fe311af2662b752ec0501269389",
+    "os/migrations/0001_foundation.up.sql": "506862ea92234627c2fbe8bed636689b61063dbadb1b4155e15c63c804894b2c",
+    "os/migrations/0002_coexistence_sync.up.sql": "a6804229f6edf9f515fe0b29b16d6e378f1df84e3753b30809672513782aaa64",
+    "os/migrations/0003_coexistence_worker.up.sql": "2881083056c097537a133da0c78ea7b10f249c0241d309abc359e6b18d4312c0",
+    "os/src/CoexistenceWorker.php": "0d64fc4acfcf692bcfc4b4da26730140d56af3852db3bdbe8958e9fcdac0cd4a",
+    "os/src/Db.php": "92bbee126edbe65d72956440c8c29654c46016d4d1cf96fc8832267474ec4f50",
+    "os/src/LegacyDesk.php": "26906520583e986d37229e4994009db5c7dc78b0098ce3805537a5f6a337821c",
+    "os/src/LifecycleBridge.php": "30d69bbb8884727b79eede5c79bc26b8233c023a8e8b6bfff3ce7a21bf8c9b6b",
+    "os/src/PhoneOverride.php": "7b3e4081566bd07284ee3df21c6ffdbed4ede03389f55fea85306c546e5ea0d3",
+    "os/src/PrivateConfig.php": "6800bc3e3053af5c1ec7151bf2068966af8eb154a7a0970c391bcd093f28a31c",
+    "os/src/WhatsAppWebhook.php": "4fddddb4d9952110c34c764060dc9488d26066a0927d727338b726d770484514",
+    "os/tests/SECURITY-P0-20261023.md": "2cd7e48ae6710d12e2d4b525481bc7ebee9c9f4f25b9985e8b41d881123bda85",
+    "os/tests/p0-fixture.php": "b06d9d418ebe1f54b50f99aaab4e0709cd817c8b96da7bf149d7e0a8d07ac78f",
+    "os/tests/run-security-p0.py": "40a56eda493a6de0678b81dac81b18ced30bf16dcd802f7b11f421c104f92185",
+    "webhook/index.php": "2a938116cbe79b52b8a8752e87d8ec23c0409d7981f92f23efca869d591bb4d1",
+    "whatsapp/meja/guard.php": "62ae224bbd78960062ff3e4cf2cd4941a155853c88d009d2bb1629994abd67b1",
+    "whatsapp/meja/index.php": "251963ff508eb373515683140496b4b3efff52528f7f8c8ed27711b2a834ddf2",
+    "whatsapp/meja/lib.php": "abc3502c35731e19f8852eb8468257e52205d74a243755ba58ddccc8db5bae71",
+    "whatsapp/meja/perbualan/index.php": "733787e048d7749ae7d39c59ff26a45c1e913f10c465a07f7ed94df034b40fbe",
+    "whatsapp/meja/pesanan/index.php": "c9e50bdf5a960a0ad7c59f32468dfefa800275f892512870e4b92c52d0731b2b",
+    "whatsapp/sambungan/webhook.php": "a097e638e041da4ba5289d1a34a0af455c45f27bc362d3a1e9b6e2b60911b2ad"
+  }
+}

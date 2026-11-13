@@ -1,0 +1,52 @@
+{
+  "network": "none",
+  "ports": {},
+  "mounts": [
+    {
+      "Type": "volume",
+      "Name": "beshare-mysql84-20261023-p0-socket",
+      "Source": "/var/lib/docker/volumes/beshare-mysql84-20261023-p0-socket/_data",
+      "Destination": "/sockets/p0",
+      "Driver": "local",
+      "Mode": "z",
+      "RW": true,
+      "Propagation": ""
+    },
+    {
+      "Type": "volume",
+      "Name": "beshare-mysql84-20261023-source-socket",
+      "Source": "/var/lib/docker/volumes/beshare-mysql84-20261023-source-socket/_data",
+      "Destination": "/sockets/source",
+      "Driver": "local",
+      "Mode": "z",
+      "RW": true,
+      "Propagation": ""
+    },
+    {
+      "Type": "volume",
+      "Name": "beshare-mysql84-20261023-restore-socket",
+      "Source": "/var/lib/docker/volumes/beshare-mysql84-20261023-restore-socket/_data",
+      "Destination": "/sockets/restore",
+      "Driver": "local",
+      "Mode": "z",
+      "RW": true,
+      "Propagation": ""
+    },
+    {
+      "Type": "volume",
+      "Name": "beshare-mysql84-20261023-partial-socket",
+      "Source": "/var/lib/docker/volumes/beshare-mysql84-20261023-partial-socket/_data",
+      "Destination": "/sockets/partial",
+      "Driver": "local",
+      "Mode": "z",
+      "RW": true,
+      "Propagation": ""
+    }
+  ],
+  "restart": {
+    "Name": "no",
+    "MaximumRetryCount": 0
+  },
+  "memory": 805306368,
+  "cpus": 1000000000
+}

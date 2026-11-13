@@ -1,0 +1,81 @@
+{
+  "containers": [
+    {
+      "name": "beshare-mysql84-20261023-r2-app",
+      "running": false,
+      "status": "exited",
+      "oom_killed": false,
+      "volumes_retained": [
+        "beshare-mysql84-20261023-r2-p0-socket",
+        "beshare-mysql84-20261023-r2-source-socket",
+        "beshare-mysql84-20261023-r2-restore-socket",
+        "beshare-mysql84-20261023-r2-partial-socket"
+      ]
+    },
+    {
+      "name": "beshare-mysql84-20261023-r2-p0",
+      "running": false,
+      "status": "exited",
+      "oom_killed": false,
+      "volumes_retained": [
+        "beshare-mysql84-20261023-r2-p0-data",
+        "beshare-mysql84-20261023-r2-p0-socket"
+      ]
+    },
+    {
+      "name": "beshare-mysql84-20261023-r2-partial",
+      "running": false,
+      "status": "exited",
+      "oom_killed": false,
+      "volumes_retained": [
+        "beshare-mysql84-20261023-r2-partial-data",
+        "beshare-mysql84-20261023-r2-partial-socket"
+      ]
+    },
+    {
+      "name": "beshare-mysql84-20261023-r2-restore",
+      "running": false,
+      "status": "exited",
+      "oom_killed": false,
+      "volumes_retained": [
+        "beshare-mysql84-20261023-r2-restore-data",
+        "beshare-mysql84-20261023-r2-restore-socket"
+      ]
+    },
+    {
+      "name": "beshare-mysql84-20261023-r2-source",
+      "running": false,
+      "status": "exited",
+      "oom_killed": false,
+      "volumes_retained": [
+        "beshare-mysql84-20261023-r2-source-data",
+        "beshare-mysql84-20261023-r2-source-socket"
+      ]
+    },
+    {
+      "name": "beshare-mysql84-20261023-r2-recovery-app",
+      "running": false,
+      "status": "exited",
+      "oom_killed": false,
+      "volumes_retained": [
+        "beshare-mysql84-20261023-r2-recovery-socket"
+      ]
+    },
+    {
+      "name": "beshare-mysql84-20261023-r2-recovery",
+      "running": false,
+      "status": "exited",
+      "oom_killed": false,
+      "volumes_retained": [
+        "beshare-mysql84-20261023-r2-recovery-socket",
+        "beshare-mysql84-20261023-r2-recovery-data"
+      ]
+    }
+  ],
+  "all_stopped": true,
+  "deletions": false,
+  "other_projects_touched": false,
+  "colima_profile": "beshare-rehearsal",
+  "vm_stopped": true,
+  "all_local_running_containers_after_stop": []
+}

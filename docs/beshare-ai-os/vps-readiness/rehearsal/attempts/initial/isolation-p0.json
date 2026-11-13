@@ -1,0 +1,32 @@
+{
+  "network": "none",
+  "ports": {},
+  "mounts": [
+    {
+      "Type": "volume",
+      "Name": "beshare-mysql84-20261023-p0-data",
+      "Source": "/var/lib/docker/volumes/beshare-mysql84-20261023-p0-data/_data",
+      "Destination": "/var/lib/mysql",
+      "Driver": "local",
+      "Mode": "z",
+      "RW": true,
+      "Propagation": ""
+    },
+    {
+      "Type": "volume",
+      "Name": "beshare-mysql84-20261023-p0-socket",
+      "Source": "/var/lib/docker/volumes/beshare-mysql84-20261023-p0-socket/_data",
+      "Destination": "/var/run/mysqld",
+      "Driver": "local",
+      "Mode": "z",
+      "RW": true,
+      "Propagation": ""
+    }
+  ],
+  "restart": {
+    "Name": "no",
+    "MaximumRetryCount": 0
+  },
+  "memory": 805306368,
+  "cpus": 1000000000
+}

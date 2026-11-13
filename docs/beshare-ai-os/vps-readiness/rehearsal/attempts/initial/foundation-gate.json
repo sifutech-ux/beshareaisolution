@@ -1,0 +1,7 @@
+{
+  "exit": 4,
+  "stdout": "",
+  "stderr": "backup_server_unbound\n",
+  "empty_dump_sha256": "dc5bbaefd876889ae7bfcc861f1f511180a660d2951f62cd5124e540fcfb960c",
+  "server_version": "8.4.13"
+}

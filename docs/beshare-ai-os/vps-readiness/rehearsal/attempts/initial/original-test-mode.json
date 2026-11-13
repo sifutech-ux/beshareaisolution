@@ -1,0 +1,4 @@
+{
+  "exit": 1,
+  "stderr": "ERROR 1231 (42000) at line 1: Variable 'sql_mode' can't be set to the value of 'NO_AUTO_CREATE_USER'\n"
+}

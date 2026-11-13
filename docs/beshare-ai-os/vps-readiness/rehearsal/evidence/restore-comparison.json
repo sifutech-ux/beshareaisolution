@@ -1,0 +1,5 @@
+{
+  "raw_equal": false,
+  "canonical_equal": true,
+  "normalization": "SHOW CREATE TABLE adds redundant CHARACTER SET utf8mb4 after mysqldump restore; remove only that exact token on both sides. All row hashes, table counts, other DDL including AUTO_INCREMENT and triggers must match."
+}
