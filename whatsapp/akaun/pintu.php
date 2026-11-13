@@ -89,7 +89,15 @@ try {
         && \BesharOs\CredentialSession::installed($pdo)) {
         $recovery = new \BesharOs\PasswordRecovery($pdo, $seal, new RateLimit(RateLimit::resolveDirectory()));
     }
-    $http = new AuthHttp($pdo, new RateLimit(RateLimit::resolveDirectory()), $gateway, $ai, $knowledge, $recovery);
+    $preview = null;
+    if ($knowledge instanceof KnowledgeCentre && is_array($private) && \BesharOs\AiReplyPolicy::serverReady($private)) {
+        try {
+            $generator = new \BesharOs\GeminiTransport($private['gemini_api_key'], $private['gemini_model']);
+            $rollout = array_intersect_key($private, array_flip(['ai_customer_rollout','owner_ai_business_id']));
+            $preview = new \BesharOs\AiReplyPreview($knowledge, [$generator, 'reply'], new RateLimit(RateLimit::resolveDirectory(),12,900), $rollout);
+        } catch (Throwable) { $preview = null; }
+    }
+    $http = new AuthHttp($pdo, new RateLimit(RateLimit::resolveDirectory()), $gateway, $ai, $knowledge, $recovery, $preview);
     $result = $http->handle($method, $action, $_SESSION, $body, $headers, $remote, $host, session_id());
     if ($result['regenerate']) {
         session_regenerate_id(true);

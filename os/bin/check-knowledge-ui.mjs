@@ -126,12 +126,13 @@ async function fixture(initial = sessionSeed()) {
       const action = new URL(url, location.origin).searchParams.get('tindakan');
       const body = init.body ? JSON.parse(init.body) : null;
       requests.push({ action, body });
-      if (['knowsave', 'knowpublish', 'knowimport'].includes(action)) {
+      if (['knowsave', 'knowpublish', 'knowimport', 'knowtest'].includes(action)) {
         assert.equal(typeof body.expected_business_public_id, 'string', 'knowledge action carries the captured business');
         if (body.expected_business_public_id !== server.business.public_id) return response({ ok: false, error: 'Perniagaan sesi telah berubah.' });
       }
       if (deferred.has(action)) return deferred.get(action)(body);
       if (action === 'sesi' || action === 'peti') return response(server);
+      if (action === 'knowtest') return response({ok:true,csrf:'synthetic-csrf',preview:{revision:body.expected_published_revision,sent:false,handoff:false,reply:'Balasan simulasi <script>test</script>',attachment:false}});
       if (action === 'knowimport') return response({
         ok: true, csrf: 'synthetic-csrf',
         source: { url: body.url, title: 'Tajuk sumber yang dibaca', text: 'Teks import untuk disemak pemilik.' }
@@ -417,5 +418,28 @@ full.input('source', 'enabled', false, 'b'.repeat(32));
 await full.submit('knowledge-draft');
 await full.click('kc-review');
 check('disabling an unneeded source frees publication space while preserving its draft', full.editor().review && full.editor().document.sources[0].text.length === 8000);
+
+const preview = await fixture();
+check('preview explains active publication and no WhatsApp sends',preview.html().includes('Uji balasan AI') && preview.html().includes('Tiada mesej dihantar ke WhatsApp'));
+await preview.submit('knowledge-preview',{preview_message:'Bisnes apa ni ya?'});
+const previewCall=preview.requests.find(r=>r.action==='knowtest');
+check('preview binds tenant and publication without sending draft facts',previewCall.body.expected_business_public_id==='synthetic-business' && previewCall.body.expected_published_revision===3 && !('document' in previewCall.body));
+check('model response is escaped in preview',preview.html().includes('&lt;script&gt;test&lt;/script&gt;')&&!preview.html().includes('simulasi <script>'));
+await preview.submit('knowledge-preview',{preview_message:'Yang untuk WhatsApp tu?'});
+check('follow-up carries only preview context',preview.requests.filter(r=>r.action==='knowtest')[1].body.history.length===2);
+check('preview does not publish or activate anything',!preview.requests.some(r=>['knowpublish','knowsave','aiconfig'].includes(r.action)));
+check('preview conversation is never persisted to browser storage',![...preview.storage.values()].some(v=>v.includes('Bisnes apa ni')));
+await preview.click('kc-preview-clear');check('new test clears context',preview.editor().preview.messages.length===0);
+const releasePreview=preview.defer('knowtest');
+const pendingPreview=preview.submit('knowledge-preview',{preview_message:'Pending private preview'});
+await new Promise(resolve=>setImmediate(resolve));
+await preview.submit('knowledge-preview',{preview_message:'Duplicate'});
+check('busy preview cannot double submit',preview.requests.filter(r=>r.action==='knowtest').length===3);
+await preview.refresh(sessionSeed('another-business'));
+await releasePreview({ok:true,preview:{revision:3,sent:false,handoff:false,reply:'STALE_PRIVATE_PREVIEW'}});await pendingPreview;
+check('tenant switch discards in-flight preview',!preview.html().includes('STALE_PRIVATE_PREVIEW')&&preview.editor().preview.messages.length===0);
+const revised=await fixture();await revised.submit('knowledge-preview',{preview_message:'Old publication test'});
+const newerPreview=sessionSeed();newerPreview.knowledge_centre.published_revision=4;newerPreview.knowledge_centre.revision=4;await revised.refresh(newerPreview);
+check('publication change clears earlier preview context',revised.editor().preview.revision===4&&revised.editor().preview.messages.length===0);
 
 console.log(`PASS — knowledge-centre UI: ${checks} focused checks; synthetic APIs only.`);

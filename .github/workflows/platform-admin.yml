@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - 'os/src/Platform*.php'
+      - 'os/src/AiReplyPreview.php'
+      - 'os/src/KnowledgeCentre.php'
+      - 'os/tests/check-ai-preview.php'
       - 'os/src/*Recovery*.php'
       - 'os/src/CredentialSession.php'
       - 'os/src/RecoveryMail.php'
@@ -83,3 +86,5 @@ jobs:
         run: php os/tests/check-password-recovery.php
       - name: Recovery links and forms in real workspace script
         run: node os/tests/check-password-recovery-ui.mjs
+      - name: Owner-only AI preview, active knowledge and no dispatch side effects
+        run: php os/tests/check-ai-preview.php

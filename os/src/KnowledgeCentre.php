@@ -152,6 +152,17 @@ final class KnowledgeCentre
         return $document;
     }
 
+    /** Read the same verified publication used by the worker, never an unpublished draft. */
+    public function previewContext(array $actor): array
+    {
+        $actor = $this->owner($actor);
+        PlatformAccess::assertBusinessAccess($this->pdo, (int)$actor['business_id']);
+        $document = $this->runtime((int)$actor['business_id']);
+        if ($document === []) { throw new AuthException('Terbitkan pengetahuan perniagaan sebelum menguji balasan.', 409); }
+        return ['document'=>$document,'knowledge'=>$this->compile($document),
+            'revision'=>$document['_published_revision'],'hash'=>$document['_compiled_hash']];
+    }
+
     /** Called under the settings lock, so the legacy controls cannot overwrite a publication. */
     public function assertLegacyKnowledge(int $businessId, string $knowledge): void
     {
