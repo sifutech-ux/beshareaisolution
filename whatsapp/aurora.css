@@ -587,3 +587,12 @@ html[data-theme="cerah"] .os-tone-amber { color: #89611c; }
   html { scroll-behavior: auto; }
   .os-app *, .os-app *::before, .os-app *::after, .os-landing *, .os-landing *::before, .os-landing *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Owner-only conversation preview */
+.os-app .kc-preview-chat { display:grid; gap:12px; max-height:480px; overflow:auto; padding:12px 0; }
+.os-app .kc-preview-message { max-width:88%; padding:14px 18px; border:1px solid var(--os-line,rgba(255,255,255,.12)); border-radius:18px; background:rgba(148,123,218,.09); overflow-wrap:anywhere; }
+.os-app .kc-preview-message--user { justify-self:end; background:rgba(148,123,218,.17); }
+.os-app .kc-preview-message--notice { max-width:100%; background:rgba(232,186,100,.08); }
+.os-app .kc-preview-message small { color:var(--os-muted,#b5bad2); font-size:.75rem; }
+.os-app .kc-preview-message p { white-space:pre-wrap; margin:.5rem 0 0; line-height:1.65; }
+@media(max-width:600px) { .os-app .kc-preview-message { max-width:96%; padding:12px; } }

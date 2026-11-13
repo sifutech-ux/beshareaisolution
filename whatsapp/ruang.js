@@ -837,7 +837,7 @@ function knowledgeCentre(state) {
       <p class="muted">Sediakan fakta, gambar dan maklumat bayaran untuk membantu AI menjawab pelanggan. Simpan draf, semak kandungannya, kemudian terbitkan apabila semuanya betul.</p>
       <div class="kc-status-row"><span class="kc-status" id="kc-save-state">${editor.dirty ? "Perubahan belum disimpan" : editor.revision ? `Draf disimpan · Versi ${editor.revision}` : "Draf baharu"}</span><span class="muted">${editor.publishedRevision ? `Versi aktif ${esc(editor.publishedRevision)}${editor.publishedAt ? " · " + esc(editor.publishedAt) : ""}` : "Belum diterbitkan"}</span></div>
     </header>
-    <nav class="kc-nav" aria-label="Bahagian pusat pengetahuan">${[["kc-facts", "01", "Fakta & pautan"], ["kc-assets", "02", "Gambar produk"], ["kc-payment", "03", "Bayaran"], ["kc-test", "04", "Kawalan AI"]].map(([id, number, label]) => `<button type="button" data-act="kc-jump" data-value="${id}"><span>${number}</span>${label}</button>`).join("")}</nav>
+    <nav class="kc-nav" aria-label="Bahagian pusat pengetahuan">${[["kc-facts", "01", "Fakta & pautan"], ["kc-assets", "02", "Gambar produk"], ["kc-payment", "03", "Bayaran"], ["kc-test", "04", "Kawalan AI"], ["kc-preview", "05", "Uji balasan"]].map(([id, number, label]) => `<button type="button" data-act="kc-jump" data-value="${id}"><span>${number}</span>${label}</button>`).join("")}</nav>
     <p id="kc-feedback" class="kc-notice ${!editor.busy && editor.noticeKind === "error" ? "kc-notice--error" : ""}" role="${editor.noticeKind === "error" ? "alert" : "status"}" ${note ? "" : "hidden"}>${esc(note)}</p>
     ${editor.conflict ? '<div class="kc-notice kc-notice--error" role="alert"><p>Draf pelayan telah berubah dalam sesi lain. Perubahan anda masih berada dalam borang ini. Salin perubahan yang diperlukan sebelum memuat semula draf.</p><button class="btn btn--ghost" type="button" data-act="kc-reload">Buang perubahan & muat semula draf</button></div>' : ""}
     <form id="knowledge-draft" autocomplete="off">
@@ -873,7 +873,58 @@ function knowledgeCentre(state) {
     </form>
     ${editor.review && !editor.dirty ? knowledgeReview(editor, state) : ""}
     ${aiSettings(state, true)}
+    ${knowledgePreviewView(editor)}
   </article>`;
+}
+
+function knowledgePreviewState(editor) {
+  if (!editor.preview || editor.preview.revision !== editor.publishedRevision) {
+    editor.preview = { revision: editor.publishedRevision, messages: [], input: '', busy: false, error: '' };
+  }
+  return editor.preview;
+}
+
+function knowledgePreviewView(editor) {
+  const preview = knowledgePreviewState(editor);
+  return `<section class="kc-section" id="kc-preview"><div class="kc-section-heading"><h2><span class="kc-number">05</span> Uji balasan AI</h2><button class="btn btn--ghost" type="button" data-act="kc-preview-clear">Ujian baharu</button></div>
+    <p class="muted">Cuba berbual sebagai pelanggan menggunakan pengetahuan aktif versi ${esc(preview.revision)}. Tiada mesej dihantar ke WhatsApp. Sejarah ujian hanya kekal dalam halaman ini.</p>
+    ${editor.dirty ? '<p class="kc-notice">Terbitkan perubahan fakta untuk menggunakannya dalam ujian.</p>' : ''}
+    <div class="kc-preview-chat" role="log" aria-label="Perbualan ujian AI" aria-live="polite">${preview.messages.map(item => `<article class="kc-preview-message kc-preview-message--${item.role}"><small>${item.role === 'user' ? 'Anda sebagai pelanggan' : item.role === 'assistant' ? 'Balasan AI · simulasi' : 'Status ujian'}</small><p>${esc(item.text)}</p>${item.attachment ? '<small>Balasan ini turut memilih gambar yang diluluskan.</small>' : ''}</article>`).join('') || '<p class="muted">Contoh: “Bisnes apa ni ya?” Kemudian sambung dengan soalan pelanggan yang biasa anda terima.</p>'}</div>
+    ${preview.busy ? '<p role="status">AI sedang menyediakan balasan…</p>' : ''}
+    ${preview.error ? `<p class="error" role="alert">${esc(preview.error)}</p>` : ''}
+    <form id="knowledge-preview"><label class="field">Mesej pelanggan untuk ujian<textarea name="preview_message" rows="2" maxlength="2000" required placeholder="Taip soalan pelanggan…" ${preview.busy ? 'disabled' : ''}>${esc(preview.input)}</textarea></label><button class="btn" type="submit" ${preview.busy || !preview.revision ? 'disabled' : ''}>${preview.busy ? 'Menjana balasan…' : 'Uji balasan'}</button></form>
+    ${!preview.revision ? '<p class="muted">Terbitkan pengetahuan dahulu untuk memulakan ujian.</p>' : ''}
+  </section>`;
+}
+
+async function testKnowledgeReply(data) {
+  const editor = knowledgeEditorFor(load());
+  if (!editor) return;
+  const preview = knowledgePreviewState(editor);
+  if (preview.busy || !preview.revision) return;
+  const message = String(data.get('preview_message') || '').trim();
+  if (!message || new TextEncoder().encode(message).length > 2000) { preview.error = 'Gunakan mesej ringkas, maksimum 2,000 bait.'; route(); return; }
+  const history = preview.messages.filter(item => ['user', 'assistant'].includes(item.role)).slice(-6).map(({role, text}) => {
+    let bounded = text;
+    while (new TextEncoder().encode(bounded).length > 1900) bounded = Array.from(bounded).slice(0, -1).join('');
+    return { role, text: bounded };
+  });
+  preview.busy = true; preview.error = ''; preview.input = message;
+  route();
+  const result = await callApi('knowtest', { expected_business_public_id: editor.businessPublicId, expected_published_revision: preview.revision, message, history });
+  if (!knowledgeCurrent(editor) || editor.preview !== preview || editor.publishedRevision !== preview.revision) return;
+  preview.busy = false;
+  if (!result.ok || !result.preview || result.preview.revision !== preview.revision || result.preview.sent !== false) {
+    preview.error = result.error || 'Balasan ujian tidak dapat disediakan. Cuba lagi.';
+  } else {
+    preview.messages.push({ role: 'user', text: message });
+    if (result.preview.handoff) preview.messages.push({ role: 'notice', text: 'AI tidak menyediakan balasan automatik untuk soalan ini. Lengkapkan fakta atau semak dengan manusia. Ujian ini tidak mengubah mod perbualan pelanggan.' });
+    else preview.messages.push({ role: 'assistant', text: result.preview.reply, attachment: result.preview.attachment });
+    preview.messages = preview.messages.slice(-16);
+    preview.input = '';
+  }
+  route();
+  document.getElementById('kc-preview')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function aiControlDefaults(ai) {
@@ -1255,9 +1306,10 @@ function knowledgeClick(action, value) {
   const editor = knowledgeEditorFor(load());
   if (!editor) return;
   if (action === "kc-jump") {
-    if (["kc-facts", "kc-assets", "kc-payment", "kc-test"].includes(value)) document.getElementById(value)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (["kc-facts", "kc-assets", "kc-payment", "kc-test", "kc-preview"].includes(value)) document.getElementById(value)?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
+  if (action === "kc-preview-clear") { editor.preview = null; route(); return; }
   if (editor.busy) return;
   if (action === "kc-import") return importKnowledgeSource(editor, value);
   if (action === "kc-reload") return reloadKnowledgeDraft(editor);
@@ -1684,6 +1736,7 @@ function onSubmit(event) {
   }
   const state = load();
   if (!state) return;
+  if (formId === "knowledge-preview") return testKnowledgeReply(data);
   if (formId === "knowledge-draft") return saveKnowledgeDraft();
   if (formId === "knowledge-publish") return publishKnowledge(data);
   if (formId === "ai-settings") {
@@ -1823,6 +1876,11 @@ function openOwnerPanel() {
 }
 
 function onInput(event) {
+  if (event.target?.name === 'preview_message') {
+    const editor = knowledgeEditorFor(load());
+    if (editor) knowledgePreviewState(editor).input = event.target.value;
+    return;
+  }
   if (knowledgeInput(event.target)) return;
   const state = load();
   if (!state) return;

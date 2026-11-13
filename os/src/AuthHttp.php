@@ -11,7 +11,7 @@ require_once __DIR__ . '/PlatformAccess.php';
 
 final class AuthHttp
 {
-    public function __construct(private PDO $pdo, private RateLimit $rates, private ?WhatsAppGateway $whatsapp = null, private ?AiReplyStore $ai = null, private ?KnowledgeCentre $knowledge = null, private ?PasswordRecovery $recovery = null)
+    public function __construct(private PDO $pdo, private RateLimit $rates, private ?WhatsAppGateway $whatsapp = null, private ?AiReplyStore $ai = null, private ?KnowledgeCentre $knowledge = null, private ?PasswordRecovery $recovery = null, private ?AiReplyPreview $preview = null)
     {
     }
 
@@ -83,6 +83,10 @@ final class AuthHttp
         // Platform restrictions are separate from the customer's own business status.
         // Switching to another membership and signing out remain available.
         if ($action !== 'pilih') { PlatformAccess::assertBusinessAccess($this->pdo, $actor['business_id']); }
+        if ($action === 'knowtest') {
+            if (!$this->preview instanceof AiReplyPreview) { throw new AuthException('Ujian AI belum tersedia sekarang.', 503); }
+            return $this->respond($session, false, ['ok'=>true,'preview'=>$this->preview->reply($actor,$body)]);
+        }
         if (in_array($action, ['knowsave', 'knowpublish', 'knowimport'], true)) {
             if (!$this->knowledge instanceof KnowledgeCentre) { throw new AuthException('Pusat Pengetahuan belum tersedia.', 409); }
             $this->knowledge->assertRequestScope($actor, $body['expected_business_public_id'] ?? null);

@@ -41,3 +41,5 @@ require __DIR__ . '/AuthHttp.php';
 require_once __DIR__ . '/CredentialSession.php';
 require_once __DIR__ . '/PasswordRecovery.php';
 require_once __DIR__ . '/RecoveryMail.php';
+
+require_once __DIR__ . '/AiReplyPreview.php';
