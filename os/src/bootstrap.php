@@ -37,3 +37,7 @@ require_once __DIR__ . '/KnowledgeSource.php';
 require_once __DIR__ . '/AiReplyStore.php';
 require_once __DIR__ . '/AiReplyWorker.php';
 require __DIR__ . '/AuthHttp.php';
+
+require_once __DIR__ . '/CredentialSession.php';
+require_once __DIR__ . '/PasswordRecovery.php';
+require_once __DIR__ . '/RecoveryMail.php';

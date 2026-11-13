@@ -59,6 +59,7 @@ try {
         }
     }
     $pdo = Db::connect();
+    \BesharOs\CredentialSession::assertCurrent($pdo, $_SESSION);
     $actor = Membership::require($pdo, $userId, $businessId);
     \BesharOs\PlatformAccess::assertBusinessAccess($pdo, $businessId);
     $private = PrivateConfig::load();

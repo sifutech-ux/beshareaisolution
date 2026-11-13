@@ -83,7 +83,13 @@ try {
     }
     $ai = $seal instanceof TokenSeal && is_array($private) ? new AiReplyStore($pdo, $seal, $private) : null;
     $knowledge = $seal instanceof TokenSeal ? new KnowledgeCentre($pdo, $seal) : null;
-    $http = new AuthHttp($pdo, new RateLimit(RateLimit::resolveDirectory()), $gateway, $ai, $knowledge);
+    $recovery = null;
+    $heartbeat = dirname(__DIR__, 3) . '/private/password-recovery-ready';
+    if ($seal instanceof TokenSeal && is_file($heartbeat) && filemtime($heartbeat) > time() - 300
+        && \BesharOs\CredentialSession::installed($pdo)) {
+        $recovery = new \BesharOs\PasswordRecovery($pdo, $seal, new RateLimit(RateLimit::resolveDirectory()));
+    }
+    $http = new AuthHttp($pdo, new RateLimit(RateLimit::resolveDirectory()), $gateway, $ai, $knowledge, $recovery);
     $result = $http->handle($method, $action, $_SESSION, $body, $headers, $remote, $host, session_id());
     if ($result['regenerate']) {
         session_regenerate_id(true);

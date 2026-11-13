@@ -35,6 +35,22 @@ final class RateLimit
         }
     }
 
+    /** Atomic reservation for credential recovery; concurrent requests share one lock. */
+    public function consume(string $key): bool
+    {
+        $lock = fopen($this->path($key) . '.lock', 'c');
+        if ($lock === false) { throw new AuthException('Had percubaan tidak tersedia.', 503); }
+        chmod($this->path($key) . '.lock', 0600);
+        try {
+            if (!flock($lock, LOCK_EX)) { throw new AuthException('Had percubaan tidak tersedia.', 503); }
+            $events = $this->fresh($key);
+            if (count($events) >= $this->maxAttempts) { return false; }
+            $events[] = time();
+            $this->write($key, $events);
+            return true;
+        } finally { flock($lock, LOCK_UN); fclose($lock); }
+    }
+
     public function tooMany(string $key): bool
     {
         return count($this->fresh($key)) >= $this->maxAttempts;
@@ -80,8 +96,9 @@ final class RateLimit
     private function write(string $key, array $events): void
     {
         $path = $this->path($key);
-        file_put_contents($path, json_encode(array_values($events)), LOCK_EX);
-        chmod($path, 0600);
+        if (file_put_contents($path, json_encode(array_values($events)), LOCK_EX) === false || !chmod($path, 0600)) {
+            throw new AuthException('Had percubaan tidak tersedia.', 503);
+        }
     }
 
     private function path(string $key): string
