@@ -14,12 +14,96 @@
 .kad-cadangan h3 { margin: 0 0 12px; font-size: 1rem; }
 .kad-cadangan p { font-size: .9rem; line-height: 1.6; }
 .kad-cadangan .butang { margin: 6px 8px 0 0; }
-.suara-bijak { border-bottom: 1px solid rgba(128,128,160,.2); padding: 12px 16px; max-height: 45dvh; overflow: auto; flex-shrink: 0; }
-.suara-bijak summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
-.suara-bijak .butang { margin: 8px 8px 0 0; }
-.suara-bijak audio { width: 100%; height: 32px; margin: 8px 0; }
-#suara-transkrip { max-height: 210px; overflow-y: auto; }
-.baris-transkrip { padding: 10px 0; border-top: 1px solid rgba(128,128,160,.2); }
-.baris-transkrip p { margin: 5px 0; white-space: pre-wrap; }
+.meja .suara-pintu {
+  position: relative; isolation: isolate; display: flex; align-items: center; gap: 17px;
+  width: calc(100% - 32px); margin: 14px 16px 4px; padding: 18px 20px; flex-shrink: 0;
+  overflow: hidden; text-align: left; font: inherit; color: #fff; cursor: pointer;
+  border: 1px solid rgba(177,158,255,.4); border-radius: 20px;
+  background: radial-gradient(ellipse at 100% 0%,rgba(45,211,198,.17),transparent 55%),linear-gradient(112deg,#34215f,#211c43 60%,#152b3e);
+  box-shadow: 0 8px 24px rgba(72,38,144,.14),inset 0 1px rgba(255,255,255,.09);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.meja .suara-pintu:hover:not(:disabled) { transform: translateY(-2px); border-color: #b8a5ff; box-shadow: 0 10px 30px rgba(99,63,187,.25); }
+.meja .suara-pintu:active { transform: translateY(0); }
+.meja .suara-pintu svg, .meja .suara-dialog svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.suara-pintu__ikon { width: 54px; height: 54px; flex-shrink: 0; display: grid; place-items: center; border: 1px solid rgba(224,212,255,.45); border-radius: 18px; background: linear-gradient(140deg,#9c78ef,#7351c3 55%,#376b94); box-shadow: 0 0 24px rgba(158,117,255,.3),inset 0 1px rgba(255,255,255,.3); }
+.suara-pintu__ikon svg { width: 25px; height: 25px; }
+.suara-pintu__teks { display: grid; gap: 4px; min-width: 0; }
+.suara-pintu__label { display: flex; align-items: center; gap: 8px; font-size: 10px; letter-spacing: .16em; font-weight: 700; color: #bdf4ed; }
+.suara-pintu__label span { font-size: 12px; }
+.meja .suara-pintu strong { font-size: 18px; font-weight: 650; line-height: 1.3; letter-spacing: -.025em; }
+.suara-pintu__nota { font-size: 12px; line-height: 1.5; color: #dbd5ee; }
+.suara-pintu__anak { display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; margin-left: auto; border-radius: 50%; background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.12); color: #c3f2ed; }
+.suara-pintu__anak svg { width: 18px; height: 18px; }
+
+/* A native modal keeps voice independent of the chat layout and contains keyboard focus. */
+.meja .suara-dialog {
+  color-scheme: dark; width: min(460px,calc(100% - 32px)); max-width: none; max-height: calc(100dvh - 40px);
+  padding: 0; margin: auto; overflow: auto; overscroll-behavior: contain; color: #f6f3ff; font: inherit;
+  border: 1px solid rgba(181,164,242,.3); border-radius: 28px; background: #141226;
+  box-shadow: 0 32px 100px rgba(0,0,0,.48); scrollbar-width: thin;
+}
+.meja .suara-dialog::backdrop { background: rgba(8,6,20,.65); backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); }
+.meja .suara-dialog [hidden] { display: none !important; }
+html:has(.meja .suara-dialog[open]) { overflow: hidden; }
+.suara-bilik { background: radial-gradient(ellipse at 50% 30%,rgba(111,65,174,.16),transparent 58%),#141226; }
+.suara-bilik__kepala { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 0 26px; }
+.suara-bilik__kepala > span { display: flex; align-items: center; gap: 8px; color: #d9d1ef; font-size: 10px; font-weight: 700; letter-spacing: .17em; }
+.suara-titik { width: 6px; height: 6px; border-radius: 50%; background: #9ce5d6; box-shadow: 0 0 12px #61b8a899; }
+.meja .suara-tutup { display: grid; place-items: center; width: 44px; height: 44px; color: #d8d0ed; border: 1px solid rgba(255,255,255,.1); border-radius: 50%; background: rgba(255,255,255,.04); cursor: pointer; }
+.meja .suara-tutup:hover:not(:disabled) { background: rgba(255,255,255,.12); }
+.meja .suara-tutup svg { width: 18px; height: 18px; }
+.suara-pentas { padding: 27px 28px 20px; text-align: center; }
+.suara-orb { position: relative; display: grid; place-items: center; width: 146px; height: 146px; margin: 0 auto 26px; }
+.suara-orb::before, .suara-orb::after { content: ''; position: absolute; inset: 0; border: 1px solid rgba(190,159,255,.2); border-radius: 50%; }
+.suara-orb::after { inset: 10px; border-color: rgba(190,159,255,.13); }
+.suara-orb__teras { display: grid; place-items: center; width: 108px; height: 108px; border-radius: 50%; border: 1px solid rgba(224,208,255,.5); background: radial-gradient(circle at 30% 20%,#c6a6ff,#9272da 30%,#5d408d 65%,#307d83); box-shadow: 0 0 45px rgba(151,103,229,.3),inset 0 2px 12px rgba(255,255,255,.25),inset -5px -8px 20px rgba(26,13,64,.35); }
+.suara-orb__teras svg { width: 34px; height: 34px; filter: drop-shadow(0 2px 6px #291b4a); }
+.suara-keadaan { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .15em; color: #c9b4ef; }
+.suara-pentas h2 { margin: 12px auto 10px; max-width: 320px; font-size: 26px; font-weight: 650; line-height: 1.22; letter-spacing: -.035em; color: #f6f3ff; }
+.suara-pentas > p { max-width: 320px; min-height: 40px; margin: 0 auto; color: #b8b1cc; font-size: 13px; line-height: 1.6; }
+.suara-kawalan { padding: 0 28px 22px; text-align: center; }
+.meja .suara-utama, .meja .suara-tamat { width: 100%; min-height: 54px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid rgba(225,210,255,.3); border-radius: 16px; padding: 14px 20px; font: inherit; font-size: 15px; font-weight: 650; color: #fff; cursor: pointer; background: linear-gradient(110deg,#9868df,#7450b4); box-shadow: inset 0 1px rgba(255,255,255,.18),0 7px 24px rgba(122,74,191,.18); }
+.meja .suara-utama:hover:not(:disabled) { filter: brightness(1.12); }
+.meja .suara-utama svg { width: 20px; height: 20px; }
+.meja .suara-tamat { background: #45263c; border-color: #83516d; box-shadow: none; color: #ffd7e6; }
+.meja .suara-tamat:hover:not(:disabled) { background: #573047; }
+.meja .suara-tamat span { font-size: 12px; }
+.meja .suara-dialog .suara-privasi { max-width: 320px; margin: 12px auto 0; color: #a8a1ba; font-size: 11px; line-height: 1.6; }
+.meja .suara-audio { display: block; width: 100%; min-height: 44px; margin-top: 8px; border: 1px solid #686081; border-radius: 12px; background: #29243f; color: #f0eaff; cursor: pointer; font: inherit; font-size: 13px; }
+.suara-bilik__kaki { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 16px 26px max(18px,env(safe-area-inset-bottom)); border-top: 1px solid rgba(213,194,255,.1); font-size: 10px; color: #aaa2bc; }
+.suara-catatan { margin: 0 28px 22px; border-top: 1px solid rgba(213,194,255,.15); padding-top: 4px; }
+.suara-catatan summary { padding: 13px 0; color: #e1d7f6; cursor: pointer; font-size: 13px; font-weight: 600; }
+.suara-catatan summary span { margin-left: 8px; font-size: 11px; font-weight: 400; color: #aaa2bc; }
+#suara-transkrip { max-height: 180px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.baris-transkrip { padding: 12px 0; border-top: 1px solid rgba(213,194,255,.1); font-size: 12px; line-height: 1.6; }
+.baris-transkrip strong { color: #c3adeb; font-size: 11px; }
+.baris-transkrip p { margin: 5px 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #e1dbea; }
+.suara-catatan button { min-height: 40px; padding: 8px 12px; border: 1px solid #65567c; border-radius: 10px; background: #292139; color: #e4d8f8; font: inherit; font-size: 11px; cursor: pointer; }
+.suara-catatan > p { color: #aaa2bc; font-size: 10px; line-height: 1.6; margin: 10px 0 0; }
+.meja .suara-dialog[data-state="active"] .suara-keadaan { color: #9ce5d6; }
+.meja .suara-dialog[data-state="active"] .suara-orb::before { animation: suara-nafas 2.8s ease-in-out infinite; border-color: #9ce5d65c; }
+.meja .suara-dialog[data-state="connecting"] .suara-orb::before { animation: suara-nafas 1.6s ease-in-out infinite; }
+.meja .suara-dialog[data-state="error"] .suara-keadaan { color: #f4b5ca; }
+.meja .suara-dialog :focus-visible, .meja .suara-pintu:focus-visible { outline: 3px solid #b8eee6; outline-offset: 4px; }
+@keyframes suara-nafas { 50% { transform: scale(1.08); opacity: .4; } }
 .editor-pemasaran { min-height: 180px; margin-top: 12px; }
-@media(max-width:600px) { .ingatan-grid { grid-template-columns: 1fr; } .suara-bijak { padding: 8px 12px; } }
+@media(max-width:600px) {
+  .ingatan-grid { grid-template-columns: 1fr; }
+  .meja .suara-pintu { width: calc(100% - 20px); margin: 10px 10px 2px; padding: 14px; gap: 12px; border-radius: 18px; }
+  .suara-pintu__ikon { width: 46px; height: 46px; border-radius: 15px; }
+  .meja .suara-pintu strong { font-size: 15px; }
+  .suara-pintu__nota { font-size: 11px; }
+  .suara-pintu__anak { width: 28px; height: 28px; }
+  .meja .suara-dialog { width: 100%; margin: auto 0 0; max-height: calc(100dvh - 18px); border-radius: 28px 28px 0 0; border-bottom: 0; }
+  .suara-pentas { padding-top: 20px; }
+  .suara-orb { width: 130px; height: 130px; margin-bottom: 22px; }
+  .suara-orb__teras { width: 96px; height: 96px; }
+  .suara-pentas h2 { font-size: 25px; }
+}
+@media(max-height:700px) {
+  .suara-pentas { padding-top: 12px; padding-bottom: 14px; }
+  .suara-orb { width: 104px; height: 104px; margin-bottom: 18px; }
+  .suara-orb__teras { width: 80px; height: 80px; }
+  .suara-pentas h2 { font-size: 23px; }
+}

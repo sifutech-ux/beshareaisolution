@@ -20,7 +20,7 @@
     </script>
     <link rel="stylesheet" href="../styles.css?v=20260929" />
     <link rel="stylesheet" href="penasihat.css?v=20261112aurora1" />
-    <link rel="stylesheet" href="bijak.css?v=20261113b1" />
+    <link rel="stylesheet" href="bijak.css?v=20261113voice2" />
   </head>
   <body class="meja" data-skrin="muat">
     <a class="lompat" href="#kandungan">Langkau ke kandungan</a>
@@ -209,21 +209,17 @@
                 <button type="button" id="keluar">Keluar</button>
               </div>
             </div>
-            <details class="suara-bijak" id="suara-panel"><summary>Bercakap dengan Copilot</summary>
-              <p>Perbualan dengan suara AI · sehingga 5 minit setiap sesi. Transkrip dipaparkan di sini.</p>
-              <button type="button" class="butang butang-utama" id="suara-mula">Mula bercakap</button>
-              <button type="button" class="butang butang-senyap" id="suara-henti" disabled>Tamatkan</button>
-              <button type="button" class="butang butang-senyap" id="suara-salin">Salin transkrip</button>
-              <p id="suara-status" role="status">Mikrofon hanya dibuka apabila anda memulakan sesi.</p>
-              <audio id="audio-bijak" controls autoplay></audio><div id="suara-transkrip" aria-live="polite"></div>
-              <p class="ingat">Transkrip sesi ini tidak disimpan ke akaun. Salin sebelum meninggalkan halaman.</p>
-            </details>
+            <button type="button" class="suara-pintu" id="suara-buka" aria-haspopup="dialog" aria-controls="suara-panel">
+              <span class="suara-pintu__ikon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11v1a7 7 0 0 0 14 0v-1M12 19v3M9 22h6"/></svg></span>
+              <span class="suara-pintu__teks"><span class="suara-pintu__label">SUARA AI <span aria-hidden="true">✦</span></span><strong>Bercakap dengan Copilot</strong><span class="suara-pintu__nota">Luahkan idea. Kita susun bersama.</span></span>
+              <span class="suara-pintu__anak" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+            </button>
             <div id="log" class="log" aria-live="polite"></div>
             <form id="mesej" class="mesej">
               <label class="sr" for="tulis">Mesej kepada penasihat</label>
               <textarea id="tulis" maxlength="600" rows="1" enterkeyhint="send" placeholder="Tulis mesej…"></textarea>
               <div class="mesej-aksi">
-                <button type="button" id="cakap" aria-label="Cakap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V7a3 3 0 0 1 3-3zM8 12a4 4 0 0 0 8 0M12 16v3"/></svg></button>
+                <button type="button" id="cakap" aria-label="Buka perbualan suara" aria-haspopup="dialog" aria-controls="suara-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V7a3 3 0 0 1 3-3zM8 12a4 4 0 0 0 8 0M12 16v3"/></svg></button>
                 <button type="submit" id="hantar" aria-label="Hantar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h12M13 6l6 6-6 6"/></svg></button>
               </div>
             </form>
@@ -368,8 +364,28 @@
     <script src="../stor-draf.js?v=20261012g" defer></script>
     <script src="../meja-akaun.js?v=20261012g" defer></script>
     <script src="../akaun-asal.js?v=20261018vpsproduction" defer></script>
-    <script src="bijak.js?v=20261113b1" defer></script>
-    <script src="penasihat.js?v=20261113b1" defer></script>
+    <dialog class="suara-dialog" id="suara-panel" aria-labelledby="suara-tajuk" aria-describedby="suara-status" data-state="idle">
+      <div class="suara-bilik">
+        <header class="suara-bilik__kepala"><span><span class="suara-titik" aria-hidden="true"></span> COPILOT VOICE</span><button type="button" class="suara-tutup" id="suara-tutup" aria-label="Tutup dan tamatkan sesi suara"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+        <div class="suara-pentas">
+          <div class="suara-orb" aria-hidden="true"><div class="suara-orb__teras"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11v1a7 7 0 0 0 14 0v-1M12 19v3M9 22h6"/></svg></div></div>
+          <span class="suara-keadaan" id="suara-keadaan">SEDIA UNTUK BERBUAL</span>
+          <h2 id="suara-tajuk">Idea bermula dengan perbualan.</h2>
+          <p id="suara-status" role="status">Ceritakan apa yang anda fikirkan. Copilot sedia membantu.</p>
+        </div>
+        <div class="suara-kawalan">
+          <button type="button" class="suara-utama" id="suara-mula" autofocus><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11v1a7 7 0 0 0 14 0v-1M12 19v3"/></svg>Mula bercakap</button>
+          <button type="button" class="suara-tamat" id="suara-henti" hidden disabled><span aria-hidden="true">■</span> Tamatkan sesi</button>
+          <button type="button" class="suara-audio" id="suara-main" hidden>Dengar audio Copilot</button>
+          <audio id="audio-bijak" autoplay playsinline hidden></audio>
+          <p class="suara-privasi">Mikrofon aktif hanya semasa sesi. Tutup panel untuk menamatkannya.</p>
+        </div>
+        <details class="suara-catatan" id="suara-catatan" hidden><summary>Transkrip perbualan <span id="suara-bilangan"></span></summary><div id="suara-transkrip" aria-live="polite" role="log" aria-label="Transkrip perbualan suara"></div><button type="button" id="suara-salin">Salin transkrip</button><p>Transkrip tidak disimpan ke akaun. Salin sebelum memulakan sesi baharu atau meninggalkan halaman.</p></details>
+        <footer class="suara-bilik__kaki"><span>Perbualan dengan suara AI</span><span>Sehingga 5 minit / sesi</span></footer>
+      </div>
+    </dialog>
+    <script src="bijak.js?v=20261113voice2" defer></script>
+    <script src="penasihat.js?v=20261113voice2" defer></script>
   </body>
 </html>
 
