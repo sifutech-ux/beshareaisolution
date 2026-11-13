@@ -14,6 +14,7 @@ final class PlatformAdminHttp
     {
         $method=strtoupper($method);
         if(!in_array($method,['GET','POST'],true)){throw new AuthException('Kaedah tidak dibenarkan.',405);}
+        CredentialSession::assertCurrent($this->pdo,$session);
         $admin=PlatformAccess::requireAdmin($this->pdo,(int)($session['user_id']??0));
         if($method==='GET') {
             $data=match($action) {

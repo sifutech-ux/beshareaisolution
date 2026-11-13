@@ -12,6 +12,7 @@ final class LegacyDesk
 {
     public static function authorize(PDO $pdo, array $session, array $config, string $method, array $body, array $actions): array
     {
+        CredentialSession::assertCurrent($pdo, $session);
         $actor = Membership::require($pdo, (int) ($session['user_id'] ?? 0), (int) ($session['business_id'] ?? 0));
         PlatformAccess::assertBusinessAccess($pdo, (int) $actor['business_id']);
         $business = $config['legacy_business_id'] ?? '';

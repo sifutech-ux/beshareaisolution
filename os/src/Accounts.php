@@ -71,6 +71,7 @@ final class Accounts
             'id' => (int) $row['id'],
             'email' => (string) $row['email'],
             'name' => (string) $row['name'],
+            'credential_stamp' => hash('sha256', (string) $row['password_hash']),
         ];
     }
 

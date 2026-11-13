@@ -9,7 +9,7 @@ require_once __DIR__ . '/PlatformAccess.php';
 
 final class AuthHttp
 {
-    public function __construct(private PDO $pdo, private RateLimit $rates, private ?WhatsAppGateway $whatsapp = null, private ?AiReplyStore $ai = null, private ?KnowledgeCentre $knowledge = null)
+    public function __construct(private PDO $pdo, private RateLimit $rates, private ?WhatsAppGateway $whatsapp = null, private ?AiReplyStore $ai = null, private ?KnowledgeCentre $knowledge = null, private ?PasswordRecovery $recovery = null)
     {
     }
 
@@ -50,6 +50,17 @@ final class AuthHttp
         }
         if ($method !== 'POST') {
             throw new AuthException('Kaedah tidak dibenarkan.', 405);
+        }
+        if ($action === 'lupa' || $action === 'pulih') {
+            if (!$this->recovery instanceof PasswordRecovery) { throw new AuthException('Pemulihan sedang disediakan. Cuba lagi sebentar lagi.', 503); }
+            if ($action === 'lupa') {
+                $this->recovery->request($this->text($body, 'email'), $remote);
+                return $this->respond($session, false, ['ok'=>true,'message'=>PasswordRecovery::MESSAGE]);
+            }
+            $this->recovery->reset($this->text($body, 'token'), $this->text($body, 'password'), $this->text($body, 'password2'), $remote);
+            $session = [];
+            Csrf::rotate($session);
+            return $this->respond($session, true, ['ok'=>true,'user'=>null,'message'=>'Kata laluan berjaya dikemas kini. Sila masuk semula.']);
         }
         if ($action === 'masuk') {
             return $this->login($session, $body, $remote);
@@ -175,6 +186,7 @@ final class AuthHttp
         $session = [
             'user_id' => $context['user_id'],
             'business_id' => $context['business_id'],
+            'credential_stamp' => $user['credential_stamp'],
         ];
         Accounts::audit($this->pdo, $context['business_id'], $context['user_id'], 'masuk', 'user', $context['user_id']);
         return $this->respond($session, true, $this->payload($context));
@@ -202,6 +214,7 @@ final class AuthHttp
         $session = [
             'user_id' => $context['user_id'],
             'business_id' => $context['business_id'],
+            'credential_stamp' => CredentialSession::stamp($this->pdo, $context['user_id']),
         ];
         return $this->respond($session, true, $this->payload($context));
     }
@@ -218,6 +231,7 @@ final class AuthHttp
             return ['ok' => true, 'user' => null];
         }
         try {
+            CredentialSession::assertCurrent($this->pdo, $session);
             return $this->payload(Membership::require($this->pdo, $userId, $businessId));
         } catch (AuthException) {
             unset($session['user_id'], $session['business_id']);
@@ -234,6 +248,7 @@ final class AuthHttp
             throw new AuthException('Sesi diperlukan.', 401);
         }
         try {
+            CredentialSession::assertCurrent($this->pdo, $session);
             return Membership::require($this->pdo, $userId, $businessId);
         } catch (AuthException) {
             unset($session['user_id'], $session['business_id']);

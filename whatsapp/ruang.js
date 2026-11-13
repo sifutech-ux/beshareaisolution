@@ -1,3 +1,16 @@
+// Recovery secrets stay in memory only; remove them before any network request.
+let recoveryToken = '';
+let recoveryNotice = '';
+let recoveryDone = false;
+function captureRecoveryToken() {
+  if (!location.hash.startsWith('#pulih=')) return;
+  recoveryDone = false;
+  recoveryNotice = '';
+  const candidate = location.hash.slice(7);
+  recoveryToken = /^[a-f0-9]{64}$/.test(candidate) ? candidate : '';
+  history.replaceState(null, '', location.pathname + '#pulih');
+}
+captureRecoveryToken();
 const UI_KEY = "beshare-os-ui";
 const AUTH_RETURN_KEY = "beshare-os-auth-return";
 let authReturn = null;
@@ -305,6 +318,7 @@ function route() {
   const kept = bar ? bar.scrollLeft : 0;
   const state = load();
   applyTheme(state);
+  captureRecoveryToken();
   const hash = location.hash.replace("#", "") || (state ? "papan" : "masuk");
   const changedPage = Boolean(paintedHash && paintedHash !== hash);
   if (state && paintedHash && paintedHash !== hash && state.notice) {
@@ -313,13 +327,13 @@ function route() {
   }
   paintedHash = hash;
   const root = document.getElementById("app");
-  const open = ["daftar", "masuk", "lupa", "sahkan"];
+  const open = ["daftar", "masuk", "lupa", "pulih", "sahkan"];
   if (!open.includes(hash) && !state) {
     setAuthReturn(hash);
     location.hash = "masuk";
     return;
   }
-  if (hash === "daftar" || hash === "masuk" || hash === "lupa") root.innerHTML = authView(hash, state);
+  if (hash === "daftar" || hash === "masuk" || hash === "lupa" || hash === "pulih") root.innerHTML = authView(hash, state);
   else if (hash === "sahkan") root.innerHTML = `<main class="page"><section class="panel" style="max-width:560px;margin:2rem auto;"><h1>Pengesahan e-mel</h1><p class="muted">Pengesahan e-mel tidak digunakan. Tiada e-mel dihantar.</p><p><a href="#masuk">Masuk</a></p></section></main>`;
   else if (state && state.business.accessStatus === "suspended") root.innerHTML = shell(state, "papan", '<article class="panel"><h1>Akses perniagaan digantung</h1><p>Hubungi pemilik sistem BeShare untuk bantuan. Anda masih boleh memilih ruang perniagaan lain atau keluar daripada akaun.</p></article>');
   else if (hash === "mula") root.innerHTML = shell(state, "papan", board(state));
@@ -416,16 +430,16 @@ function connectionCards(state) {
 }
 
 function authView(kind) {
-  const title = { daftar: "Cipta ruang perniagaan.", masuk: "Selamat kembali.", lupa: "Bantuan akaun." }[kind];
-  const subtitle = { daftar: "Mulakan dengan akaun anda dan nama perniagaan.", masuk: "Masuk untuk mengurus pelanggan dan pembantu AI anda.", lupa: "Masukkan e-mel akaun untuk menyemak pilihan pemulihan." }[kind];
+  const title = { daftar: "Cipta ruang perniagaan.", masuk: "Selamat kembali.", lupa: "Lupa kata laluan?", pulih: "Kata laluan baharu." }[kind];
+  const subtitle = { daftar: "Mulakan dengan akaun anda dan nama perniagaan.", masuk: "Masuk untuk mengurus pelanggan dan pembantu AI anda.", lupa: "Kami akan hantarkan pautan untuk anda menetapkan semula kata laluan.", pulih: "Pilih kata laluan 10 hingga 72 aksara yang hanya anda tahu." }[kind];
   const extra = kind === "daftar" ? `<label class="field">Sahkan kata laluan<input name="password2" type="password" required minlength="10" autocomplete="new-password"></label>` : "";
   const nameField = kind === "daftar" ? `<label class="field">Nama<input name="name" required autocomplete="name" placeholder="Nama anda"></label><label class="field">Nama perniagaan<input name="business" required autocomplete="organization" placeholder="Nama perniagaan anda"></label>` : "";
-  const fields = kind === "lupa" ? `<label class="field">E-mel<input name="email" type="email" required autocomplete="username" placeholder="nama@perniagaan.com"></label>`
+  const fields = kind === "pulih" ? `<label class="field">Kata laluan baharu<input name="password" type="password" required minlength="10" maxlength="72" autocomplete="new-password"></label><label class="field">Sahkan kata laluan baharu<input name="password2" type="password" required minlength="10" maxlength="72" autocomplete="new-password"></label>` : kind === "lupa" ? `<label class="field">E-mel<input name="email" type="email" required autocomplete="username" placeholder="nama@perniagaan.com"></label>`
     : `${nameField}<label class="field">E-mel<input name="email" type="email" required placeholder="nama@perniagaan.com" autocomplete="username"></label><label class="field">Kata laluan<input name="password" type="password" required minlength="10" maxlength="72" placeholder="Sekurang-kurangnya 10 aksara" autocomplete="${kind === "daftar" ? "new-password" : "current-password"}"></label>${extra}`;
   return `<main class="os-auth" id="os-main" tabindex="-1">
     <section class="os-auth-story"><p class="os-eyebrow">BISNES ANDA. LEBIH TERATUR.</p><h2>Satu ruang.<br>Lebih banyak<br><span>kemungkinan.</span></h2><p>Satukan perbualan pelanggan, pengetahuan perniagaan dan kawalan AI dalam satu tempat.</p><div class="os-auth-orbit" aria-hidden="true"><span class="os-orbit-ring"></span><span class="os-orbit-core">${osIcon('pengetahuan')}</span><span class="os-orbit-tag os-orbit-tag--one">${osIcon('peti')} Perbualan</span><span class="os-orbit-tag os-orbit-tag--two">${osIcon('pengetahuan')} Pengetahuan AI</span></div><div class="os-story-foot"><span class="os-dot"></span> Dibina untuk cara anda berniaga.</div></section>
     <section class="panel os-auth-card"><span class="os-auth-symbol">${osIcon(kind === 'masuk' ? 'papan' : 'audit')}</span><p class="os-eyebrow">BESHARE AI OS</p><h1>${title}</h1><p class="muted">${subtitle}</p>
-      <form id="auth" data-kind="${kind}">${fields}<p class="error" id="form-error" role="alert" hidden></p><button class="btn" type="submit">${{ daftar: 'Cipta akaun', masuk: 'Masuk ke ruang kerja', lupa: 'Semak pemulihan' }[kind]} ${osIcon('arrow')}</button></form>
+      ${kind === 'pulih' && (!recoveryToken || recoveryDone) ? `<p class="os-notice" role="status">${esc(recoveryDone ? recoveryNotice : 'Buka pautan daripada e-mel anda. Jika pautan sudah tamat tempoh, minta pautan baharu.')}</p><p><a class="btn" href="${recoveryDone ? '#masuk' : '#lupa'}">${recoveryDone ? 'Masuk semula' : 'Minta pautan baharu'}</a></p>` : `<form id="auth" data-kind="${kind}">${fields}<p class="error" id="form-error" role="alert" hidden></p><p class="os-notice" id="recovery-notice" role="status" ${kind !== 'lupa' || !recoveryNotice ? 'hidden' : ''}>${kind === 'lupa' ? esc(recoveryNotice) : ''}</p><button class="btn" type="submit">${{ daftar: 'Cipta akaun', masuk: 'Masuk ke ruang kerja', lupa: 'Hantar pautan pemulihan', pulih: 'Simpan kata laluan baharu' }[kind]} ${osIcon('arrow')}</button></form>`}
       <div class="os-auth-links">${kind === 'masuk' ? '<a href="#lupa">Lupa kata laluan?</a><span>Belum ada akaun? <a href="#daftar">Daftar sekarang</a></span>' : '<a href="#masuk">Kembali ke log masuk</a>'}</div>
       <p class="os-auth-note">${osIcon('audit')} Gunakan kata laluan yang unik untuk akaun perniagaan anda.</p>
     </section></main>`;
@@ -1601,8 +1615,34 @@ function onSubmit(event) {
     const kind = form.getAttribute("data-kind");
     const email = String(data.get("email") || "").trim();
     const password = String(data.get("password") || "");
-    if (kind === "lupa") {
-      showError("Set semula kata laluan belum tersedia. Tiada e-mel dihantar.");
+    if (kind === "lupa" || kind === "pulih") {
+      if (form.dataset.busy === 'true') return;
+      if (kind === 'pulih' && password !== String(data.get('password2') || '')) {
+        showError('Kata laluan tidak sepadan.');
+        return;
+      }
+      const button = form.querySelector('button[type="submit"]');
+      form.dataset.busy = 'true';
+      button.disabled = true;
+      const previousLabel = button.innerHTML;
+      button.textContent = kind === 'lupa' ? 'Memproses permintaan…' : 'Menyimpan…';
+      const error = document.getElementById('form-error');
+      if (error) error.hidden = true;
+      callApi(kind, kind === 'lupa' ? { email } : { token: recoveryToken, password, password2: String(data.get('password2') || '') }).then(result => {
+        if (form !== document.getElementById('auth')) return;
+        if (!result.ok) { showError(result.error || 'Permintaan gagal. Cuba lagi.'); return; }
+        recoveryNotice = result.message;
+        if (kind === 'pulih') {
+          recoveryToken = '';
+          recoveryDone = true;
+          applyLive(result);
+        }
+        route();
+      }).finally(() => {
+        form.dataset.busy = 'false';
+        button.disabled = false;
+        button.innerHTML = previousLabel;
+      });
       return;
     }
     if (!email.includes("@") || password.length < 10 || password.length > 72) {
@@ -1774,6 +1814,7 @@ function onSubmit(event) {
 
 // Only one fixed same-origin destination; the server independently authorizes every admin request.
 function openOwnerPanel() {
+  if (/^#(?:pulih|lupa)(?:=|$)/.test(location.hash)) return false;
   if (live && live.platform_admin === true && new URLSearchParams(location.search || "").get("tujuan") === "pemilik") {
     location.href = "/whatsapp/pemilik/";
     return true;

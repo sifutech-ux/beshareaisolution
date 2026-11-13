@@ -3,6 +3,14 @@ on:
   pull_request:
     paths:
       - 'os/src/Platform*.php'
+      - 'os/src/*Recovery*.php'
+      - 'os/src/CredentialSession.php'
+      - 'os/src/RecoveryMail.php'
+      - 'os/src/RateLimit.php'
+      - 'os/src/Accounts.php'
+      - 'os/migrations/0008_password_recovery.up.sql'
+      - 'os/tests/check-password-recovery*'
+      - 'os/bin/*password-recovery.php'
       - 'os/src/AdminWhatsAppActivation.php'
       - 'os/src/CloudPhoneRegistration.php'
       - 'os/src/AiReplyStore.php'
@@ -71,3 +79,7 @@ jobs:
         run: php os/tests/check-admin-whatsapp.php
       - name: Admin UI confirmation, target binding and stale-request handling
         run: node os/tests/check-admin-ui.mjs
+      - name: Single-use recovery, expiry, account isolation, session revocation and delivery retries
+        run: php os/tests/check-password-recovery.php
+      - name: Recovery links and forms in real workspace script
+        run: node os/tests/check-password-recovery-ui.mjs
