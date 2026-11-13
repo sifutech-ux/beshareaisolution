@@ -1829,9 +1829,7 @@ document.getElementById('keluar').addEventListener('click', () => keluarAkaun())
 document.getElementById('keluar-profil').addEventListener('click', () => keluarAkaun())
 document.getElementById('konflik-muat').addEventListener('click', () => muatSalinanPelayan())
 cakap.addEventListener('click', () => {
-  bukaAudio()
-  document.getElementById('suara-panel').open = true
-  BeshareBijak.startVoice()
+  BeshareBijak.openVoice()
 })
 document.getElementById('mesej').addEventListener('submit', (event) => {
   event.preventDefault()
