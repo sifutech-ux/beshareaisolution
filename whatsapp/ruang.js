@@ -888,8 +888,8 @@ function knowledgePreviewView(editor) {
   const preview = knowledgePreviewState(editor);
   return `<section class="kc-section" id="kc-preview"><div class="kc-section-heading"><h2><span class="kc-number">05</span> Uji balasan AI</h2><button class="btn btn--ghost" type="button" data-act="kc-preview-clear">Ujian baharu</button></div>
     <p class="muted">Cuba berbual sebagai pelanggan menggunakan pengetahuan aktif versi ${esc(preview.revision)}. Tiada mesej dihantar ke WhatsApp. Sejarah ujian hanya kekal dalam halaman ini.</p>
-    ${editor.dirty ? '<p class="kc-notice">Terbitkan perubahan fakta untuk menggunakannya dalam ujian.</p>' : ''}
-    <div class="kc-preview-chat" role="log" aria-label="Perbualan ujian AI" aria-live="polite">${preview.messages.map(item => `<article class="kc-preview-message kc-preview-message--${item.role}"><small>${item.role === 'user' ? 'Anda sebagai pelanggan' : item.role === 'assistant' ? 'Balasan AI · simulasi' : 'Status ujian'}</small><p>${esc(item.text)}</p>${item.attachment ? '<small>Balasan ini turut memilih gambar yang diluluskan.</small>' : ''}</article>`).join('') || '<p class="muted">Contoh: “Bisnes apa ni ya?” Kemudian sambung dengan soalan pelanggan yang biasa anda terima.</p>'}</div>
+    ${editor.dirty || editor.revision !== preview.revision ? '<p class="kc-notice">Terbitkan perubahan fakta untuk menggunakannya dalam ujian.</p>' : ''}
+    <div class="kc-preview-chat" id="kc-preview-chat" role="log" aria-label="Perbualan ujian AI" aria-live="polite">${preview.messages.map(item => `<article class="kc-preview-message kc-preview-message--${item.role}"><small>${item.role === 'user' ? 'Anda sebagai pelanggan' : item.role === 'assistant' ? 'Balasan AI · simulasi' : 'Status ujian'}</small><p>${esc(item.text)}</p>${item.attachment ? '<small>Balasan ini turut memilih gambar yang diluluskan.</small>' : ''}</article>`).join('') || '<p class="muted">Contoh: “Bisnes apa ni ya?” Kemudian sambung dengan soalan pelanggan yang biasa anda terima.</p>'}</div>
     ${preview.busy ? '<p role="status">AI sedang menyediakan balasan…</p>' : ''}
     ${preview.error ? `<p class="error" role="alert">${esc(preview.error)}</p>` : ''}
     <form id="knowledge-preview"><label class="field">Mesej pelanggan untuk ujian<textarea name="preview_message" rows="2" maxlength="2000" required placeholder="Taip soalan pelanggan…" ${preview.busy ? 'disabled' : ''}>${esc(preview.input)}</textarea></label><button class="btn" type="submit" ${preview.busy || !preview.revision ? 'disabled' : ''}>${preview.busy ? 'Menjana balasan…' : 'Uji balasan'}</button></form>
@@ -911,6 +911,7 @@ async function testKnowledgeReply(data) {
   });
   preview.busy = true; preview.error = ''; preview.input = message;
   route();
+  scrollKnowledgePreview();
   const result = await callApi('knowtest', { expected_business_public_id: editor.businessPublicId, expected_published_revision: preview.revision, message, history });
   if (!knowledgeCurrent(editor) || editor.preview !== preview || editor.publishedRevision !== preview.revision) return;
   preview.busy = false;
@@ -924,7 +925,13 @@ async function testKnowledgeReply(data) {
     preview.input = '';
   }
   route();
+  scrollKnowledgePreview();
   document.getElementById('kc-preview')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function scrollKnowledgePreview() {
+  const chat = document.getElementById('kc-preview-chat');
+  if (chat) chat.scrollTop = chat.scrollHeight;
 }
 
 function aiControlDefaults(ai) {

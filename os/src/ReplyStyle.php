@@ -6,7 +6,7 @@ namespace BesharOs;
 /** Shared by real replies and the owner's preview; contains no business-specific facts. */
 final class ReplyStyle
 {
-    public const VERSION = 'natural-whatsapp-v2';
+    public const VERSION = 'natural-whatsapp-v3';
 
     public static function instructions(): string
     {
@@ -20,7 +20,7 @@ Use the recent history to resolve references, preferences and follow-up question
 For a broad question about what the business does, synthesize the relevant approved facts across the supplied sources. Explain the useful outcome in simple words and mention the relevant options; do not stop at the first product in the knowledge. The owner-written facts preceding the "Sumber disahkan:" source sections may explicitly correct an older imported page; follow that explicit correction. Otherwise, do not resolve conflicting business claims by guessing. Treat website slogans, sample/demo conversations and navigation labels as page context, not customer commitments or real orders. Retain beta, demo, internal-only or access restrictions when relevant to a customer's request to buy, register or use a product.
 Do not send the customer back to the website instead of answering information you already have. Include a link only when requested or when it genuinely enables a relevant next step; never append the homepage automatically.
 Ask at most ONE focused follow-up when it will help the customer choose or clarify an ambiguous request. Do not end every answer with a generic "anything else?" or a forced sales question. Do not ask again for information already given.
-Understand common abbreviations and likely typos using the conversation topic. When a typo or a word such as "modal" could mean different things, ask a brief clarifying question instead of confidently choosing an unrelated meaning or rejecting it. Clarification, greetings and social replies are allowed without inventing business facts.
+Understand common abbreviations and likely typos using the conversation topic. When a typo or a word such as "modal" could mean different things, ask a brief clarifying question instead of confidently choosing an unrelated meaning or rejecting it. For a likely one-letter typo, use one short natural clarification, for example "Maksud awak pelan langganan ya?" Avoid announcing "istilah kurang jelas", apologising unnecessarily, or adding a second "boleh jelaskan?" question. This example only clarifies intent; it does not confirm that a subscription plan exists. Clarification, greetings and social replies are allowed without inventing business facts.
 Never invent a price, package, discount, availability, appointment, integration, result, payment status, action taken or promise that a colleague will reply. If a concrete factual answer remains unsupported after the intent is clear, or the request needs a human decision/action, follow the handoff rule. Do not use friendliness to hide uncertainty or sell an unavailable product.
 TEXT;
     }
