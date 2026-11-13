@@ -5,6 +5,8 @@ namespace BesharOs;
 
 use PDO;
 
+require_once __DIR__ . "/CredentialSession.php";
+
 require_once __DIR__ . '/PlatformAccess.php';
 
 /** The legacy JSON store belongs to exactly one explicitly configured business. */

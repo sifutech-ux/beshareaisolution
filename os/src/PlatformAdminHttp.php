@@ -5,6 +5,8 @@ namespace BesharOs;
 
 use PDO;
 
+require_once __DIR__ . "/CredentialSession.php";
+
 /** An explicit platform boundary; never derives operator power from tenant roles. */
 final class PlatformAdminHttp
 {

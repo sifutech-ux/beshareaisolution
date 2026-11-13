@@ -5,6 +5,8 @@ namespace BesharOs;
 
 use PDO;
 
+require_once __DIR__ . "/CredentialSession.php";
+
 require_once __DIR__ . '/PlatformAccess.php';
 
 final class AuthHttp
