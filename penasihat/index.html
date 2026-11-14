@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="../styles.css?v=20260929" />
     <link rel="stylesheet" href="penasihat.css?v=20261112aurora1" />
     <link rel="stylesheet" href="bijak.css?v=20261113voice2" />
+    <link rel="stylesheet" href="hasil.css?v=20261114a" />
   </head>
   <body class="meja" data-skrin="muat">
     <a class="lompat" href="#kandungan">Langkau ke kandungan</a>
@@ -136,7 +137,7 @@
             <div class="baris-butang">
               <button type="button" class="butang butang-senyap" id="borang-kembali">Kembali</button>
               <button type="button" class="butang butang-utama" id="borang-terus">Teruskan</button>
-              <button type="submit" class="butang butang-utama" id="borang-siap" hidden>Mula dengan soalan</button>
+              <button type="submit" class="butang butang-utama" id="borang-siap" hidden>Buka ruang kerja</button>
             </div>
           </form>
 
@@ -150,6 +151,15 @@
               </div>
               <button type="button" class="butang butang-utama" data-pergi="nasihat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.3 6.7L21 12l-6.7 2.3L12 21l-2.3-6.7L3 12l6.7-2.3z"/></svg>Tanya Copilot</button>
             </div>
+            <section class="hasil-mula kad" aria-labelledby="hasil-mula-tajuk">
+              <div class="hasil-kepala"><div><p class="eyebrow">SATU LANGKAH, HASIL YANG JELAS</p><h2 id="hasil-mula-tajuk">Apa yang mahu anda siapkan?</h2><p>Pilih satu. Copilot gunakan maklumat perniagaan anda untuk membantu.</p></div><span class="hasil-tanda">Mulakan di sini</span></div>
+              <div class="hasil-pilihan">
+                <button type="button" data-hasil-mula="pemasaran"><span class="hasil-nombor">01</span><strong>Siapkan promosi</strong><span>Draf yang boleh disunting, disimpan dan digunakan.</span><b aria-hidden="true">↗</b></button>
+                <button type="button" data-hasil-mula="pelan"><span class="hasil-nombor">02</span><strong>Susun minggu ini</strong><span>Langkah kecil yang sesuai dengan masa dan matlamat anda.</span><b aria-hidden="true">↗</b></button>
+                <button type="button" data-hasil-mula="angka"><span class="hasil-nombor">03</span><strong>Fahami angka</strong><span>Semak hasil dan kos yang telah anda rekodkan.</span><b aria-hidden="true">↗</b></button>
+              </div>
+              <div class="hasil-pintasan"><button class="pautan-kecil" type="button" data-hasil-koleksi>Koleksi draf & ringkasan</button><button class="pautan-kecil" type="button" id="hasil-buka-semakan">Semak kemajuan minggu ini</button></div>
+            </section>
             <article class="kad kad-fokus"><p class="eyebrow">Fokus hari ini</p><div id="fokus-hari" aria-live="polite"><p>Memuat fokus daripada akaun…</p></div></article>
             <div class="papan">
               <article class="kad kad-matlamat">
@@ -214,6 +224,7 @@
               <span class="suara-pintu__teks"><span class="suara-pintu__label">SUARA AI <span aria-hidden="true">✦</span></span><strong>Bercakap dengan Copilot</strong><span class="suara-pintu__nota">Luahkan idea. Kita susun bersama.</span></span>
               <span class="suara-pintu__anak" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
             </button>
+            <div class="hasil-toolbar"><button type="button" class="butang butang-senyap" data-hasil-koleksi>Koleksi draf & ringkasan</button><button type="button" class="butang butang-senyap" id="hasil-suara-sambung" hidden>Semak sesi suara terakhir</button></div>
             <div id="log" class="log" aria-live="polite"></div>
             <form id="mesej" class="mesej">
               <label class="sr" for="tulis">Mesej kepada penasihat</label>
@@ -247,6 +258,15 @@
               <ul id="pelan-konflik-senarai"></ul>
               <button type="button" id="pelan-muat" class="butang butang-senyap">Muat salinan pelayan</button>
             </div>
+            <details class="kad hasil-semakan" id="hasil-semakan-panel"><summary><span class="eyebrow">SEMAKAN MINGGUAN</span><strong>Apa yang sudah bergerak?</strong><span id="hasil-semakan-ringkas">Catat kemajuan, hasil dan halangan anda.</span></summary>
+              <form id="hasil-semakan-form" class="hasil-form"><p id="hasil-semakan-minggu"></p><label>Kaitkan dengan tugasan<select id="hasil-semakan-tugas"><option value="">Keseluruhan minggu ini</option></select></label>
+                <label>Apa yang sudah anda buat?<textarea id="hasil-semakan-dibuat" maxlength="1500" required rows="3" placeholder="Contoh: Terbitkan promosi dan hubungi semula lima pelanggan."></textarea></label>
+                <label>Apa hasil yang anda lihat?<textarea id="hasil-semakan-hasil" maxlength="1500" rows="3" placeholder="Contoh: Tiga pertanyaan, satu tempahan. Jika belum tahu, nyatakan belum ada rekod."></textarea></label>
+                <label>Apa yang menghalang atau perlu dibantu?<textarea id="hasil-semakan-halangan" maxlength="1500" rows="2" placeholder="Contoh: Pelanggan bertanya tentang penghantaran, tetapi saya belum ada jawapan yang jelas."></textarea></label>
+                <p class="hasil-nota">Catatan ini membantu nasihat seterusnya. Angka di sini tidak dimasukkan secara automatik ke rekod Angka.</p>
+                <div class="hasil-aksi"><button class="butang butang-utama" id="hasil-semakan-simpan" type="submit">Simpan semakan</button><button class="butang butang-senyap" type="button" id="hasil-semakan-nasihat">Bantu langkah seterusnya</button><button class="butang butang-senyap" type="button" id="hasil-semakan-muat">Muat salinan akaun</button></div>
+                <p id="hasil-semakan-status" role="status"></p><section id="hasil-semakan-konflik" hidden><h3>Salinan akaun yang lebih baharu</h3><p class="hasil-teks" id="hasil-semakan-perbandingan"></p><button class="butang butang-senyap" type="button" id="hasil-semakan-guna">Guna salinan akaun</button></section>
+              </form><div id="hasil-semakan-sejarah"></div></details>
             <div class="kad" id="rujukan-pelan"></div>
             <ul id="senarai-pelan" class="senarai-tugas"></ul>
             <p id="pelan-kosong" class="kosong" hidden>Belum ada tugasan dalam akaun untuk minggu ini.</p>
@@ -377,6 +397,7 @@
         <div class="suara-kawalan">
           <button type="button" class="suara-utama" id="suara-mula" autofocus><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11v1a7 7 0 0 0 14 0v-1M12 19v3"/></svg>Mula bercakap</button>
           <button type="button" class="suara-tamat" id="suara-henti" hidden disabled><span aria-hidden="true">■</span> Tamatkan sesi</button>
+          <button type="button" class="suara-audio" id="hasil-suara-buka" hidden>Semak ringkasan sesi</button>
           <button type="button" class="suara-audio" id="suara-main" hidden>Dengar audio Copilot</button>
           <audio id="audio-bijak" autoplay playsinline hidden></audio>
           <p class="suara-privasi">Mikrofon aktif hanya semasa sesi. Tutup panel untuk menamatkannya.</p>
@@ -385,9 +406,19 @@
         <footer class="suara-bilik__kaki"><span>Perbualan dengan suara AI</span><span>Sehingga 5 minit / sesi</span></footer>
       </div>
     </dialog>
-    <script src="bijak.js?v=20261113voice2" defer></script>
-    <script src="penasihat.js?v=20261113voice2" defer></script>
-    <script src="bil.js?v=20261113" defer></script>
+
+    <dialog class="hasil-dialog hasil-dialog-kecil" id="hasil-mula-dialog" aria-labelledby="hasil-mula-heading"><div class="hasil-dialog-kepala"><div><p class="eyebrow">MULA DENGAN SATU HASIL</p><h2 id="hasil-mula-heading">Siapkan promosi</h2></div><button type="button" class="hasil-tutup" data-hasil-tutup="hasil-mula-dialog" aria-label="Tutup panduan">×</button></div>
+      <form id="hasil-mula-form" class="hasil-form"><p id="hasil-mula-keterangan"></p><label id="hasil-mula-saluran-label">Di mana anda mahu gunakan promosi ini?<select id="hasil-mula-saluran"><option>WhatsApp</option><option>Facebook</option><option>Instagram</option><option>TikTok</option><option>Lain</option></select></label><label><span id="hasil-mula-label">Apa yang mahu dipromosikan?</span><textarea id="hasil-mula-input" rows="3" maxlength="400" placeholder="Nyatakan produk atau matlamat. Boleh kosongkan untuk gunakan profil anda."></textarea></label><p class="hasil-nota">Semak cadangan sebelum digunakan. Tiada kandungan diterbitkan secara automatik.</p><button class="butang butang-utama" type="submit" id="hasil-mula-hantar">Jana draf pertama</button></form></dialog>
+    <dialog class="hasil-dialog" id="hasil-koleksi-dialog" aria-labelledby="hasil-koleksi-heading"><div class="hasil-dialog-kepala"><div><p class="eyebrow">KERJA ANDA, MUDAH DICARI SEMULA</p><h2 id="hasil-koleksi-heading">Koleksi draf & ringkasan</h2></div><button type="button" class="hasil-tutup" data-hasil-tutup="hasil-koleksi-dialog" aria-label="Tutup koleksi">×</button></div>
+      <div class="hasil-koleksi-grid"><section class="hasil-senarai-panel"><div class="hasil-form"><label>Cari tajuk atau petikan<input id="hasil-cari" type="search" maxlength="100" placeholder="Cari kerja tersimpan…"></label><label>Paparan<select id="hasil-tapis"><option value="aktif">Semua kerja aktif</option><option value="pemasaran">Draf pemasaran</option><option value="suara">Ringkasan suara</option><option value="digunakan">Sudah digunakan</option><option value="arkib">Arkib</option></select></label></div><div class="hasil-aksi"><button class="butang butang-senyap" type="button" id="hasil-draf-baru">Draf baharu</button><button class="butang butang-senyap" type="button" id="hasil-draf-muat">Muat semula</button></div><p id="hasil-koleksi-status" role="status"></p><ul id="hasil-draf-senarai" class="hasil-draf-senarai"></ul></section>
+      <section class="hasil-editor-panel"><p id="hasil-editor-kosong">Pilih draf, atau simpan jawapan pemasaran daripada perbualan anda.</p><form id="hasil-editor" class="hasil-form" hidden><p class="eyebrow" id="hasil-editor-jenis">DRAF PEMASARAN</p><label>Nama draf<input id="hasil-editor-tajuk" maxlength="100" required></label><div class="hasil-dua"><label>Saluran<select id="hasil-editor-saluran"><option>WhatsApp</option><option>Facebook</option><option>Instagram</option><option>TikTok</option><option>Lain</option></select></label><label>Status<select id="hasil-editor-status"><option value="draf">Draf</option><option value="digunakan">Sudah digunakan</option><option value="arkib">Arkib</option></select></label></div><label>Kandungan<textarea id="hasil-editor-kandungan" rows="11" maxlength="8000" required></textarea></label><div class="hasil-aksi"><button class="butang butang-utama" type="submit" id="hasil-editor-simpan">Simpan dalam akaun</button><button class="butang butang-senyap" type="button" id="hasil-editor-salin">Salin kandungan</button><button class="butang butang-senyap" type="button" id="hasil-editor-batal">Batalkan suntingan</button></div><p id="hasil-editor-nota" role="status"></p><section id="hasil-editor-konflik" hidden><h3>Salinan akaun yang lebih baharu</h3><p class="hasil-teks" id="hasil-editor-perbandingan"></p><button class="butang butang-senyap" type="button" id="hasil-editor-guna">Guna salinan akaun</button></section></form></section></div></dialog>
+    <dialog class="hasil-dialog hasil-dialog-kecil" id="hasil-suara-dialog" aria-labelledby="hasil-suara-heading"><div class="hasil-dialog-kepala"><div><p class="eyebrow">DARIPADA PERBUALAN KEPADA TINDAKAN</p><h2 id="hasil-suara-heading">Semak sesi suara</h2></div><button type="button" class="hasil-tutup" data-hasil-tutup="hasil-suara-dialog" aria-label="Tutup ringkasan suara">×</button></div>
+      <p id="hasil-suara-keterangan">Semak transkrip sebelum menjana ringkasan. Ringkasan menggunakan kuota nasihat AI anda.</p><details><summary>Semak atau betulkan transkrip</summary><label class="hasil-form">Transkrip sesi<textarea id="hasil-suara-transkrip" rows="8" maxlength="30000"></textarea></label></details><p class="hasil-nota">Transkrip sementara tidak dimasukkan ke sejarah sembang. Untuk menyimpan hasilnya, pilih Simpan ringkasan selepas menjana.</p><button class="butang butang-utama" type="button" id="hasil-suara-jana">Jana ringkasan & cadangan</button><p id="hasil-suara-status" role="status"></p><div id="hasil-suara-jawapan" class="hasil-teks"></div></dialog>
+    <script src="hasil-core.js?v=20261114a" defer></script>
+    <script src="hasil.js?v=20261114a" defer></script>
+    <script src="bijak.js?v=20261114a" defer></script>
+    <script src="penasihat.js?v=20261114a" defer></script>
+    <script src="bil.js?v=20261114a" defer></script>
 </body>
 </html>
 

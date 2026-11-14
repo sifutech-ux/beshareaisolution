@@ -1,0 +1,32 @@
+.hasil-mula { margin-bottom: 22px; background: linear-gradient(115deg,rgba(139,105,218,.12),rgba(68,183,167,.05)); }
+.hasil-kepala,.hasil-dialog-kepala { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
+.hasil-kepala h2,.hasil-dialog-kepala h2 { margin:6px 0 10px; font-size:clamp(22px,2.2vw,28px); letter-spacing:-.035em; }
+.hasil-kepala p { margin:8px 0 20px; color:var(--senyap); font-size:14px; line-height:1.6; }
+.hasil-tanda { flex-shrink:0; padding:7px 10px; border:1px solid var(--garis); border-radius:20px; color:var(--senyap); font-size:11px; }
+.hasil-pilihan { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.meja .hasil-pilihan button { position:relative; display:grid; gap:9px; text-align:left; padding:19px; border:1px solid var(--garis); border-radius:18px; color:var(--dakwat); background:var(--kaca); font:inherit; cursor:pointer; transition:transform .16s,border-color .16s; }
+.hasil-pilihan button:hover { transform:translateY(-2px); border-color:var(--ungu); }
+.hasil-pilihan strong { font-size:16px; }.hasil-pilihan span:not(.hasil-nombor) { font-size:12px; line-height:1.65; color:var(--senyap); }
+.hasil-nombor { color:var(--ungu); font-size:12px; font-weight:700; }.hasil-pilihan b { position:absolute; top:16px; right:17px; color:var(--senyap); }
+.hasil-pintasan,.hasil-aksi,.hasil-toolbar { display:flex; flex-wrap:wrap; gap:10px; }.hasil-pintasan { margin-top:18px; }.hasil-toolbar { padding:8px 16px 0; flex-shrink:0; }.hasil-toolbar .butang { font-size:12px; }
+.meja .hasil-dialog { width:min(1000px,calc(100% - 28px)); max-width:none; max-height:calc(100dvh - 32px); padding:26px; margin:auto; border:1px solid var(--garis); border-radius:24px; color:var(--dakwat); background:var(--latar); box-shadow:var(--bayang); font:inherit; overflow:auto; overscroll-behavior:contain; }
+.meja .hasil-dialog-kecil { width:min(620px,calc(100% - 28px)); }
+.hasil-dialog::backdrop { background:rgba(8,6,20,.72); backdrop-filter:blur(7px); }
+.hasil-dialog [hidden],.hasil-semakan [hidden] { display:none!important; }
+.hasil-dialog-kepala { margin-bottom:18px; }.hasil-dialog .eyebrow { margin:0; font-size:10px; line-height:1.5; }
+.meja .hasil-tutup { flex-shrink:0; width:42px; height:42px; border:1px solid var(--garis); border-radius:50%; background:var(--kad); color:var(--dakwat); font-size:25px; cursor:pointer; }
+.hasil-form { display:grid; gap:15px; }.hasil-form label { display:grid; gap:7px; font-size:13px; line-height:1.5; font-weight:600; }
+.meja .hasil-form input,.meja .hasil-form textarea,.meja .hasil-form select { width:100%; min-width:0; box-sizing:border-box; border:1px solid var(--garis); border-radius:12px; padding:11px 12px; background:var(--kad); color:var(--dakwat); font:inherit; font-size:14px; }
+.hasil-form textarea { resize:vertical; }.hasil-form input:focus-visible,.hasil-form textarea:focus-visible,.hasil-form select:focus-visible,.hasil-dialog button:focus-visible,.hasil-pilihan button:focus-visible { outline:2px solid var(--ungu); outline-offset:3px; }
+.hasil-nota { font-size:12px; color:var(--senyap); line-height:1.65; margin:4px 0; }.hasil-teks { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.7; }
+.hasil-dua { display:grid; grid-template-columns:1fr 1fr; gap:12px; }.hasil-koleksi-grid { display:grid; grid-template-columns:290px minmax(0,1fr); gap:24px; }
+.hasil-senarai-panel { border-right:1px solid var(--garis); padding-right:20px; min-width:0; }.hasil-senarai-panel>.hasil-aksi { margin-top:12px; }.hasil-editor-panel { min-width:0; }
+.hasil-draf-senarai { list-style:none; padding:0; display:grid; gap:8px; max-height:460px; overflow:auto; }
+.meja .hasil-draf-pilih { display:grid; gap:6px; width:100%; text-align:left; padding:13px; border:1px solid var(--garis); border-radius:13px; color:var(--dakwat); background:var(--kad); cursor:pointer; font:inherit; overflow-wrap:anywhere; }
+.hasil-draf-pilih strong { font-size:14px; }.hasil-draf-pilih span { font-size:11px; color:var(--senyap); line-height:1.6; }.hasil-draf-pilih[aria-current=true] { border-color:var(--ungu); }
+.hasil-semakan { margin:0 0 22px; }.hasil-semakan>summary { cursor:pointer; display:grid; gap:9px; list-style:none; }.hasil-semakan>summary strong { font-size:20px; letter-spacing:-.02em; }.hasil-semakan>summary>span:last-child { color:var(--senyap); font-size:13px; }.hasil-semakan[open]>.hasil-form { padding-top:22px; }
+.hasil-sejarah { border-top:1px solid var(--garis); margin-top:20px; padding-top:16px; }.hasil-sejarah summary { cursor:pointer; font-size:13px; font-weight:600; }.hasil-sejarah p { font-size:13px; line-height:1.7; white-space:pre-wrap; }
+#hasil-editor-konflik,#hasil-semakan-konflik { padding:14px; border:1px solid var(--amaran); border-radius:14px; font-size:13px; }
+#hasil-suara-jawapan>.hasil-aksi { margin-top:16px; }#hasil-suara-dialog details { margin:15px 0; }#hasil-suara-dialog details>summary { cursor:pointer; font-size:13px; margin-bottom:12px; }
+@media(max-width:700px) { .hasil-pilihan { grid-template-columns:1fr; }.meja .hasil-pilihan button { padding:16px 18px 16px 52px; gap:4px; }.hasil-nombor { position:absolute; top:18px; left:17px; }.hasil-tanda { display:none; }.hasil-koleksi-grid { grid-template-columns:1fr; }.hasil-senarai-panel { border-right:0; padding-right:0; border-bottom:1px solid var(--garis); padding-bottom:16px; }.hasil-draf-senarai { max-height:170px; }.meja .hasil-dialog { padding:20px 16px; border-radius:20px; }.hasil-dialog-kepala h2 { font-size:23px; }.hasil-dua { grid-template-columns:1fr; }.hasil-aksi>.butang { flex:1 1 auto; }.hasil-toolbar { gap:6px; }.hasil-toolbar .butang { padding:9px 10px; }.hasil-pintasan { gap:14px; } }
+@media(prefers-reduced-motion:reduce) { .hasil-pilihan button { transition:none; }.hasil-pilihan button:hover { transform:none; } }

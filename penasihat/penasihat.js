@@ -579,6 +579,7 @@ function lukis() {
 }
 
 function lupusSesi() {
+  BeshareHasil.reset()
   BeshareBijak.reset()
   try { localStorage.removeItem(AKAUN_KUNCI) } catch { /* sesi sudah tiada */ }
   keadaan = null
@@ -1183,6 +1184,7 @@ async function muatMeja() {
     angkaGagal = false
   } else if (angkaBalas.status !== 200) angkaGagal = true
   lukisMeja()
+  BeshareHasil.refresh()
 }
 
 function lukisMeja() {
@@ -1200,6 +1202,7 @@ function gunaPelan(pelan) {
   pelanDimuat = true
   pelanGagal = false
   pelanKonflik = null
+  BeshareHasil.tasks()
 }
 
 function salinanPelan(data) {
@@ -1809,9 +1812,8 @@ borang.addEventListener('submit', async (event) => {
   const disimpan = await simpan()
   if (!disimpan) return
   lukis()
-  pergi('nasihat')
+  pergi('utama')
   muatMeja()
-  tulis.focus()
 })
 
 document.getElementById('borang-terus').addEventListener('click', terusBorang)
@@ -1970,6 +1972,7 @@ gunaTema(localStorage.getItem(TEMA) || 'sistem')
 window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
   if ((localStorage.getItem(TEMA) || 'sistem') === 'sistem') gunaTema('sistem')
 })
+BeshareHasil.init()
 BeshareBijak.init()
 mula()
 
