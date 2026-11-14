@@ -8,7 +8,7 @@ Three guided starts on Utama lead to marketing drafts, weekly actions and an exp
 - Up to 200 saved items per account, including archives. Search titles/previews; edit title, channel, content and status; archive/restore. Status `digunakan` is self-reported, not automatic publishing.
 - Drafts and weekly reviews have optimistic versions and retry-safe saves. A conflict preserves the local edit and displays the account copy. No drafts or transcripts are written to browser localStorage.
 - One review per week, optionally linked to an owned task in that week; current or preceding 90 days. Last four reviews enter AI context. Review notes do not create financial records and do not prove sales causality.
-- Voice transcript is temporary, lost on reload or replaced after the next session. Maximum 30,000 characters; oversize input is rejected rather than clipped. Summary requests reuse existing authenticated advice/quotas with a stable retry key. Raw transcript is not added to account chat history. Existing service/provider processing and result retention still apply.
+- Voice transcript is temporary, lost on reload or replaced after the next session. Maximum 20,000 characters; oversize input is rejected rather than clipped. Summary requests reuse existing authenticated advice/quotas with a stable retry key. Raw transcript is not added to account chat history. Existing service/provider processing and result retention still apply.
 - Summary saving and action confirmation are separate. Only existing trusted, server-recorded proposals can change tasks/numbers. Editable summary text cannot replace a proposal payload.
 - No new AI provider, API key, billing plan, outbound reminder or automatic publishing. No changes to WhatsApp AI OS or investment data.
 

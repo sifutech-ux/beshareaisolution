@@ -106,7 +106,7 @@ const BeshareBijak = (() => {
       host.append(card)
     } catch { if (owner === akaunId && host.isConnected) host.append(text('p', 'Cadangan belum dapat dimuat. Muat semula untuk menyemaknya.')) }
   }
-  function decorate(item, host, actions) {
+  function decorate(item, host, actions, summaryOnly = false) {
     if (item.dari !== 'penasihat') return
     BeshareHasil.decorate(item, host, actions)
     const full = [item.teks, ...(item.langkah || [])].join('\n')
@@ -115,7 +115,7 @@ const BeshareBijak = (() => {
       try { await navigator.clipboard.writeText(full); control.textContent = 'Disalin' }
       catch { status.textContent = 'Pilih teks jawapan untuk menyalinnya.' }
     }))
-    actions.append(button('Ringkaskan', () => hantarTeks('Ringkaskan jawapan berikut kepada dua ayat sahaja:\n' + item.teks.slice(0, 3300), false)))
+    if (!summaryOnly) actions.append(button('Ringkaskan', () => hantarTeks('Ringkaskan jawapan berikut kepada dua ayat sahaja:\n' + item.teks.slice(0, 3300), false)))
     if (item.format === 'pemasaran') {
       actions.append(button('Tambah ke pelan', async e => {
         const control = e.currentTarget; control.disabled = true

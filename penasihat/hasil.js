@@ -72,7 +72,7 @@ const BeshareHasil = (() => {
       if (r.status !== 200) throw Error(r.data.error || 'Draf belum dapat dimuat.')
       // A new unsaved draft may have been opened while this request was pending.
       if (!canSwitch()) return
-      showDraft(r.data.draf)
+      showDraft(r.data.draf); $('hasil-editor-tajuk').focus()
     } catch(e) { if (live(who, version) && seq === draftSeq) note('hasil-koleksi-status', e.message || 'Cuba muat semula.') }
   }
   async function saveDraft(event) {
@@ -118,10 +118,11 @@ const BeshareHasil = (() => {
     note('hasil-semakan-minggu', `Minggu bermula ${item.minggu} · waktu Malaysia`)
     note('hasil-semakan-ringkas', item.versi ? 'Semakan minggu ini sudah disimpan. Boleh kemas kini apabila ada perkembangan.' : 'Catat kemajuan, hasil dan halangan anda.')
   }
-  async function refresh(force = false) {
+  async function refresh(force = false, compare = false) {
     if (!sesiAkaun() || !akaunId) return
     if (owner && owner !== akaunId) reset()
     owner = akaunId
+    if (!review) { review = emptyReview(mingguSemasa().isnin); note('hasil-semakan-minggu', `Minggu bermula ${review.minggu} · waktu Malaysia`) }
     const who = owner, version = epoch, seq = ++reviewSeq
     try {
       const r = await request('/semakan')
@@ -129,6 +130,10 @@ const BeshareHasil = (() => {
       if (r.status !== 200 || !r.data.ok) throw Error(r.data.error || 'Semakan belum dapat dimuat.')
       reviews = r.data.semakan
       const current = reviews.find(x => x.minggu === mingguSemasa().isnin) || emptyReview(mingguSemasa().isnin)
+      if (compare && reviewDirty && !reviewSaving) {
+        reviewConflict = current; $('hasil-semakan-konflik').hidden = false
+        note('hasil-semakan-perbandingan', HasilCore.reviewText(current)); note('hasil-semakan-status', 'Salinan akaun dimuat untuk perbandingan. Draf anda dikekalkan sehingga anda memilih Guna salinan akaun.')
+      }
       if (!reviewSaving && (!reviewDirty || force)) showReview(current)
       else if (review && review.minggu !== current.minggu) note('hasil-semakan-status', `Draf ini untuk minggu ${review.minggu}. Simpan dahulu sebelum memuat minggu baharu.`)
       tasks(); renderReviews()
@@ -182,6 +187,7 @@ const BeshareHasil = (() => {
     if (voiceInput !== transcript || !voiceKey) { voiceInput = transcript; voiceKey = ids() }
     const controller = new AbortController(); voiceAbort = controller
     $('hasil-suara-jana').disabled = true; $('hasil-suara-transkrip').readOnly = true
+    $('hasil-suara-jawapan').replaceChildren()
     note('hasil-suara-status', 'Menjana ringkasan untuk semakan anda…')
     const timeout = setTimeout(() => controller.abort(), 90000)
     try {
@@ -191,10 +197,11 @@ const BeshareHasil = (() => {
       if (!live(who, version) || seq !== voiceSeq || sesiTamat(response.status)) return
       if (!response.ok || !data.ok || data.bukan_model !== false || typeof data.jawapan !== 'string' || !['openai','tersimpan'].includes(data.sumber)) throw Error(data.error || 'Ringkasan belum dapat dijana. Cuba sekali lagi.')
       voiceResult = [data.jawapan, ...(Array.isArray(data.langkah) ? data.langkah : [])].join('\n')
-      const host = $('hasil-suara-jawapan'); host.replaceChildren(node('p', voiceResult))
+      // A distinct connected node prevents late proposal fetches from reviving an older summary.
+      const host = document.createElement('section'); host.append(node('p', voiceResult)); $('hasil-suara-jawapan').replaceChildren(host)
       const actions = document.createElement('div'); actions.className = 'hasil-aksi'; host.append(actions)
       actions.append(button('Simpan ringkasan', () => { $('hasil-suara-dialog').close(); newDraft(voiceResult, 'suara') }))
-      BeshareBijak.decorate({ dari: 'penasihat', teks: data.jawapan, langkah: data.langkah, cadangan_id: data.cadangan_id, format: 'ringkas' }, host, actions)
+      BeshareBijak.decorate({ dari: 'penasihat', teks: data.jawapan, langkah: data.langkah, cadangan_id: data.cadangan_id, format: 'ringkas' }, host, actions, true)
       note('hasil-suara-status', 'Ringkasan siap. Semak fakta; cadangan tindakan hanya disimpan selepas anda sahkan.')
     } catch(e) { if (live(who, version) && seq === voiceSeq) note('hasil-suara-status', e.name === 'AbortError' ? 'Permintaan mengambil masa. Tekan Jana sekali lagi untuk menyemak hasil permintaan yang sama.' : e.message || 'Sambungan terputus. Cuba sekali lagi.') }
     finally { clearTimeout(timeout); if (live(who, version) && seq === voiceSeq) { voiceAbort = null; $('hasil-suara-jana').disabled = false; $('hasil-suara-transkrip').readOnly = false } }
@@ -237,7 +244,7 @@ const BeshareHasil = (() => {
     $('hasil-editor-salin').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('hasil-editor-kandungan').value); note('hasil-editor-nota', 'Kandungan disalin. Status simpanan tidak berubah.') } catch { $('hasil-editor-kandungan').focus(); $('hasil-editor-kandungan').select(); note('hasil-editor-nota', 'Teks dipilih. Salin menggunakan menu peranti anda.') } })
     $('hasil-semakan-form').addEventListener('input', () => { reviewDirty = true; note('hasil-semakan-status', 'Suntingan semakan belum disimpan.') })
     $('hasil-semakan-form').addEventListener('submit', saveReview)
-    $('hasil-semakan-muat').addEventListener('click', () => { if (reviewSaving) return; if (reviewDirty) { reviewConflict = reviews.find(x => x.minggu === mingguSemasa().isnin) || emptyReview(mingguSemasa().isnin); $('hasil-semakan-konflik').hidden = false; note('hasil-semakan-perbandingan', HasilCore.reviewText(reviewConflict)); note('hasil-semakan-status', 'Draf anda dikekalkan. Pilih Guna salinan akaun untuk menggantikannya.'); } else refresh(true) })
+    $('hasil-semakan-muat').addEventListener('click', () => { if (!reviewSaving) refresh(!reviewDirty, reviewDirty) })
     $('hasil-semakan-guna').addEventListener('click', () => { if (reviewConflict && !reviewSaving) { showReview(reviewConflict); note('hasil-semakan-status', 'Salinan yang dipaparkan telah dimuat.'); refresh() } })
     $('hasil-semakan-nasihat').addEventListener('click', async () => { if (sibuk || !review) return; const who = akaunId, version = epoch; if ((reviewDirty || !review.versi) && !(await saveReview())) return; if (!live(who, version)) return; pergi('nasihat', true); hantarTeks(`Berdasarkan semakan minggu ${review.minggu} yang saya simpan, bantu pilih satu langkah seterusnya. Bezakan hasil yang direkod dengan andaian. Jangan anggap perubahan jualan disebabkan satu tindakan sahaja.`, false) })
     $('hasil-suara-buka').addEventListener('click', openVoiceReview); $('hasil-suara-sambung').addEventListener('click', openVoiceReview)
