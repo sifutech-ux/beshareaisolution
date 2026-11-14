@@ -1,0 +1,21 @@
+const test = require('node:test'), assert = require('node:assert/strict')
+const { voiceTurns, startPrompt, reviewText } = require('../../penasihat/hasil-core')
+test('preserve complete voice transcript and negation across provider turn limit', () => {
+  const input = 'Anda: Jangan rekod harga sebagai jualan. '.repeat(480)
+  const turns = voiceTurns(input)
+  assert.ok(turns.length <= 8)
+  assert.ok(turns.every(t => t.teks.length <= 4000 && t.dari === 'klien'))
+  assert.equal(turns.slice(-8).slice(1,-1).map(t=>t.teks.replace('PETIKAN TRANSKRIP:\n','')).join(''),input)
+  assert.match(turns.at(-1).teks,/jumlah serta tarikh/)
+})
+test('oversize or empty transcript requires correction rather than silent clipping', () => {
+  for (const value of ['', '   ', null, 'a'.repeat(20001)]) assert.throws(()=>voiceTurns(value))
+  assert.doesNotThrow(()=>voiceTurns('a'.repeat(20000)))
+})
+test('guided outcomes preserve user detail and avoid invented sales or promotions', () => {
+  assert.match(startPrompt('pemasaran','Latte RM8','WhatsApp'),/Latte RM8/)
+  assert.match(startPrompt('pemasaran','','Facebook'),/Jangan cipta diskaun/)
+  assert.match(startPrompt('angka','',null),/untung bersih/)
+  assert.match(startPrompt('pelan','Ada 2 jam',null),/semak dan sahkan/)
+  assert.match(reviewText({minggu:'2026-11-09',dibuat:'Promosi'}),/Belum dinyatakan/)
+})

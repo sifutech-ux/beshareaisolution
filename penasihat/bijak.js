@@ -106,15 +106,16 @@ const BeshareBijak = (() => {
       host.append(card)
     } catch { if (owner === akaunId && host.isConnected) host.append(text('p', 'Cadangan belum dapat dimuat. Muat semula untuk menyemaknya.')) }
   }
-  function decorate(item, host, actions) {
+  function decorate(item, host, actions, summaryOnly = false) {
     if (item.dari !== 'penasihat') return
+    BeshareHasil.decorate(item, host, actions)
     const full = [item.teks, ...(item.langkah || [])].join('\n')
     actions.append(button('Salin', async e => {
       const control = e.currentTarget
       try { await navigator.clipboard.writeText(full); control.textContent = 'Disalin' }
       catch { status.textContent = 'Pilih teks jawapan untuk menyalinnya.' }
     }))
-    actions.append(button('Ringkaskan', () => hantarTeks('Ringkaskan jawapan berikut kepada dua ayat sahaja:\n' + item.teks.slice(0, 3300), false)))
+    if (!summaryOnly) actions.append(button('Ringkaskan', () => hantarTeks('Ringkaskan jawapan berikut kepada dua ayat sahaja:\n' + item.teks.slice(0, 3300), false)))
     if (item.format === 'pemasaran') {
       actions.append(button('Tambah ke pelan', async e => {
         const control = e.currentTarget; control.disabled = true
@@ -126,7 +127,7 @@ const BeshareBijak = (() => {
         const editor = document.createElement('textarea'); editor.className = 'editor-pemasaran'; editor.value = item.teks
         editor.setAttribute('aria-label', 'Sunting draf pemasaran'); editor.maxLength = 4000
         const copy = button('Salin draf suntingan', async () => { try { await navigator.clipboard.writeText(editor.value); copy.textContent = 'Disalin' } catch { editor.select() } })
-        host.append(editor, copy); editor.focus()
+        host.append(editor, copy, button('Simpan draf suntingan', () => BeshareHasil.newDraft(editor.value))); editor.focus()
       }))
     }
     // Defer until the bubble has been attached to the document.
@@ -154,10 +155,11 @@ const BeshareBijak = (() => {
     if (voice || starting) closeVoice()
     if ($('suara-panel').open) $('suara-panel').close()
   }
-  function closeVoice(message = 'Perbualan suara ditamatkan.', state = 'ended') {
+  function closeVoice(message = 'Perbualan suara ditamatkan.', state = 'ended', suppressSummary = false) {
     voiceGeneration += 1; starting = false
     const current = voice; voice = null
     if (current) {
+      if (!suppressSummary && current.owner === akaunId) BeshareHasil.offerVoice(current.entries, state === 'error')
       current.abort?.abort(); clearTimeout(current.timer)
       current.media?.getTracks().forEach(t => t.stop()); current.channel?.close(); current.peer?.close()
       $('audio-bijak').srcObject = null
@@ -178,7 +180,7 @@ const BeshareBijak = (() => {
     $('suara-henti').disabled = false; $('suara-henti').hidden = false; $('suara-henti').focus()
     voiceState('connecting', 'Membuka mikrofon…'); $('suara-transkrip').replaceChildren()
     $('suara-catatan').hidden = true; $('suara-catatan').open = false; $('suara-salin').textContent = 'Salin transkrip'
-    const current = { headers: kepalaAkaun(), abort: new AbortController() }; voice = current
+    const current = { owner, entries: [], headers: kepalaAkaun(), abort: new AbortController() }; voice = current
     const alive = () => seq === voiceGeneration && owner === akaunId && voice === current
     try {
       const media = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
@@ -205,7 +207,8 @@ const BeshareBijak = (() => {
         const key = `${data.type}:${data.item_id || data.response_id}`
         if (seen.has(key)) return; seen.add(key)
         const line = document.createElement('article'); line.className = 'baris-transkrip'
-        const transcript = data.transcript.slice(0, 4000)
+        const transcript = data.transcript
+        current.entries.push({ speaker: user ? 'user' : 'assistant', text: transcript })
         line.append(text('strong', user ? 'Anda' : 'Copilot'), text('p', transcript))
         if (user) line.append(button('Jadikan arahan dalam sembang', () => {
           closeVoicePanel(); tulis.value = transcript.slice(0, 600); tulis.focus()
@@ -235,7 +238,7 @@ const BeshareBijak = (() => {
     } finally { if (alive()) starting = false }
   }
   function reset() {
-    closeVoice(); closeVoicePanel(); generation += 1; context = null; memoryVersion = null; dirty = false; proposalCache.clear()
+    closeVoice(undefined, 'ended', true); closeVoicePanel(); generation += 1; context = null; memoryVersion = null; dirty = false; proposalCache.clear()
     fields.forEach(key => { $(`ingatan-${key}`).value = '' })
     $('ingatan-simpan').disabled = true; $('suara-transkrip').replaceChildren(); $('suara-catatan').hidden = true; $('fokus-hari').replaceChildren()
     voiceState('idle', 'Ceritakan apa yang anda fikirkan. Copilot sedia membantu.')
