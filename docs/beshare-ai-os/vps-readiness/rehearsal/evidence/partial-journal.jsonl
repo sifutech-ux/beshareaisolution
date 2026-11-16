@@ -1,0 +1,2 @@
+{"migration":"0001_foundation.up.sql","file_sha256":"506862ea92234627c2fbe8bed636689b61063dbadb1b4155e15c63c804894b2c","statement":1,"statement_sha256":"8150b9397ae907f2b6f1648680cca2973a8ff024c13f2634213f03476fdc912d","result":"PASS","ms":4.587184,"error":null}
+{"migration":"0001_foundation.up.sql","file_sha256":"506862ea92234627c2fbe8bed636689b61063dbadb1b4155e15c63c804894b2c","statement":2,"statement_sha256":"b6180300a0b89bdeba936f29dd006070e755fc51aa3e77780147ae20980660da","result":"PASS","ms":4.703248,"error":null}

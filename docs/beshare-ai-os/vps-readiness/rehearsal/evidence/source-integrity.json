@@ -1,0 +1,30 @@
+{
+  "p0_commit": "c955270cf393c435bc51356ce9f261eda4ceb2fb",
+  "unchanged_files": {
+    "os/bin/check-lifecycle.php": true,
+    "os/bin/check-meta.php": true,
+    "os/bin/check-worker.php": true,
+    "os/migrations/0001_foundation.down.sql": true,
+    "os/migrations/0001_foundation.up.sql": true,
+    "os/migrations/0002_coexistence_sync.up.sql": true,
+    "os/migrations/0003_coexistence_worker.up.sql": true,
+    "os/src/CoexistenceWorker.php": true,
+    "os/src/Db.php": true,
+    "os/src/LegacyDesk.php": true,
+    "os/src/LifecycleBridge.php": true,
+    "os/src/PhoneOverride.php": true,
+    "os/src/PrivateConfig.php": true,
+    "os/src/WhatsAppWebhook.php": true,
+    "os/tests/SECURITY-P0-20261023.md": true,
+    "os/tests/p0-fixture.php": true,
+    "webhook/index.php": true,
+    "whatsapp/meja/guard.php": true,
+    "whatsapp/meja/index.php": true,
+    "whatsapp/meja/lib.php": true,
+    "whatsapp/meja/perbualan/index.php": true,
+    "whatsapp/meja/pesanan/index.php": true,
+    "whatsapp/sambungan/webhook.php": true
+  },
+  "all_match": true,
+  "exception": "os/tests/run-security-p0.py only: documented test harness adapter"
+}

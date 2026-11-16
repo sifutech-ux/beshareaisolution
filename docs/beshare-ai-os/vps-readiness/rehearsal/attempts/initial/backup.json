@@ -1,0 +1,8 @@
+{
+  "seconds": 0.04130616699694656,
+  "bytes": 61005,
+  "sha256": "da39668766409ff2e5913e8f2081f10ca524ebebab422194d97870c9044ac126",
+  "consistent": "single transaction; no concurrent writers or DDL",
+  "routines": 0,
+  "events": 0
+}

@@ -1,0 +1,5 @@
+{
+  "exit": 1,
+  "routes": "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT                                                       \n",
+  "stderr": "bash: connect: Network is unreachable\nbash: line 1: /dev/tcp/192.0.2.1/443: Network is unreachable\n"
+}
