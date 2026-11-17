@@ -1,0 +1,63 @@
+@charset "UTF-8";
+.marketing-policy{color-scheme:dark;--policy-bg:#0b101c;--policy-surface:#111a2a;--policy-text:#edf1fa;--policy-muted:#a8b5cc;--policy-line:#2c374d;--policy-violet:#c0afff;--policy-mint:#8be5ce;margin:0;background:radial-gradient(ellipse at 85% 0,rgba(114,81,189,.14),transparent 42%),var(--policy-bg);color:var(--policy-text);font:16px/1.75 Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.marketing-policy *{box-sizing:border-box}
+.marketing-policy a{color:var(--policy-violet);text-decoration-thickness:1px;text-underline-offset:4px;overflow-wrap:anywhere}
+.marketing-policy a:hover{color:#ded4ff}
+.marketing-policy a:focus-visible{outline:3px solid var(--policy-mint);outline-offset:5px;border-radius:3px}
+.marketing-policy h1,.marketing-policy h2,.marketing-policy h3{color:var(--policy-text);line-height:1.25;letter-spacing:-.025em}
+.marketing-policy h1{font-size:clamp(35px,4.7vw,60px);font-weight:650;margin:18px 0 20px;max-width:800px}
+.marketing-policy h2{font-size:26px;font-weight:620;margin:0 0 20px}
+.marketing-policy h3{font-size:19px;font-weight:600;margin:0 0 10px}
+.marketing-policy p{margin:0 0 18px}
+.marketing-policy p:last-child{margin-bottom:0}
+.marketing-policy strong{color:var(--policy-text);font-weight:620}
+.marketing-policy ul,.marketing-policy ol{padding-left:23px;margin:16px 0 20px}
+.marketing-policy li{padding-left:5px;margin:11px 0}
+.marketing-policy section{scroll-margin-top:30px}
+.marketing-policy .policy-skip{position:fixed;left:16px;top:12px;z-index:10;transform:translateY(-160%);padding:12px 18px;background:var(--policy-mint);color:#10241f;border-radius:8px;text-decoration:none}
+.marketing-policy .policy-skip:focus{transform:translateY(0)}
+.marketing-policy .policy-header{max-width:1180px;margin:auto;padding:30px 38px;display:flex;align-items:center;justify-content:space-between;gap:24px;border-bottom:1px solid var(--policy-line)}
+.marketing-policy .policy-brand{display:inline-flex;align-items:center;gap:11px;text-decoration:none;color:var(--policy-text);font-size:21px;font-weight:650;line-height:1.15;letter-spacing:-.035em}
+.marketing-policy .policy-brand img{border-radius:9px;flex:none}
+.marketing-policy .policy-brand em{font-style:normal;color:var(--policy-violet)}
+.marketing-policy .policy-brand small{display:block;font-size:9px;font-weight:600;color:var(--policy-muted);letter-spacing:.14em;margin-top:6px}
+.marketing-policy .policy-back{font-size:13px;font-weight:550;text-decoration:none;white-space:nowrap}
+.marketing-policy .policy-main{max-width:1180px;margin:auto;padding:58px 38px 70px;outline:none}
+.marketing-policy .policy-kicker{display:flex;align-items:center;gap:9px;text-transform:uppercase;letter-spacing:.16em;font-size:11px;font-weight:650;color:var(--policy-mint);margin-bottom:0}
+.marketing-policy .policy-kicker::before{content:"";width:6px;height:6px;background:var(--policy-mint);border-radius:50%}
+.marketing-policy .policy-lead{font-size:19px;line-height:1.65;color:var(--policy-muted);max-width:770px}
+.marketing-policy .policy-meta{display:flex;gap:16px 22px;flex-wrap:wrap;color:var(--policy-muted);font-size:12px;margin:26px 0 40px}
+.marketing-policy .policy-summary{padding:25px 28px;border:1px solid #4a4367;border-radius:16px;background:linear-gradient(110deg,rgba(109,83,174,.12),rgba(31,77,77,.09));max-width:100%;color:#d4deee;font-size:15px}
+.marketing-policy .policy-summary strong{display:block;font-size:17px;margin-bottom:7px}
+.marketing-policy .policy-layout{display:grid;grid-template-columns:205px minmax(0,1fr);gap:64px;align-items:start;margin-top:48px}
+.marketing-policy .policy-toc{position:sticky;top:28px;font-size:13px;border-top:1px solid var(--policy-line);padding-top:22px}
+.marketing-policy .policy-toc h2{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--policy-muted);margin:0 0 16px}
+.marketing-policy .policy-toc ol{list-style:none;padding:0;margin:0}
+.marketing-policy .policy-toc li{padding:0;margin:0}
+.marketing-policy .policy-toc a{display:block;padding:10px 0;text-decoration:none;line-height:1.5;color:#b8c3d9}
+.marketing-policy .policy-toc a:hover{color:var(--policy-violet)}
+.marketing-policy .policy-article{min-width:0;color:var(--policy-muted)}
+.marketing-policy .policy-section{padding:0 0 38px;margin-bottom:37px;border-bottom:1px solid var(--policy-line)}
+.marketing-policy .policy-section:last-child{margin-bottom:0}
+.marketing-policy .policy-data{margin:24px 0 0;border:1px solid var(--policy-line);border-radius:14px;overflow:hidden;background:rgba(17,26,42,.7)}
+.marketing-policy .policy-data>div{padding:22px 24px;border-top:1px solid var(--policy-line)}
+.marketing-policy .policy-data>div:first-child{border-top:0}
+.marketing-policy .policy-data dt{font-size:15px;font-weight:620;color:#e0e7f6;margin-bottom:7px}
+.marketing-policy .policy-data dd{margin:0;font-size:14px;line-height:1.8}
+.marketing-policy .policy-note{padding:20px 22px;border-left:3px solid var(--policy-mint);border-radius:0 10px 10px 0;background:rgba(86,151,137,.07);font-size:14px;margin:22px 0 0}
+.marketing-policy .policy-steps{list-style:none;counter-reset:policy-steps;padding:0;margin:24px 0}
+.marketing-policy .policy-steps li{counter-increment:policy-steps;position:relative;padding:0 0 0 46px;min-height:34px;margin:22px 0}
+.marketing-policy .policy-steps li::before{content:counter(policy-steps,decimal-leading-zero);position:absolute;left:0;top:0;width:30px;height:30px;display:grid;place-items:center;border:1px solid #4b4268;border-radius:8px;font-size:11px;font-weight:650;color:var(--policy-violet);background:rgba(141,113,215,.08)}
+.marketing-policy .policy-contact{padding:27px;border:1px solid #45405c;border-radius:15px;background:var(--policy-surface);margin-top:24px}
+.marketing-policy .policy-contact-label{font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:var(--policy-muted);margin-bottom:10px}
+.marketing-policy .policy-email{font-size:clamp(17px,3.4vw,24px);font-weight:600;letter-spacing:-.02em;display:inline-block;margin-bottom:14px}
+.marketing-policy .policy-contact p{font-size:14px}
+.marketing-policy .policy-button{display:inline-flex;justify-content:center;align-items:center;min-height:44px;padding:10px 17px;gap:12px;background:#b7a1fa;color:#171126;border:1px solid #c2b0ff;border-radius:9px;text-decoration:none;font-size:13px;font-weight:650;line-height:1.5}
+.marketing-policy .policy-button:hover{background:#c8b6ff;color:#171126}
+.marketing-policy .policy-footer{max-width:1180px;margin:auto;padding:26px 38px 35px;border-top:1px solid var(--policy-line);display:flex;gap:20px 30px;justify-content:space-between;flex-wrap:wrap;font-size:12px;color:var(--policy-muted)}
+.marketing-policy .policy-footer nav{display:flex;gap:14px 24px;flex-wrap:wrap}
+.marketing-policy .policy-footer a{color:var(--policy-muted)}
+@media(max-width:800px){.marketing-policy .policy-layout{grid-template-columns:1fr;gap:32px}.marketing-policy .policy-toc{position:static;border-bottom:1px solid var(--policy-line);padding:20px 0}.marketing-policy .policy-toc ol{display:grid;grid-template-columns:1fr 1fr;column-gap:24px}.marketing-policy .policy-toc h2{margin-bottom:9px}.marketing-policy .policy-main{padding-top:42px}.marketing-policy .policy-lead{font-size:17px}}
+@media(max-width:520px){.marketing-policy{font-size:15px}.marketing-policy .policy-header{padding:22px 21px;gap:12px;align-items:center}.marketing-policy .policy-brand{font-size:18px;gap:9px}.marketing-policy .policy-brand img{width:33px;height:33px}.marketing-policy .policy-brand small{font-size:8px}.marketing-policy .policy-back{font-size:11px}.marketing-policy .policy-main{padding:36px 21px 45px}.marketing-policy h1{font-size:36px;margin-top:16px}.marketing-policy h2{font-size:23px}.marketing-policy .policy-summary{padding:21px;font-size:14px}.marketing-policy .policy-meta{margin:23px 0 29px;gap:8px 18px}.marketing-policy .policy-layout{margin-top:31px}.marketing-policy .policy-toc{font-size:12px}.marketing-policy .policy-data>div{padding:20px}.marketing-policy .policy-contact{padding:22px}.marketing-policy .policy-section{margin-bottom:29px;padding-bottom:29px}.marketing-policy .policy-footer{padding:24px 21px 30px}.marketing-policy .policy-steps li{padding-left:43px}}
+@media(prefers-reduced-motion:reduce){.marketing-policy *{scroll-behavior:auto!important}}
+@media print{.marketing-policy{color:#202020;background:white;font-size:11pt}.marketing-policy h1,.marketing-policy h2,.marketing-policy h3,.marketing-policy strong,.marketing-policy a{color:#111}.marketing-policy .policy-header,.marketing-policy .policy-toc,.marketing-policy .policy-skip,.marketing-policy .policy-footer{display:none}.marketing-policy .policy-main{padding:0;max-width:none}.marketing-policy .policy-layout{display:block}.marketing-policy .policy-article,.marketing-policy .policy-lead,.marketing-policy .policy-meta{color:#333}.marketing-policy .policy-summary,.marketing-policy .policy-data,.marketing-policy .policy-contact,.marketing-policy .policy-note{color:#222;background:white;border-color:#aaa;break-inside:avoid}.marketing-policy .policy-data dt{color:#111}.marketing-policy .policy-button{color:#111;background:white;border-color:#777}.marketing-policy .policy-section{border-color:#bbb}}

@@ -206,6 +206,28 @@ class ReleasePreflightTests(unittest.TestCase):
             metadata['candidate']['cmd'] = ['different']
             self.assertEqual(preflight.preflight('observed-account-1', 'candidate', 'dependencies')['image_gate'], 'blocked')
 
+    def test_direct_candidate_must_descend_live_image_and_preserve_runtime(self):
+        container = {'image_id': IMAGE, 'running': True, 'restarting': False, 'health': 'healthy', 'mounts': []}
+        metadata = {IMAGE: image_metadata(IMAGE, [BASE_LAYER]),
+                    'candidate': image_metadata(CANDIDATE_IMAGE, [BASE_LAYER, CANDIDATE_LAYER])}
+        def probe(identifier, expected):
+            return {'image_id': identifier, **preflight.clean_probe(probe_result(expected), expected)}
+        with patch.object(preflight, 'command_json', return_value=container), \
+                patch.object(preflight, 'inspect_image', side_effect=metadata.__getitem__), \
+                patch.object(preflight, 'probe_image', side_effect=probe) as run_probe:
+            result = preflight.preflight('observed-account-1', candidate='candidate')
+            self.assertEqual(result['image_gate'], 'passed')
+            self.assertEqual(result['candidate_image']['parent_image_id'], IMAGE)
+            for field, value in (('rootfs_layers', [CANDIDATE_LAYER]), ('cmd', ['unexpected-command'])):
+                with self.subTest(field=field):
+                    metadata['candidate'] = image_metadata(CANDIDATE_IMAGE, [BASE_LAYER, CANDIDATE_LAYER])
+                    metadata['candidate'][field] = value
+                    run_probe.reset_mock()
+                    result = preflight.preflight('observed-account-1', candidate='candidate')
+                    self.assertEqual(result['image_gate'], 'blocked')
+                    self.assertIn('probe_skipped', result['candidate_image'])
+                    self.assertEqual(run_probe.call_count, 1)
+
 
 if __name__ == '__main__':
     unittest.main()

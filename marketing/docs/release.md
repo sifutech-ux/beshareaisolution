@@ -3,7 +3,7 @@
 This checklist prepares the existing account service for Marketing. It does not
 choose a container, Compose project, database, proxy, image or supervisor. Obtain
 those values from the running deployment before substituting the placeholders.
-The first release keeps automatic publishing disabled and can provide campaign
+The release keeps automatic publishing disabled and can provide campaign
 planning, saved posts, reference notes and manually reported results without
 social app credentials.
 
@@ -111,10 +111,16 @@ python3 marketing/bin/release-preflight.py --container ACCOUNT_CONTAINER --candi
 ```
 
 Resolve `VERIFIED_BASE_REFERENCE` to the immutable base established above; keep
-the mapping recorded. Choose `CANDIDATE_IMAGE` through the existing release
-naming convention. The second probe checks the candidate's unchanged account
-and HTTP baseline files plus the five released Python files against this local
-checkout. It does not pull images or run the candidate's normal entrypoint.
+the mapping recorded. The current baseline is the deployed `4f86a43` Marketing
+account layer. Its account router hash was intentionally updated from the
+pre-Marketing baseline; the account/authentication and HTTP baseline hashes are
+unchanged. Choose `CANDIDATE_IMAGE` through the existing release naming
+convention. The second probe requires the candidate to descend from the exact
+live image (or the explicitly verified dependency image) and preserve its
+runtime. It checks the unchanged account/authentication file plus the seven
+released Python files against this checkout, including the HTTP server and
+provider lifecycle handler. It does not pull images or run the candidate's
+normal entrypoint.
 
 Confirm the account process uses the expected Python runtime and `/app` layout.
 The helper invokes `python`, matching the release Dockerfile dependency check;
