@@ -17,15 +17,53 @@ Configure these on the **dedicated account service and its worker**, never in th
 | `MARKETING_THREADS_APP_SECRET` | The secret corresponding to that Threads app ID, not the parent Meta app secret. |
 | `MARKETING_THREADS_API_VERSION` | Threads API version, initially `v1.0`. |
 | `MARKETING_OAUTH_REDIRECT_URI` | Exact HTTPS return URL: `https://beshareaisolution.com/marketing/connect.html`. Register the identical URI in both app configurations. Staging uses its own HTTPS callback and credentials. |
+| `MARKETING_DATA_DELETION_STATUS_URL` | Public HTTPS status endpoint for Meta deletion confirmations: `https://akaun.beshareaisolution.com/api/akaun/copilot/marketing/provider/deletion-status`. Must have this exact path with no query or fragment; never derived from an incoming Host header. Required by the account service for deletion callbacks. |
 | `MARKETING_PUBLISH_ENABLED` | `1` enables admission to the queue and processing by the worker. The default is disabled. This flag is not a worker heartbeat. |
 
 Install `cryptography` in the account/worker image. Missing/invalid encryption configuration fails closed. Retain the encryption key with the database backup. Replacing it without a migration makes existing ciphertext unusable and requires reconnection; no plaintext fallback exists.
 
 The existing `ACCOUNT_DATABASE_URL`, `ACCOUNT_DATABASE_NAME` and `ACCOUNT_DATABASE_ROLE` guard applies. The worker does not read the trading database or use `DATABASE_URL` as fallback.
 
+### Operator credential entry
+
+`marketing/bin/configure-social.py` prepares a **new** private Compose env file
+without changing services. Its default is a no-write plan. Run the reviewed
+checkout on the deployment host in an interactive terminal, adding `--write`
+only when the operator is ready to enter the two app secrets privately:
+
+```sh
+python3 marketing/bin/configure-social.py \
+  --output /opt/beshare-copilot-production/marketing.env \
+  --meta-app-id 1473513278172621 \
+  --meta-login-config-id 1151269530711228 \
+  --threads-app-id 2429078661181153
+```
+
+The write mode requires a real terminal, refuses any existing destination or
+symlink, disables secret echo, generates the Fernet key once on that host and
+creates an owner-only `0600` file. It prints variable names without their values.
+No secret belongs in a command argument, chat, source control or a screenshot.
+If a file already exists, use the established secret-management process; do not
+delete it merely to rerun this helper or accidentally rotate the encryption key.
+After private entry, add this same provider file to the account and worker's
+reviewed `env_file` lists, preserving their existing files and the worker's
+separate database-only environment. Validate the resolved values privately and
+recreate only those two services. The helper itself does not edit Compose,
+restart a process, call a provider or enable publishing.
+
 ## Platform setup
 
 Activation settings below were checked against official Meta documentation on **18 November 2026**.
+
+The dedicated development app prepared for this deployment is **BeShare AI Marketing**,
+parent Meta app ID `1473513278172621`, in the BeShare Ai Solution business portfolio.
+Its **BeShare Marketing Social** configuration ID is `1151269530711228`, using
+the General login variation and **User access token** with the five permissions
+in the table below. Threads has its own app ID, `2429078661181153`. Both redirect
+settings contain the exact OAuth return URL above. These are public identifiers;
+their corresponding secrets belong only in the protected server environment.
+The app is unpublished: these settings do not prove successful real-account
+OAuth, publication, App Review or public customer access.
 
 ### App and Facebook Login configuration
 
@@ -42,13 +80,18 @@ The current code shares one configuration ID between Facebook and Instagram and 
 | `pages_manage_posts` | Publish to the selected Facebook Page. |
 | `instagram_basic` | Access the linked Instagram Professional account. |
 | `instagram_content_publish` | Publish Instagram media. |
-| `publish_video` | Required by this release when scheduling Facebook video. |
 
 Retain permissions required by the chosen Meta use case; the Pages use case automatically includes `business_management`, `pages_show_list` and `public_profile`. In **Facebook Login for Business > Settings > Valid OAuth redirect URIs**, register exactly `https://beshareaisolution.com/marketing/connect.html`, matching `MARKETING_OAUTH_REDIRECT_URI` without a query or fragment.
 
 ### Facebook and Instagram assets
 
-Without a configuration ID, Facebook Login requests `pages_show_list`, `pages_read_engagement`, `pages_manage_posts` and `publish_video`. The selected Page must be managed by the connecting user with content creation rights. Video scheduling additionally checks the granted `publish_video` scope. Personal Facebook profile publishing is not supported. Graph calls include `appsecret_proof` when using provider tokens.
+Without a configuration ID, Facebook Login requests `pages_show_list`, `pages_read_engagement` and `pages_manage_posts`. The selected Page must return a content-creation task; missing tasks or `MANAGE` alone are insufficient. Ordinary video publication through `/{page-id}/videos` uses these same three Page permissions. The endpoint-specific v27 reference and Permissions Reference distinguish this from `publish_video`, which is for live-video streaming; this release does not request live streaming. Personal Facebook profile publishing is not supported. Graph calls include `appsecret_proof` when using provider tokens.
+
+The server independently inspects both the user token and each candidate Page
+token, verifies the app and returned user/Page identity, and bounds saved access
+expiry by the token metadata. The separately verified user discovery permission
+is retained when it is absent from the Page token's action scopes. Older stored
+connections without verified authorizer/app identity require reconnection.
 
 Instagram uses the Facebook Login route; without a configuration ID it requests `pages_show_list`, `pages_read_engagement`, `instagram_basic` and `instagram_content_publish`. The selector lists eligible **Business or Creator** accounts linked to the user's Facebook Pages. Publishing uses the selected Page access token. This is not the separate Instagram Login or Unified Login integration.
 
@@ -62,11 +105,59 @@ For testing, use **App roles > Roles > Add People > Threads Tester**. The invite
 
 Threads uses `threads_basic` and `threads_content_publish`. Its current official endpoints use `threads.com` and `graph.threads.com`. The server exchanges the short-lived token for a long-lived token, obtains an app access token and inspects the user's token through `debug_token`. Actual granted scopes, validity, app/user identity and expiry are checked before saving. An exchange alone is insufficient because `threads_basic` can permit an exchange without publishing permission. The server records the expiry and requires reconnection before scheduling beyond it. There is no claim of automatic indefinite refresh.
 
-### App roles, public release and outstanding callbacks
+### App roles and public release
 
 Initial Facebook/Instagram checks use an app-role account with the necessary Page tasks; Threads uses an accepted Threads tester. Public customer access requires the relevant permissions to pass App Review/Advanced Access and the app to be **Live/Published**. Facebook Login for Business also requires Advanced Access to `public_profile` for external users. Connect the required business portfolio and complete the dashboard's applicable verification/review requirements before opening customer onboarding.
 
-Threads settings list a **Deauthorize callback URL** and **Data Deletion Requests URL**. Public app publication also requires a privacy-policy URL and a data-deletion URL with instructions or a functioning callback. **This release does not implement provider deauthorisation or data-deletion callbacks.** `marketing/connect.html` only handles OAuth returns and must not be entered for either server callback. Local connection removal is not a provider data-deletion callback. The current `/privasi/` content describes WhatsApp data/deletion; extend the policy and deletion instructions to cover the marketing integration and provide the required working endpoints before claiming public-release readiness. App-role OAuth checks do not establish that these public-release requirements are complete.
+Marketing-specific public pages are `/marketing/privasi.html` and
+`/marketing/padam-data.html`; the existing `/privasi/` remains the WhatsApp
+policy. Use the deployed Marketing privacy page and deletion-instructions page
+for the app-level Basic settings. Meta permits deletion instructions or a
+functioning callback for that app-level requirement. Register callback URLs only
+after their runtime configuration and HTTPS routes have been verified.
+
+### Provider deauthorization and deletion callbacks
+
+The account service implements these public, provider-authenticated routes:
+
+| Method and path | Purpose |
+| --- | --- |
+| `POST /api/akaun/copilot/marketing/provider/meta/deauthorize` | Remove the matching Meta grant and provider-derived metadata. |
+| `POST /api/akaun/copilot/marketing/provider/meta/data-deletion` | Apply the same removal and return JSON `url` and `confirmation_code`. |
+| `GET /api/akaun/copilot/marketing/provider/deletion-status?code=…` | Human-readable generic completion status for an unguessable 64-character hexadecimal code. |
+
+POST accepts a bounded URL-encoded `signed_request`, verifies HMAC-SHA256 with
+the configured Meta app secret over the encoded payload, and resolves the
+app-scoped authorizing `user_id`. Invalid signatures/forms, missing configuration
+and unsupported methods are rejected before opening the database. No BeShare
+bearer session or browser Origin is required for a valid provider callback.
+Never register the OAuth browser return page as a lifecycle callback.
+
+Removal is limited to records matching the provider app and verified authorizer,
+including their grants across BeShare accounts. It deletes encrypted tokens,
+connection identities, matching pending candidates/states, publishing bindings,
+attempt metadata and stored provider publication IDs. Queued posts are cancelled;
+potentially in-flight writes remain `uncertain`. User-authored campaigns, drafts,
+references, results and the BeShare login remain. Published platform posts are
+not deleted. An already accepted provider request cannot be recalled.
+
+Minimal hashed subject/receipt records and opaque confirmation codes remain to
+prevent retries or an older in-flight OAuth flow from restoring deleted access.
+The revocation watermark never moves backwards. Canonically equivalent callback
+replays return the existing receipt and do not clear a later reconnection.
+Status responses do not reveal account IDs, tokens or post content.
+
+Meta's data-deletion signed-request and JSON confirmation contract is documented.
+The deauthorization adapter uses the same authenticated request format, but still
+requires an actual provider-originated deauthorization check before operational
+acceptance. No undocumented timestamp freshness limit is imposed.
+
+**Threads lifecycle callbacks remain disabled (503)** because the reviewed
+official Threads guides list callback fields but do not establish their signing
+key, payload identity or acknowledgement contract. Do not register these reserved
+routes or treat a static instructions page as a working Threads callback. Use
+the published deletion instructions/support path while completing this provider
+verification. A successful app-role OAuth test is not public-release approval.
 
 The code defaults remain `v27.0` for Meta Graph API and `v1.0` for Threads. At the review date, Meta's versioning guide explicitly identifies `v27.0` as latest, and its Threads publishing examples use `v1.0`.
 
@@ -75,6 +166,9 @@ Official references checked for this integration:
 - [Meta app creation and compatible use cases](https://developers.facebook.com/documentation/development/create-an-app)
 - [Facebook Login for Business configurations and access requirements](https://developers.facebook.com/documentation/facebook-login/facebook-login-for-business)
 - [Facebook Page publishing](https://developers.facebook.com/documentation/pages-api/posts)
+- [Page video endpoint and publishing permissions](https://developers.facebook.com/docs/graph-api/reference/page/videos/)
+- [Meta permissions reference](https://developers.facebook.com/documentation/development/permissions)
+- [Meta data-deletion callback contract](https://developers.facebook.com/documentation/development/create-an-app/app-dashboard/data-deletion-callback)
 - [Instagram with Facebook Login setup](https://developers.facebook.com/documentation/instagram-platform/instagram-api-with-facebook-login/get-started)
 - [Instagram publishing permissions and Page-token requirements](https://developers.facebook.com/documentation/instagram-platform/content-publishing)
 - [Threads credentials and tester invitations](https://developers.facebook.com/documentation/threads/get-started)
@@ -87,7 +181,7 @@ Official references checked for this integration:
 
 ## HTTP contract
 
-All routes use the existing authenticated BeShare bearer session and origin checks. Base: `/api/akaun/copilot/marketing/connections`.
+The connection routes below use the existing authenticated BeShare bearer session and origin checks. Base: `/api/akaun/copilot/marketing/connections`. Provider callbacks above are a separate signed-request interface.
 
 - `GET /`: safe connection descriptors, selected account names/IDs and capabilities. No tokens or app secrets.
 - `POST /{facebook|instagram|threads}/begin {}`: returns `authorization_url`. State is random, owner-bound, stored as a hash, single-use and valid for ten minutes.
@@ -98,6 +192,12 @@ All routes use the existing authenticated BeShare bearer session and origin chec
 - `DELETE /{platform}`: removes BeShare's stored token and pending authorisation state. It does not claim to revoke the entire app grant at the provider; users can also remove that grant in the platform's settings.
 
 `connect.html` immediately removes OAuth query parameters before loading external resources, applies `Referrer-Policy: no-referrer`, and restricts scripts using a CSP hash. `connect.js` keeps return codes/candidates only in memory and uses the existing account session. Losing the callback page requires starting the connection again. Provider errors are redacted. No provider response bodies or request URLs containing exchange credentials are logged.
+
+The callback also captures the initial BeShare session and checks it before and
+after asynchronous requests and before account selection. A changed, removed or
+malformed session permanently stops that callback page, aborts pending browser
+requests and clears its candidate UI; start a fresh connection from Marketing.
+Aborting a browser request does not undo a request already processed by the server.
 
 ## Publishing workflow
 

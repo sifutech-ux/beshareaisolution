@@ -68,6 +68,10 @@ class AkaunHandler(BaseHTTPRequestHandler):
         _tulis(self, 404, {'error': 'Endpoint tidak ditemui.'})
 
     def _akaun(self, method):
+        from marketing_lifecycle import is_provider_path
+        if is_provider_path(urllib.parse.urlsplit(self.path).path):
+            self._marketing_provider(method)
+            return
         try:
             length = int(self.headers.get('Content-Length', 0) or 0)
         except ValueError:
@@ -98,6 +102,43 @@ class AkaunHandler(BaseHTTPRequestHandler):
             )
         except Exception:
             status, body = 503, {'error': 'Akaun tidak dapat dihubungi. Cuba semula.'}
+        _tulis(self, status, body)
+
+
+    def _marketing_provider(self, method):
+        from marketing_lifecycle import MAX_BODY, STATUS_PATH, dispatch_provider, status_html
+        parsed = urllib.parse.urlsplit(self.path)
+        raw = b''
+        try:
+            lengths = self.headers.get_all('Content-Length') or []
+            if self.headers.get('Transfer-Encoding') or len(lengths) > 1:
+                raise ValueError()
+            length = int(lengths[0]) if lengths else 0
+            if length < 0 or length > MAX_BODY:
+                _tulis(self, 413, {'ok': False, 'error': 'Permintaan platform terlalu besar.'})
+                return
+            if method == 'POST':
+                self.connection.settimeout(10)
+                raw = self.rfile.read(length)
+                if len(raw) != length:
+                    raise ValueError()
+        except (ValueError, TimeoutError, OSError):
+            _tulis(self, 400, {'ok': False, 'error': 'Permintaan platform tidak sah.'})
+            return
+        status, body = dispatch_provider(method, parsed.path, raw, self.headers.get('Content-Type'),
+                                         parsed.query, self._connect, self._postgres())
+        if method == 'GET' and parsed.path == STATUS_PATH:
+            rendered = status_html(status)
+            self.send_response(status)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Content-Length', str(len(rendered)))
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Referrer-Policy', 'no-referrer')
+            self.send_header('X-Content-Type-Options', 'nosniff')
+            self.send_header('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+            self.end_headers()
+            self.wfile.write(rendered)
+            return
         _tulis(self, status, body)
 
 

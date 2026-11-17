@@ -23,6 +23,8 @@ OTHER = 'b' * 32
 CAMPAIGN = 'c' * 32
 POST = 'd' * 32
 TOKEN = 'provider-token-never-in-client'
+USER_TOKEN = 'synthetic-user-access'
+APP_TOKEN = 'synthetic-app-access'
 
 
 class MarketingSocialTests(unittest.TestCase):
@@ -68,7 +70,17 @@ class MarketingSocialTests(unittest.TestCase):
 
     def meta_transport(self, method, url, params, token):
         if url.endswith('/oauth/access_token'):
-            return {'access_token': TOKEN, 'expires_in': 60 * 86400}
+            return {'access_token': APP_TOKEN if params.get('grant_type') == 'client_credentials' else USER_TOKEN,
+                    'expires_in': 60 * 86400}
+        if url.endswith('/debug_token'):
+            page = params.get('input_token') == TOKEN
+            self.assertEqual(token, APP_TOKEN)
+            return {'data': {'app_id': '12345', 'user_id': '5001', 'is_valid': True,
+                             'type': 'PAGE' if page else 'USER', **({'profile_id': '1001'} if page else {}),
+                             'expires_at': NOW + 60 * 86400,
+                             'scopes': sorted(set(social.SCOPES['facebook'] + social.SCOPES['instagram']))}}
+        if url.endswith('/me'):
+            return {'id': '1001' if token == TOKEN else '5001'}
         if url.endswith('/me/permissions'):
             return {'data': [{'permission': s, 'status': 'granted'} for s in set(social.SCOPES['facebook'] + social.SCOPES['instagram'])]}
         if url.endswith('/me/accounts'):
@@ -83,7 +95,10 @@ class MarketingSocialTests(unittest.TestCase):
             candidate = {'platform': platform, 'account_id': account, 'account_name': 'Kedai',
                          'page_id': '1001' if platform != 'threads' else '',
                          'token_cipher': social._encrypt(TOKEN), 'token_expires_at': NOW + 60 * 86400,
-                         'scopes_json': json.dumps(social.SCOPES[platform])}
+                         'scopes_json': json.dumps(social.SCOPES[platform]),
+                         'provider_app_id': '67890' if platform == 'threads' else '12345',
+                         'provider_user_id': '3001' if platform == 'threads' else '5001',
+                         'authorization_started_at': NOW}
             social._save_connection(conn, False, owner, candidate, NOW)
             conn.commit()
         finally:
@@ -182,6 +197,87 @@ class MarketingSocialTests(unittest.TestCase):
         self.assertEqual(data['account']['account_id'], '3001')
         self.assertTrue(all('graph.threads.com' in url for _, url in seen))
         self.assertNotIn(TOKEN, json.dumps(data))
+
+    def test_meta_grant_identity_and_page_token_must_both_be_verified(self):
+        cases = ('empty_tasks', 'manage_only', 'wrong_app', 'wrong_user', 'missing_scope',
+                 'wrong_page', 'expired_page', 'missing_page_scope')
+        for index, case in enumerate(cases):
+            with self.subTest(case=case):
+                stamp = NOW + index * 61
+                state = self.begin(now=stamp)
+                def transport(method, url, params, token):
+                    data = self.meta_transport(method, url, params, token)
+                    page = params.get('input_token') == TOKEN
+                    if url.endswith('/me/accounts'):
+                        if case == 'empty_tasks':
+                            data['data'][0]['tasks'] = []
+                        elif case == 'manage_only':
+                            data['data'][0]['tasks'] = ['MANAGE']
+                    if url.endswith('/debug_token'):
+                        if not page and case == 'wrong_app':
+                            data['data']['app_id'] = '99999'
+                        if not page and case == 'wrong_user':
+                            data['data']['user_id'] = '9999'
+                        if not page and case == 'missing_scope':
+                            data['data']['scopes'] = ['pages_show_list']
+                        if page and case == 'wrong_page':
+                            data['data']['profile_id'] = '9999'
+                        if page and case == 'expired_page':
+                            data['data']['expires_at'] = NOW - 1
+                        if page and case == 'missing_page_scope':
+                            data['data']['scopes'] = ['pages_show_list']
+                    return data
+                status, body = self.call('POST', '/complete', {'code': 'validcode', 'state': state},
+                                          now=stamp, transport=transport)
+                self.assertEqual(status, 409, body)
+                self.assertNotIn(TOKEN, json.dumps(body))
+        conn = self.connect()
+        self.assertEqual(conn.execute('SELECT COUNT(*) FROM marketing_connections').fetchone()[0], 0)
+        self.assertEqual(conn.execute('SELECT COUNT(*) FROM marketing_oauth_candidates').fetchone()[0], 0)
+        conn.close()
+
+    def test_verified_authorizer_is_saved_on_candidates_connections_and_bindings(self):
+        state = self.begin()
+        status, data = self.call('POST', '/complete', {'code': 'validcode', 'state': state}, transport=self.meta_transport)
+        self.assertEqual(status, 200, data)
+        conn = self.connect()
+        self.assertEqual(conn.execute('SELECT provider_app_id,provider_user_id FROM marketing_oauth_candidates').fetchall(),
+                         [('12345', '5001')])
+        conn.close()
+        self.assertEqual(self.call('POST', '/facebook/select', {'candidate_id': data['candidates'][0]['id']})[0], 200)
+        self.queued_post()
+        conn = self.connect()
+        for table in ('marketing_connections', 'marketing_post_bindings'):
+            self.assertEqual(conn.execute(f'SELECT provider_app_id,provider_user_id FROM {table}').fetchall(),
+                             [('12345', '5001')])
+        conn.close()
+
+    def test_page_tokens_need_actions_while_user_token_proves_page_discovery(self):
+        for index, platform in enumerate(('facebook', 'instagram')):
+            with self.subTest(platform=platform):
+                stamp = NOW + 61 * index
+                state = self.begin(platform, now=stamp)
+                def transport(method, url, params, token):
+                    data = self.meta_transport(method, url, params, token)
+                    if url.endswith('/debug_token') and params.get('input_token') == TOKEN:
+                        data['data']['scopes'].remove('pages_show_list')
+                    return data
+                status, data = self.call('POST', '/complete', {'code': 'validcode', 'state': state},
+                                          now=stamp, transport=transport)
+                self.assertEqual(status, 200, data)
+                status, data = self.call('POST', '/' + platform + '/select',
+                                          {'candidate_id': data['candidates'][0]['id']}, now=stamp)
+                self.assertEqual(status, 200, data)
+                conn = self.connect()
+                scopes = conn.execute('SELECT scopes_json FROM marketing_connections WHERE platform=?', (platform,)).fetchone()[0]
+                self.assertEqual(set(json.loads(scopes)), set(social.SCOPES[platform]))
+                ready, reason = social.check_schedule(conn, False, OWNER, {
+                    'id': ('1' if platform == 'facebook' else '2') * 32, 'platform': platform,
+                    'format': 'image', 'body': 'Kandungan pelanggan', 'media_url': 'https://example.test/image.jpg'},
+                    meja._iso(stamp + 120), stamp)
+                self.assertTrue(ready, reason)
+                conn.commit()
+                conn.close()
 
     def test_threads_missing_publishing_grant_cannot_become_connected(self):
         state = self.begin('threads')

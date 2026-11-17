@@ -167,13 +167,24 @@ def _finish(conn, postgres, job, worker, stamp, status, error='', provider_id=''
     meja._dalam(conn, postgres, finish)
 
 
-def _mark_reconnect(conn, postgres, owner, platform, stamp):
+def _mark_reconnect(conn, postgres, job, worker, connection, stamp):
     ph = meja._ph(postgres)
+    owner = job['post']['akaun_id']
     def update():
         meja._kunci_akaun(conn, postgres, owner)
         conn.cursor().execute(f'''UPDATE marketing_connections SET status='reconnect_required',updated_at={ph}
-                                  WHERE akaun_id={ph} AND platform={ph} AND status='connected' ''',
-                              (meja._iso(stamp), owner, platform))
+                                  WHERE id={ph} AND akaun_id={ph} AND platform={ph} AND account_id={ph}
+                                    AND provider_app_id={ph} AND provider_user_id={ph} AND token_cipher={ph}
+                                    AND status='connected'
+                                    AND EXISTS (
+                                      SELECT 1 FROM marketing_publish_attempts a JOIN marketing_posts p
+                                      ON p.id=a.post_id AND p.akaun_id=a.akaun_id AND p.attempt_id=a.id
+                                      WHERE a.id={ph} AND a.akaun_id={ph} AND a.worker_id={ph}
+                                        AND a.lease_until>{ph} AND p.status='publishing')''',
+                              (meja._iso(stamp), connection['id'], owner, connection['platform'],
+                               connection['account_id'], connection['provider_app_id'], connection['provider_user_id'],
+                               connection['token_cipher'],
+                               job['attempt']['id'], owner, worker, int(stamp)))
         return 200, {}
     meja._dalam(conn, postgres, update)
 
@@ -300,7 +311,7 @@ def _publish_step(conn, postgres, job, worker, stamp, transport=None):
                             delay=60 * (2 ** attempt['retry_count']), error=str(error), retry_increment=1)
             return 'retry_wait'
         if error.kind == 'authorization':
-            _mark_reconnect(conn, postgres, item['akaun_id'], platform, stamp)
+            _mark_reconnect(conn, postgres, job, worker, connection, stamp)
         failed_status = 'uncertain' if attempt['provider_post_id'] else 'failed'
         _finish(conn, postgres, job, worker, stamp, failed_status, str(error))
         return failed_status

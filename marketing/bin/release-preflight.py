@@ -17,13 +17,14 @@ from pathlib import Path
 
 
 BASE_HASHES = {
-    '/app/pelanggan_copilot.py': '63c99873f3fef143d112bd1d9c7aa653f5327e54d4e2aae2d4da144e7d592334',
+    '/app/pelanggan_copilot.py': 'bf4ee5fe170955833ec5c552a5d607a6135e635f086dd55f03c5412a66dc1b7c',
     '/app/pelanggan_akaun.py': '064377cd793c5ad8750a4cde743f31d50f72719631d039af533c7b6f83d736b7',
     '/app/akaun_pelayan.py': '3ef8967bd36f535a6032b94ce0446c293780da2c19ac21d3b3a746a623055914',
 }
 RELEASE_FILES = (
     'pelanggan_copilot.py', 'pelanggan_hasil.py', 'pelanggan_marketing.py',
     'marketing_social.py', 'marketing_worker.py',
+    'akaun_pelayan.py', 'marketing_lifecycle.py',
 )
 APP_CODE_PATHS = set(BASE_HASHES) | {'/app/' + name for name in RELEASE_FILES} | {
     '/app/pelanggan_meja.py', '/app/pelanggan_kuota.py', '/app/pelanggan_bil.py',
@@ -138,7 +139,8 @@ def shadowing_mounts(mounts):
 
 
 def candidate_hashes(root):
-    expected = {path: digest for path, digest in BASE_HASHES.items() if path != '/app/pelanggan_copilot.py'}
+    released_paths = {'/app/' + name for name in RELEASE_FILES}
+    expected = {path: digest for path, digest in BASE_HASHES.items() if path not in released_paths}
     for filename in RELEASE_FILES:
         source = root / 'copilot' / 'account' / filename
         try:
@@ -280,10 +282,11 @@ def preflight(container, candidate=None, dependency=None):
               'live_checks': 'not_performed',
               'scope': 'Image/hash/dependency gate only. Database, routes, credentials and worker health require separate verification.'}
     baseline_gate = base['image_checks_passed']
-    if dependency:
+    if dependency or candidate:
         parent_metadata = inspect_image(identifier)
         if parent_metadata['image_id'] != identifier:
             raise ProbeError('The live image identity changed during inspection.')
+    if dependency:
         dependency_metadata = inspect_image(dependency)
         result['dependency_image'] = probe_descendant(dependency_metadata, parent_metadata, BASE_HASHES)
         baseline_gate = (all(item['matches'] for item in base['files'])
@@ -294,8 +297,8 @@ def preflight(container, candidate=None, dependency=None):
     if candidate:
         root = Path(__file__).resolve().parents[2]
         metadata = inspect_image(candidate)
-        result['candidate_image'] = (probe_descendant(metadata, dependency_metadata, candidate_hashes(root))
-                                     if dependency else probe_image(metadata['image_id'], candidate_hashes(root)))
+        result['candidate_image'] = probe_descendant(
+            metadata, dependency_metadata if dependency else parent_metadata, candidate_hashes(root))
     passed = (baseline_gate and raw.get('running') is True
               and raw.get('restarting') is False and not mounts
               and (not dependency or (raw.get('health') == 'healthy'
