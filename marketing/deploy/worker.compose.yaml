@@ -1,0 +1,42 @@
+# Source fragment for the observed copilot-production project, not a third live
+# overlay. Merge only this service into the existing production override, resolve
+# image/env_file placeholders to reviewed values, and retain existing networks.
+services:
+  marketing-worker:
+    image: ${MARKETING_WORKER_IMAGE:?Set the verified existing account image reference}
+    pull_policy: never
+    user: nobody
+    working_dir: /app
+    init: true
+    restart: unless-stopped
+    env_file:
+      - ${MARKETING_WORKER_ENV_FILE:?Set the absolute private worker env file path}
+    environment:
+      # Initial rollout is deliberately disabled, even if an env_file says 1.
+      MARKETING_PUBLISH_ENABLED: "0"
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    # The inherited entrypoint always launches HTTP. Replace it explicitly and
+    # retain its credential-separation purpose before running the existing worker.
+    entrypoint:
+      - python
+      - -c
+      - |
+        import os, sys
+        allowed = {
+            "ACCOUNT_DATABASE_URL", "ACCOUNT_DATABASE_NAME", "ACCOUNT_DATABASE_ROLE", "IPO_DATABASE_NAME",
+            "MARKETING_TOKEN_KEY", "MARKETING_META_APP_ID", "MARKETING_META_APP_SECRET",
+            "MARKETING_META_API_VERSION", "MARKETING_META_LOGIN_CONFIG_ID",
+            "MARKETING_THREADS_APP_ID", "MARKETING_THREADS_APP_SECRET", "MARKETING_THREADS_API_VERSION",
+            "MARKETING_OAUTH_REDIRECT_URI", "MARKETING_PUBLISH_ENABLED",
+            "PATH", "LANG", "LC_ALL", "TZ", "SSL_CERT_FILE", "SSL_CERT_DIR",
+            "PYTHONUNBUFFERED", "PYTHONDONTWRITEBYTECODE"
+        }
+        environment = {key: value for key, value in os.environ.items() if key in allowed}
+        os.execve(sys.executable, [sys.executable, "/app/marketing_worker.py", *sys.argv[1:]], environment)
+    command: ["--interval", "15", "--limit", "10"]
+    healthcheck:
+      # An inherited HTTP healthcheck would test a server this worker never runs.
+      disable: true
+    networks: [data, edge]
+    # No ports, volumes, Docker socket, provider permission changes or new image.
