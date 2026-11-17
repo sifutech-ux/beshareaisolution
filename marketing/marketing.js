@@ -217,6 +217,14 @@
     }
   }
   async function beginConnect(platform) {
+    if (location.origin === 'https://www.beshareaisolution.com') {
+      message('Sambungan Facebook, Instagram dan Threads dibuat melalui beshareaisolution.com. Masuk dengan akaun BeShare yang sama, kemudian buka Sambungan untuk meneruskan. ')
+      const link = el('a', 'Masuk di beshareaisolution.com', 'text-link')
+      link.href = 'https://beshareaisolution.com/akaun/?selepas=marketing'
+      $('global-message').append(link)
+      link.focus()
+      return
+    }
     try { notify('Menyediakan sambungan akaun…'); const d = await request(API + '/connections/' + platform + '/begin', { method: 'POST', body: {} }), u = new URL(d.authorization_url); if (u.protocol !== 'https:' || !['facebook.com', 'instagram.com', 'threads.net', 'threads.com'].some(host => u.hostname === host || u.hostname.endsWith('.' + host))) throw Error('Pautan sambungan belum dapat disahkan. Cuba lagi.'); location.assign(u.href) } catch (error) { message(error.message) }
   }
   async function disconnect(platform) {
