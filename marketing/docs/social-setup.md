@@ -58,8 +58,9 @@ Activation settings below were checked against official Meta documentation on **
 The dedicated development app prepared for this deployment is **BeShare AI Marketing**,
 parent Meta app ID `1473513278172621`, in the BeShare Ai Solution business portfolio.
 Its **BeShare Marketing Social** configuration ID is `1151269530711228`, using
-the General login variation and **User access token** with the five permissions
-in the table below. Threads has its own app ID, `2429078661181153`. Both redirect
+the General login variation and **User access token** with the permissions
+below, including `business_management` for business-linked Page discovery.
+Threads has its own app ID, `2429078661181153`. Both redirect
 settings contain the exact OAuth return URL above. These are public identifiers;
 their corresponding secrets belong only in the protected server environment.
 The app is unpublished: these settings do not prove successful real-account
@@ -69,19 +70,24 @@ OAuth, publication, App Review or public customer access.
 
 An existing WhatsApp Business app is usable only if its dashboard offers the required compatible use cases/products. Meta explicitly allows **Manage everything on your Page** and **Access Threads API** together; existing apps display only compatible additions, and added use cases cannot be removed. If the required options are unavailable, use a separate app supporting Pages and Facebook Login for Business. Do not select the consumer **Authenticate and request data from users with Facebook Login** use case for this Pages integration.
 
-In **Facebook Login for Business > Configurations**, create a configuration using **User access token**, select the needed Page/Instagram assets and permissions, and provision its ID as `MARKETING_META_LOGIN_CONFIG_ID`. The code exchanges a Facebook user token and calls `/me/permissions` and `/me/accounts`; an existing WhatsApp Embedded Signup configuration that issues a system-user token does not match this flow and must stay separate.
+In **Facebook Login for Business > Configurations**, create a configuration using **User access token**, select the permissions below, and provision its ID as `MARKETING_META_LOGIN_CONFIG_ID`. Select the intended assets during user consent; prefer **current Pages only** and **current Businesses only**, limited to the assets being connected. Access to all current and future assets is not required. The code exchanges a Facebook user token and calls `/me/permissions` and `/me/accounts`; an existing WhatsApp Embedded Signup configuration that issues a system-user token does not match this flow and must stay separate.
 
 The current code shares one configuration ID between Facebook and Instagram and omits the `scope` query when that ID is set. Configure the union of the permissions needed by the enabled formats:
 
 | Permission | Used for |
 | --- | --- |
 | `pages_show_list` | Discover the user's eligible Pages and linked Instagram accounts. |
+| `business_management` | Required for `/me/accounts` to discover Pages linked to a Meta business account; the connecting user must also have a role on that business account. |
 | `pages_read_engagement` | Page access and Instagram publishing through Facebook Login. |
 | `pages_manage_posts` | Publish to the selected Facebook Page. |
 | `instagram_basic` | Access the linked Instagram Professional account. |
 | `instagram_content_publish` | Publish Instagram media. |
 
-Retain permissions required by the chosen Meta use case; the Pages use case automatically includes `business_management`, `pages_show_list` and `public_profile`. In **Facebook Login for Business > Settings > Valid OAuth redirect URIs**, register exactly `https://beshareaisolution.com/marketing/connect.html`, matching `MARKETING_OAUTH_REDIRECT_URI` without a query or fragment.
+For Graph API v17.0 and later, Meta documents that `/me/accounts` omits business-linked Pages unless the user has granted `business_management` and has a role on the linked business account. A Page appearing in the consent chooser does not establish that the API can return it. See [Meta's User Accounts change](https://developers.facebook.com/docs/graph-api/changelog/non-versioned-changes/nvc-2023).
+
+The permission must be selected in the Login configuration and granted in a fresh consent flow; its availability in the app's use case is not sufficient. Updating an existing configuration keeps the same configuration ID and needs no server environment change or restart. `business_management` is a **user discovery** permission here, not a required Page-token action scope; do not add it to the current code's shared `SCOPES` lists as a workaround.
+
+In **Facebook Login for Business > Settings > Valid OAuth redirect URIs**, register exactly `https://beshareaisolution.com/marketing/connect.html`, matching `MARKETING_OAUTH_REDIRECT_URI` without a query or fragment.
 
 ### Facebook and Instagram assets
 
