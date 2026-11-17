@@ -3,7 +3,9 @@ const perkhidmatan = (typeof BeshareAsal !== 'undefined' && BeshareAsal && typeo
   : null
 const AKAUN = perkhidmatan ? perkhidmatan.akaun : null
 const KUNCI = 'beshare-akaun'
-const DASHBOARD = '../penasihat/#utama'
+const DASHBOARD = typeof BeshareKembali !== 'undefined'
+  ? BeshareKembali.target(location.search)
+  : '../penasihat/#utama'
 
 const borang = document.getElementById('borang')
 const sudah = document.getElementById('sudah')

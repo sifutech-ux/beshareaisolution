@@ -8,7 +8,11 @@ import pelanggan_meja as meja
 
 def ensure_copilot_schema(conn, postgres):
     from pelanggan_hasil import ensure_hasil_schema
+    from pelanggan_marketing import ensure_marketing_schema
+    from marketing_social import ensure_social_schema
     ensure_hasil_schema(conn, postgres)
+    ensure_marketing_schema(conn, postgres)
+    ensure_social_schema(conn, postgres)
     cur = conn.cursor()
     cur.execute('''CREATE TABLE IF NOT EXISTS copilot_memory (
         akaun_id TEXT PRIMARY KEY, data_json TEXT NOT NULL, versi INTEGER NOT NULL)''')
@@ -173,6 +177,9 @@ def dispatch_copilot(method, path, conn, postgres, owner, payload, stamp):
     cur.execute(f'SELECT id FROM pelanggan_akaun WHERE id = {ph}', (owner,))
     if not cur.fetchone():
         return 401, {'error': 'Sila masuk akaun dahulu.'}
+    if path == '/api/akaun/copilot/marketing' or path.startswith('/api/akaun/copilot/marketing/'):
+        from pelanggan_marketing import dispatch_marketing
+        return dispatch_marketing(method, path, conn, postgres, owner, payload, stamp)
     if path.startswith('/api/akaun/copilot/hasil/'):
         from pelanggan_hasil import dispatch_hasil
         return dispatch_hasil(method, path, conn, postgres, owner, payload, stamp)
