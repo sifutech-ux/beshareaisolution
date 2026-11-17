@@ -50,7 +50,8 @@ CONTAINER_FORMAT = '''{
 IMAGE_FORMAT = '''{
 "image_id":{{json .Id}},"os":{{json .Os}},"architecture":{{json .Architecture}},
 "user":{{json .Config.User}},"working_dir":{{json .Config.WorkingDir}},
-"entrypoint_present":{{if .Config.Entrypoint}}true{{else}}false{{end}}
+"entrypoint":{{json .Config.Entrypoint}},"cmd":{{json .Config.Cmd}},
+"rootfs_layers":{{json .RootFS.Layers}}
 }'''
 
 PROBE_CODE = r'''
@@ -193,7 +194,38 @@ def inspect_image(reference):
     identifier = metadata.get('image_id')
     if not isinstance(identifier, str) or not IMAGE_ID.fullmatch(identifier):
         raise ProbeError('An immutable local Docker image ID could not be established.')
-    return identifier
+    return metadata
+
+
+def image_relation(parent, child):
+    """Compare private image metadata without relaying command arguments."""
+    for metadata in (parent, child):
+        layers = metadata.get('rootfs_layers')
+        if (not isinstance(layers, list) or not layers
+                or any(not isinstance(layer, str) or not IMAGE_ID.fullmatch(layer) for layer in layers)):
+            raise ProbeError('Image layer ancestry could not be established.')
+        if any(not isinstance(metadata.get(field), str) for field in ('user', 'working_dir', 'os', 'architecture')):
+            raise ProbeError('Image runtime identity is incomplete.')
+        for field in ('entrypoint', 'cmd'):
+            if field not in metadata:
+                raise ProbeError('Image runtime identity is incomplete.')
+            value = metadata.get(field)
+            if value is not None and (not isinstance(value, list) or any(not isinstance(part, str) for part in value)):
+                raise ProbeError('Image runtime identity is invalid.')
+    old, new = parent['rootfs_layers'], child['rootfs_layers']
+    differences = [field for field in ('user', 'working_dir', 'entrypoint', 'cmd', 'os', 'architecture')
+                   if parent.get(field) != child.get(field)]
+    return {'parent_image_id': parent['image_id'],
+            'rootfs_descends_parent': len(new) > len(old) and new[:len(old)] == old,
+            'runtime_matches_parent': not differences, 'runtime_differences': differences}
+
+
+def probe_descendant(metadata, parent, expected):
+    relation = image_relation(parent, metadata)
+    if not relation['rootfs_descends_parent'] or not relation['runtime_matches_parent']:
+        return {'image_id': metadata['image_id'], **relation, 'image_checks_passed': False,
+                'probe_skipped': 'Image is not a verified descendant with the same runtime.'}
+    return {**probe_image(metadata['image_id'], expected), **relation}
 
 
 def remove_probe(name):
@@ -232,7 +264,7 @@ def probe_image(identifier, expected):
                              + '. Inspect only that named probe; no live service was changed.')
 
 
-def preflight(container, candidate=None):
+def preflight(container, candidate=None, dependency=None):
     raw = command_json(['docker', 'container', 'inspect', '--format', CONTAINER_FORMAT, container], 'Account container inspection')
     identifier = raw.get('image_id')
     if not isinstance(identifier, str) or not IMAGE_ID.fullmatch(identifier):
@@ -244,14 +276,30 @@ def preflight(container, candidate=None):
         'entrypoint_present', 'compose_project', 'compose_service', 'compose_config_files', 'compose_working_dir')}
     base = probe_image(identifier, BASE_HASHES)
     result = {'account_container': safe, 'code_shadowing_mounts': mounts, 'base_image': base,
-              'candidate_image': None,
+              'dependency_image': None, 'candidate_image': None,
               'live_checks': 'not_performed',
               'scope': 'Image/hash/dependency gate only. Database, routes, credentials and worker health require separate verification.'}
+    baseline_gate = base['image_checks_passed']
+    if dependency:
+        parent_metadata = inspect_image(identifier)
+        if parent_metadata['image_id'] != identifier:
+            raise ProbeError('The live image identity changed during inspection.')
+        dependency_metadata = inspect_image(dependency)
+        result['dependency_image'] = probe_descendant(dependency_metadata, parent_metadata, BASE_HASHES)
+        baseline_gate = (all(item['matches'] for item in base['files'])
+                         and base['dependencies']['psycopg2']['available'] is True)
+        result['live_baseline_code_and_postgres_passed'] = baseline_gate
+        result['dependency_note'] = ('Only the live baseline encryption dependency is delegated to the explicit staged image. '
+                                     'Live code, PostgreSQL import, healthy state and code-mount checks remain required.')
     if candidate:
         root = Path(__file__).resolve().parents[2]
-        result['candidate_image'] = probe_image(inspect_image(candidate), candidate_hashes(root))
-    passed = (base['image_checks_passed'] and raw.get('running') is True
+        metadata = inspect_image(candidate)
+        result['candidate_image'] = (probe_descendant(metadata, dependency_metadata, candidate_hashes(root))
+                                     if dependency else probe_image(metadata['image_id'], candidate_hashes(root)))
+    passed = (baseline_gate and raw.get('running') is True
               and raw.get('restarting') is False and not mounts
+              and (not dependency or (raw.get('health') == 'healthy'
+                   and result['dependency_image']['image_checks_passed']))
               and (result['candidate_image'] is None or result['candidate_image']['image_checks_passed']))
     result['image_gate'] = 'passed' if passed else 'blocked'
     if mounts:
@@ -265,9 +313,11 @@ def main():
                         help='Explicit observed account-service container name or ID; never inferred.')
     parser.add_argument('--candidate-image', type=image_reference,
                         help='Optional already-built local image; verified against source files in this checkout.')
+    parser.add_argument('--dependency-image', type=image_reference,
+                        help='Explicit staged dependency base; must descend the exact live image and preserve its runtime.')
     args = parser.parse_args()
     try:
-        result = preflight(args.container, args.candidate_image)
+        result = preflight(args.container, args.candidate_image, args.dependency_image)
     except ProbeError as error:
         print(json.dumps({'image_gate': 'blocked', 'error': str(error), 'live_checks': 'not_performed'}, indent=2))
         return 2

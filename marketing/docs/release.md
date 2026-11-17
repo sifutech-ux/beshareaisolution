@@ -59,6 +59,46 @@ missing, prepare an explicitly reviewed dependency layer on the same verified
 base; this release does not install packages into a running container. A missing
 `psycopg2` import also blocks use of that image for the PostgreSQL account service.
 
+### Explicit dependency layer when the live image lacks encryption
+
+If the verified live image lacks `cryptography`, keep that running image
+unchanged. Build the reviewed, pinned dependency layer on a local release tag
+verified against its recorded immutable image ID, using the checked-in
+encryption requirements:
+
+```sh
+docker build --pull=false -f marketing/Dockerfile.dependencies --build-arg ACCOUNT_BASE_IMAGE=VERIFIED_LIVE_REFERENCE -t DEPENDENCY_IMAGE .
+python3 marketing/bin/release-preflight.py --container ACCOUNT_CONTAINER --dependency-image DEPENDENCY_IMAGE
+```
+
+Choose the dependency tag through the release convention, for example
+`copilot-account:marketing-deps-RELEASE_SHA`. The supplied wheel lock targets the
+observed CPython 3.12, Linux x86_64, glibc 2.34+ runtime; the Dockerfile restores
+the observed `nobody` user. Review those choices again for a different runtime.
+The explicit option keeps the live
+baseline hash and PostgreSQL-import requirements, requires its container to be
+healthy with no code-shadowing mounts, and checks encryption in the staged image.
+The staged image must retain the exact live image's RootFS layers as a prefix,
+add at least one layer, preserve its User/WorkingDir/Entrypoint/Cmd, retain the
+baseline hashes, and pass both imports and the Fernet check. Image command
+arguments are compared privately and are not printed. The default command above
+continues to reject a live image missing encryption; there is no automatic
+fallback to a different image.
+
+Record the verified dependency image's immutable ID and its local release tag
+for the final Marketing build. Verify that the tag still resolves to that ID
+before building. The candidate check must keep the same explicit dependency
+selection:
+
+```sh
+docker build --pull=false -f marketing/Dockerfile --build-arg ACCOUNT_BASE_IMAGE=VERIFIED_DEPENDENCY_REFERENCE -t CANDIDATE_IMAGE .
+python3 marketing/bin/release-preflight.py --container ACCOUNT_CONTAINER --dependency-image DEPENDENCY_IMAGE --candidate-image CANDIDATE_IMAGE
+```
+
+The candidate must add layers on that exact dependency image, preserve its
+runtime configuration and match the release source hashes. A candidate built
+from another base is rejected even if its individual application hashes match.
+
 ## 3. Build and verify the candidate
 
 Use `marketing/Dockerfile` from the repository root. The old
@@ -115,6 +155,25 @@ in URLs, logs or exported reports.
 - Existing sign-in, Copilot saved work/reviews and the established billing path
   continue to work. Use established read-only or sandbox billing verification;
   a deployment check does not require charging a customer.
+
+The reviewed helper can perform this bounded HTTP check. Its default mode only
+prints the plan; explicit execution runs inside the newly verified account
+container while the host streams the checked-out script:
+
+```sh
+python3 marketing/bin/live-smoke.py
+docker exec -i ACCOUNT_CONTAINER python - --run < marketing/bin/live-smoke.py
+```
+
+It creates two generated `@example.invalid` accounts through the normal API,
+keeps passwords/tokens in memory, and removes only the exact synthetic account
+and record IDs after proving their identity. Cleanup is verified through a new
+guarded database connection. It performs billing GET checks, with no billing
+writes, AI calls, OAuth or publishing. If cleanup cannot be verified, retain the
+reported private recovery manifest and investigate those exact records; do not
+replace this with a broad account-deletion command. A timed-out or otherwise
+ambiguous HTTP write leaves cleanup pending and retains its identifiers, since
+the server may still finish the request after the client has stopped waiting.
 
 Release the static files through the repository's established deployment only
 after the API checks pass. Confirm `/marketing/`, login return through

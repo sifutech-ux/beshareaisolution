@@ -13,6 +13,11 @@ SPEC = importlib.util.spec_from_file_location('release_preflight', SCRIPT)
 preflight = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(preflight)
 IMAGE = 'sha256:' + 'a' * 64
+DEPENDENCY_IMAGE = 'sha256:' + 'c' * 64
+CANDIDATE_IMAGE = 'sha256:' + 'd' * 64
+BASE_LAYER = 'sha256:' + 'e' * 64
+DEPENDENCY_LAYER = 'sha256:' + 'f' * 64
+CANDIDATE_LAYER = 'sha256:' + '1' * 64
 PROBE_NAME = 'beshare-marketing-probe-' + 'b' * 24
 
 
@@ -22,6 +27,20 @@ def probe_result(expected):
             'dependencies': {'cryptography': {'available': True, 'version': '44.0.0'},
                              'psycopg2': {'available': True, 'version': '2.9.10 (dt dec pq3 ext lo64)'}},
             'fernet_roundtrip': True, 'unexpected_secret': 'never-display-this'}
+
+
+def image_metadata(identifier, layers):
+    return {'image_id': identifier, 'rootfs_layers': layers, 'user': 'nobody',
+            'working_dir': '/app', 'entrypoint': ['/app/entrypoint.sh'],
+            'cmd': ['private-runtime-argument'], 'os': 'linux', 'architecture': 'amd64'}
+
+
+def staged_probe(identifier, expected):
+    raw = probe_result(expected)
+    if identifier == IMAGE:
+        raw['dependencies']['cryptography'] = {'available': False, 'version': None}
+        raw['fernet_roundtrip'] = False
+    return {'image_id': identifier, **preflight.clean_probe(raw, expected)}
 
 
 class ReleasePreflightTests(unittest.TestCase):
@@ -111,6 +130,81 @@ class ReleasePreflightTests(unittest.TestCase):
                 preflight.probe_image(IMAGE, preflight.BASE_HASHES)
         self.assertIn(PROBE_NAME, str(raised.exception))
         self.assertNotIn('private-daemon-details', str(raised.exception))
+
+    def test_explicit_dependency_can_supply_crypto_while_default_stays_blocked(self):
+        container = {'image_id': IMAGE, 'running': True, 'restarting': False, 'health': 'healthy', 'mounts': []}
+        metadata = {IMAGE: image_metadata(IMAGE, [BASE_LAYER]),
+                    'dependencies': image_metadata(DEPENDENCY_IMAGE, [BASE_LAYER, DEPENDENCY_LAYER])}
+        with patch.object(preflight, 'command_json', return_value=container), \
+                patch.object(preflight, 'inspect_image', side_effect=metadata.__getitem__), \
+                patch.object(preflight, 'probe_image', side_effect=staged_probe):
+            self.assertEqual(preflight.preflight('observed-account-1')['image_gate'], 'blocked')
+            result = preflight.preflight('observed-account-1', dependency='dependencies')
+        self.assertEqual(result['image_gate'], 'passed')
+        self.assertFalse(result['base_image']['image_checks_passed'])
+        self.assertTrue(result['live_baseline_code_and_postgres_passed'])
+        self.assertTrue(result['dependency_image']['image_checks_passed'])
+        self.assertNotIn('private-runtime-argument', json.dumps(result))
+
+    def test_dependency_must_descend_live_layers_and_preserve_runtime(self):
+        container = {'image_id': IMAGE, 'running': True, 'restarting': False, 'health': 'healthy', 'mounts': []}
+        variants = [('rootfs_layers', [DEPENDENCY_LAYER]), ('rootfs_layers', [BASE_LAYER]),
+                    ('user', 'root'), ('working_dir', '/other'),
+                    ('entrypoint', ['/other/entrypoint']), ('cmd', ['other-private-argument'])]
+        for field, value in variants:
+            with self.subTest(field=field, value=value):
+                dependency = image_metadata(DEPENDENCY_IMAGE, [BASE_LAYER, DEPENDENCY_LAYER])
+                dependency[field] = value
+                metadata = {IMAGE: image_metadata(IMAGE, [BASE_LAYER]), 'dependencies': dependency}
+                with patch.object(preflight, 'command_json', return_value=container), \
+                        patch.object(preflight, 'inspect_image', side_effect=metadata.__getitem__), \
+                        patch.object(preflight, 'probe_image', side_effect=staged_probe) as probe:
+                    result = preflight.preflight('observed-account-1', dependency='dependencies')
+                self.assertEqual(result['image_gate'], 'blocked')
+                self.assertIn('probe_skipped', result['dependency_image'])
+                self.assertEqual(probe.call_count, 1)
+                self.assertNotIn('other-private-argument', json.dumps(result))
+
+    def test_dependency_does_not_bypass_live_code_postgres_health_or_mounts(self):
+        metadata = {IMAGE: image_metadata(IMAGE, [BASE_LAYER]),
+                    'dependencies': image_metadata(DEPENDENCY_IMAGE, [BASE_LAYER, DEPENDENCY_LAYER])}
+        for failure in ('code', 'postgres', 'health', 'mount'):
+            with self.subTest(failure=failure):
+                container = {'image_id': IMAGE, 'running': True, 'restarting': False, 'health': 'healthy', 'mounts': []}
+                if failure == 'health':
+                    container['health'] = 'unhealthy'
+                if failure == 'mount':
+                    container['mounts'] = [{'type': 'bind', 'destination': '/app', 'read_write': False}]
+                def probe(identifier, expected):
+                    result = staged_probe(identifier, expected)
+                    if identifier == IMAGE:
+                        if failure == 'code':
+                            result['files'][0]['matches'] = False
+                        if failure == 'postgres':
+                            result['dependencies']['psycopg2']['available'] = False
+                    return result
+                with patch.object(preflight, 'command_json', return_value=container), \
+                        patch.object(preflight, 'inspect_image', side_effect=metadata.__getitem__), \
+                        patch.object(preflight, 'probe_image', side_effect=probe):
+                    result = preflight.preflight('observed-account-1', dependency='dependencies')
+                self.assertEqual(result['image_gate'], 'blocked')
+
+    def test_candidate_must_descend_dependency_and_preserve_runtime(self):
+        container = {'image_id': IMAGE, 'running': True, 'restarting': False, 'health': 'healthy', 'mounts': []}
+        metadata = {IMAGE: image_metadata(IMAGE, [BASE_LAYER]),
+                    'dependencies': image_metadata(DEPENDENCY_IMAGE, [BASE_LAYER, DEPENDENCY_LAYER]),
+                    'candidate': image_metadata(CANDIDATE_IMAGE, [BASE_LAYER, DEPENDENCY_LAYER, CANDIDATE_LAYER])}
+        with patch.object(preflight, 'command_json', return_value=container), \
+                patch.object(preflight, 'inspect_image', side_effect=metadata.__getitem__), \
+                patch.object(preflight, 'probe_image', side_effect=staged_probe):
+            result = preflight.preflight('observed-account-1', candidate='candidate', dependency='dependencies')
+            self.assertEqual(result['image_gate'], 'passed')
+            self.assertEqual(result['candidate_image']['parent_image_id'], DEPENDENCY_IMAGE)
+            metadata['candidate']['rootfs_layers'] = [BASE_LAYER, CANDIDATE_LAYER]
+            self.assertEqual(preflight.preflight('observed-account-1', 'candidate', 'dependencies')['image_gate'], 'blocked')
+            metadata['candidate']['rootfs_layers'] = [BASE_LAYER, DEPENDENCY_LAYER, CANDIDATE_LAYER]
+            metadata['candidate']['cmd'] = ['different']
+            self.assertEqual(preflight.preflight('observed-account-1', 'candidate', 'dependencies')['image_gate'], 'blocked')
 
 
 if __name__ == '__main__':

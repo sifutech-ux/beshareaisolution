@@ -1,0 +1,17 @@
+# Supply the verified immutable current account image; there is no default base.
+# Build from the repository root, then use this image as ACCOUNT_BASE_IMAGE for
+# marketing/Dockerfile. This layer does not change the account service sources.
+ARG ACCOUNT_BASE_IMAGE
+FROM ${ACCOUNT_BASE_IMAGE}
+
+USER root
+COPY marketing/requirements-encryption.txt /tmp/requirements-encryption.txt
+RUN python -m pip --isolated install --disable-pip-version-check --no-input \
+      --no-cache-dir --no-index --only-binary=:all: --require-hashes \
+      -r /tmp/requirements-encryption.txt \
+ && python -m pip check \
+ && rm /tmp/requirements-encryption.txt
+
+# Restore the observed runtime identity and verify encryption works without root.
+USER nobody
+RUN python -c 'from importlib.metadata import version; from cryptography.fernet import Fernet; assert [version(p) for p in ("cryptography", "cffi", "pycparser")] == ["50.0.2", "2.1.1", "3.12"]; f = Fernet(Fernet.generate_key()); assert f.decrypt(f.encrypt(b"marketing-build-check")) == b"marketing-build-check"'
