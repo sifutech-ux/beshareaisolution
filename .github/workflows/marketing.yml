@@ -1,0 +1,53 @@
+name: BeShare AI Marketing
+on:
+  pull_request:
+    paths:
+      - 'marketing/**'
+      - 'copilot/account/**'
+      - 'copilot/tests/**'
+      - 'akaun/**'
+      - '.github/workflows/marketing.yml'
+permissions:
+  contents: read
+jobs:
+  account-marketing-and-publishing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: copilot_kuota_test
+          POSTGRES_USER: copilot_qa
+          POSTGRES_PASSWORD: synthetic-marketing-ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U copilot_qa -d copilot_kuota_test"
+          --health-interval=3s --health-timeout=3s --health-retries=20
+    steps:
+      - name: Fetch proposed source
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git init .
+          git remote add origin https://github.com/sifutech-ux/beshareaisolution.git
+          git fetch --depth=1 origin "$SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+      - name: Test dependencies
+        run: python3 -m pip install psycopg2-binary cryptography
+      - name: Account regressions and marketing isolation
+        env:
+          PYTHONPATH: copilot/account
+          COPILOT_TEST_POSTGRES: '1'
+          COPILOT_TEST_DATABASE_URL: postgresql://copilot_qa:synthetic-marketing-ci-only@127.0.0.1:5432/copilot_kuota_test
+        run: python3 -m unittest discover -s copilot/tests -p 'test_*.py' -v
+      - name: Browser helpers and source syntax
+        run: |
+          python3 -m unittest discover -s marketing/tests -p 'test_*.py' -v
+          node --test marketing/tests/*.test.mjs copilot/tests/hasil-core.test.js
+          node --check marketing/marketing.js
+          node --check marketing/core.js
+          node --check marketing/connect.js
+          node --check akaun/akaun.js
+          node --check akaun/kembali.js
+          python3 -m compileall -q copilot/account marketing/tests marketing/bin
