@@ -50,7 +50,7 @@ CONTAINER_FORMAT = '''{
 IMAGE_FORMAT = '''{
 "image_id":{{json .Id}},"os":{{json .Os}},"architecture":{{json .Architecture}},
 "user":{{json .Config.User}},"working_dir":{{json .Config.WorkingDir}},
-"entrypoint":{{json .Config.Entrypoint}},"cmd":{{json .Config.Cmd}},
+"entrypoint":{{json (index .Config "Entrypoint")}},"cmd":{{json (index .Config "Cmd")}},
 "rootfs_layers":{{json .RootFS.Layers}}
 }'''
 
