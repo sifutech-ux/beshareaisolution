@@ -84,6 +84,9 @@ that daemon's development script instead of starting an additional server.
 
 ## Release sequence
 
+Use the [detailed release and rollback checklist](docs/release.md), including the
+bounded image preflight, when the existing Docker deployment is accessible.
+
 1. Pass the proposed branch's account, browser-helper and PostgreSQL checks.
 2. Record the deployed account image and Compose configuration and take the
    existing dedicated account-database backup. Confirm the baseline hashes used

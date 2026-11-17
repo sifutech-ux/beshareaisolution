@@ -43,10 +43,11 @@ jobs:
         run: python3 -m unittest discover -s copilot/tests -p 'test_*.py' -v
       - name: Browser helpers and source syntax
         run: |
+          python3 -m unittest discover -s marketing/tests -p 'test_*.py' -v
           node --test marketing/tests/*.test.mjs copilot/tests/hasil-core.test.js
           node --check marketing/marketing.js
           node --check marketing/core.js
           node --check marketing/connect.js
           node --check akaun/akaun.js
           node --check akaun/kembali.js
-          python3 -m compileall -q copilot/account marketing/tests
+          python3 -m compileall -q copilot/account marketing/tests marketing/bin

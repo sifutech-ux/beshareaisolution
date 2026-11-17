@@ -58,3 +58,9 @@ The current session has GitHub access but no configured Hostinger MCP connection
 the actual deployed account image, secret configuration and worker supervision
 have not been inspected. Release in the order described in `../README.md` after
 those deployment dependencies are available.
+
+The subsequent deployment-access check also found that Hostinger restricts
+sign-in from the available cloud browser. No sign-in attempt or production change
+followed that restriction. The additional release checklist and image preflight
+prepare the next supported deployment session; they are not evidence of a live
+installation.

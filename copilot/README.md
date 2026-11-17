@@ -35,6 +35,12 @@ Open http://localhost:8000/qa. This uses a temporary SQLite account and visibly 
 
 ## Release order / rollback
 
+**Current branch:** the account router now imports Marketing modules. Ship it
+with `marketing/Dockerfile` and follow
+[the Marketing release checklist](../marketing/docs/release.md). The historical
+two-file Dockerfile/recipe below does not include those dependencies and must
+not be used to release the current router on its own.
+
 1. Pass the PR checks. Record current account image and override; take the existing dedicated account database backup.
 2. Build `copilot/account/Dockerfile` from verified `copilot-account:billing-7118f90` (or explicitly verify newer baseline hashes). A hash mismatch blocks the build; do not bypass it blindly.
 3. Deploy the account layer through the existing Compose service. Schema initialization adds `copilot_work` and `copilot_review`; no existing records are rewritten. Verify authenticated collection/review/context routes with a controlled account; ensure foreign account access is denied.

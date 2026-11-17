@@ -72,14 +72,25 @@ Media must have a public HTTPS URL fetchable by the platform and meet the platfo
 
 Threads uses a conservative 500-byte UTF-8 text limit; Instagram captions are limited to 2,200 characters. Server checks remain authoritative.
 
-Run the worker in the same account-only environment:
+For a source checkout, run the worker in the same account-only environment:
 
 ```sh
 PYTHONPATH=copilot/account python3 copilot/account/marketing_worker.py --once
 PYTHONPATH=copilot/account python3 copilot/account/marketing_worker.py --interval 15
 ```
 
-The second form is intended for an existing service supervisor. Do not run a second improvised process in production without checking the deployment. Multiple worker instances use owner locks, conditional claims and leases to avoid concurrent delivery of the same job.
+The release image produced by `marketing/Dockerfile` copies the worker to
+`/app/marketing_worker.py`; it does not contain the source checkout layout above.
+Its worker command inside that image is `python /app/marketing_worker.py --once`
+for a bounded tick, or `python /app/marketing_worker.py --interval 15` under the
+existing supervisor. First inspect the actual image entrypoint, Compose service
+and override order. Define the worker with the same account database, encryption
+key and runtime user, while omitting the HTTP service's published port and HTTP
+healthcheck. A Compose `command` alone may not replace an HTTP-specific
+entrypoint. Do not guess the service name or start an improvised second process
+inside the live web container. See [release.md](release.md) for the release and
+rollback sequence. Multiple worker instances use owner locks, conditional claims
+and leases to avoid concurrent delivery of the same job.
 
 Every publishing attempt is durably recorded. The worker commits a request marker before a provider write. Instagram/Threads containers and Facebook videos are polled on later ticks without blocking sleep. A successful media publication is recorded with the provider ID.
 
