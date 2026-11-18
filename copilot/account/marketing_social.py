@@ -568,7 +568,7 @@ def _complete(conn, postgres, owner, payload, platform, stamp, transport=None):
     required = set(SCOPES[platform])
     if not required.issubset(scopes) or not required.issubset(user_debug['scopes']):
         raise SocialError('Kebenaran penerbitan belum diberikan. Sambungkan semula dan pilih kebenaran yang diperlukan.', 409, 'authorization')
-    expiry = int(stamp) + 90 * 86400
+    user_expiry = int(stamp) + 90 * 86400
     lifetime = 0
     if 'expires_in' in long_result:
         lifetime = long_result['expires_in']
@@ -577,11 +577,11 @@ def _complete(conn, postgres, owner, payload, platform, stamp, transport=None):
             raise SocialError('Tempoh kebenaran platform tidak sah.', 409, 'authorization')
         lifetime = int(lifetime)
     if lifetime:
-        expiry = min(expiry, int(stamp) + lifetime)
-    # An absent or zero exchange lifetime gives no finite bound. Require explicit
-    # verified USER and PAGE expiry metadata instead, retaining the 90-day cap.
-    needs_debug_expiry = lifetime == 0
-    expiry = _bounded_expiry(user_debug, expiry, stamp, require_expires_at=needs_debug_expiry)
+        user_expiry = min(user_expiry, int(stamp) + lifetime)
+    # Validate the current USER grant, including explicit debugger evidence when
+    # the exchange supplies no finite lifetime. Its TTL does not bound the PAGE
+    # credential retained for publication.
+    _bounded_expiry(user_debug, user_expiry, stamp, require_expires_at=lifetime == 0)
     fields = 'id,name,access_token,tasks'
     if platform == 'instagram':
         fields += ',instagram_business_account{id,username,name}'
@@ -614,7 +614,10 @@ def _complete(conn, postgres, owner, payload, platform, stamp, transport=None):
             page_profile = provider_call('GET', base + '/me', {'fields': 'id'}, page['access_token'], transport)
             if _numeric_id(page_profile.get('id')) != page_id:
                 raise SocialError('Akses Page tidak sepadan dengan Page pilihan.', 409, 'authorization')
-            page_expiry = _bounded_expiry(page_debug, expiry, stamp, require_expires_at=needs_debug_expiry)
+            # The stored PAGE token has its own verified expiry and data-access
+            # bounds. Keep the existing local cap without inheriting USER TTL.
+            page_expiry = _bounded_expiry(page_debug, int(stamp) + 90 * 86400, stamp,
+                                          require_expires_at=True)
             # Stored grant capabilities combine separately verified purposes:
             # discovery is proved by the user's token + /me/permissions; Page
             # actions above are independently proved by the Page token itself.

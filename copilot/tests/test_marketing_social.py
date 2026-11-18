@@ -295,18 +295,20 @@ class MarketingSocialTests(unittest.TestCase):
         self.assertEqual(conn.execute('SELECT COUNT(*) FROM marketing_oauth_candidates').fetchone()[0], 0)
         conn.close()
 
-    def test_meta_lifetime_uses_verified_bounds_without_inventing_one_hour(self):
+    def test_meta_page_lifetime_uses_its_own_verified_bounds(self):
         day = 86400
         # Debugger bounds are (token expiry, data-access expiry), relative to the
         # callback; an explicit zero is retained as provider metadata.
         cases = (
-            ('omitted', {}, (0, 60 * day), (0, 70 * day), 60 * day),
-            ('zero_integer', {'expires_in': 0}, (20 * day, 0), (0, 70 * day), 20 * day),
+            ('omitted', {}, (0, 60 * day), (0, 70 * day), 70 * day),
+            ('zero_integer', {'expires_in': 0}, (20 * day, 0), (0, 70 * day), 70 * day),
             ('zero_string', {'expires_in': '0'}, (0, 60 * day), (15 * day, 0), 15 * day),
             ('page_data_bound', {}, (0, 60 * day), (0, 10 * day), 10 * day),
             ('local_cap', {}, (0, 0), (0, 0), 90 * day),
-            ('one_second', {'expires_in': 1}, (60 * day, 0), (60 * day, 0), 1),
-            ('positive_string', {'expires_in': '7200'}, (60 * day, 0), (60 * day, 0), 7200),
+            ('one_second', {'expires_in': 1}, (60 * day, 0), (60 * day, 0), 60 * day),
+            ('positive_string', {'expires_in': '7200'}, (60 * day, 0), (60 * day, 0), 60 * day),
+            ('short_user_nonexpiring_page', {'expires_in': 3600}, (3600, 0), (0, 0), 90 * day),
+            ('short_user_page_data_bound', {'expires_in': 3600}, (3600, 0), (0, 70 * day), 70 * day),
             ('positive_debug_bound', {'expires_in': 60 * day}, (20 * day, 0), (10 * day, 0), 10 * day),
         )
         for platform_index, platform in enumerate(('facebook', 'instagram')):
@@ -335,9 +337,23 @@ class MarketingSocialTests(unittest.TestCase):
                     status, body = self.call('POST', '/' + platform + '/select', {'candidate_id': candidate}, now=stamp)
                     self.assertEqual(status, 200, body)
                     conn = self.connect()
-                    self.assertEqual(conn.execute('SELECT token_expires_at FROM marketing_connections WHERE platform=?',
-                                                  (platform,)).fetchone()[0], stamp + expected)
-                    conn.close()
+                    try:
+                        self.assertEqual(conn.execute('SELECT token_expires_at FROM marketing_connections WHERE platform=?',
+                                                      (platform,)).fetchone()[0], stamp + expected)
+                        # The workspace must remain publishable beyond a short
+                        # USER lifetime and expire at the retained PAGE bound.
+                        with patch.object(social.time, 'time', return_value=stamp + 7201):
+                            connection = next(c for c in social.get_connections(conn, False, OWNER)
+                                              if c['platform'] == platform)
+                        self.assertEqual(connection['status'], 'connected')
+                        self.assertTrue(connection['publishable'])
+                        with patch.object(social.time, 'time', return_value=stamp + expected):
+                            connection = next(c for c in social.get_connections(conn, False, OWNER)
+                                              if c['platform'] == platform)
+                        self.assertEqual(connection['status'], 'expired')
+                        self.assertFalse(connection['publishable'])
+                    finally:
+                        conn.close()
                     self.assertNotIn(TOKEN, json.dumps(body))
 
     def test_meta_missing_malformed_or_expired_lifetime_evidence_saves_nothing(self):
@@ -345,6 +361,7 @@ class MarketingSocialTests(unittest.TestCase):
         cases = [
             ('missing_user_expiry', {}, 'USER', 'expires_at', missing),
             ('missing_page_expiry', {}, 'PAGE', 'expires_at', missing),
+            ('positive_missing_page_expiry', {'expires_in': 3600}, 'PAGE', 'expires_at', missing),
             ('zero_missing_user', {'expires_in': 0}, 'USER', 'expires_at', missing),
             ('zero_missing_page', {'expires_in': '0'}, 'PAGE', 'expires_at', missing),
             ('malformed_user_expiry', {}, 'USER', 'expires_at', True),
@@ -353,6 +370,11 @@ class MarketingSocialTests(unittest.TestCase):
             ('expired_page', {'expires_in': 0}, 'PAGE', 'expires_at', NOW - 1),
             ('expired_user_data', {}, 'USER', 'data_access_expires_at', NOW - 1),
             ('expired_page_data', {'expires_in': '0'}, 'PAGE', 'data_access_expires_at', NOW - 1),
+            ('positive_expired_user', {'expires_in': 3600}, 'USER', 'expires_at', NOW - 1),
+            ('positive_expired_user_data', {'expires_in': 3600}, 'USER', 'data_access_expires_at', NOW - 1),
+            ('positive_expired_page', {'expires_in': 3600}, 'PAGE', 'expires_at', NOW - 1),
+            ('positive_malformed_page_expiry', {'expires_in': 3600}, 'PAGE', 'expires_at', True),
+            ('positive_expired_page_data', {'expires_in': 3600}, 'PAGE', 'data_access_expires_at', NOW - 1),
         ]
         for value in (None, False, True, -1, '-1', 1.5, '1.5', '', 'invalid', [], {}):
             cases.append(('invalid_exchange_' + repr(value), {'expires_in': value}, None, None, None))
