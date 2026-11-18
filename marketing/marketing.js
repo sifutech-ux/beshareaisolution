@@ -92,7 +92,7 @@
       for (const k of ['campaigns', 'posts', 'sources', 'results', 'connections']) state[k] = Array.isArray(data[k]) ? data[k] : []
       state.capabilities = data.capabilities || {}; state.ready = true
       const name = account.penasihat?.nama || account.nama || s.email?.split('@')[0] || 'Perniagaan anda'
-      $('account-name').textContent = name; $('account-avatar').textContent = name.slice(0, 1).toUpperCase(); $('account-detail').textContent = 'Rekod dalam akaun'; $('preview-name').textContent = name
+      $('account-name').textContent = name; $('account-avatar').textContent = name.slice(0, 1).toUpperCase(); $('account-detail').textContent = 'Rekod dalam akaun'
       $('gate').hidden = true; $('workspace-content').hidden = false; $('workspace-state').lastChild.textContent = 'Ruang kerja disambungkan'; $('workspace-state').dataset.state = 'ready'
       document.querySelectorAll('[data-new-campaign]').forEach(b => { b.disabled = false })
       message(''); renderAll(); navigate()
@@ -281,6 +281,10 @@
   function renderPostEditor() {
     const e = editors.post; if (!e) return
     const p = e.item, platform = $('post-platform').value, format = $('post-format').value, text = $('post-body').value, locked = ['queued', 'publishing', 'published', 'uncertain'].includes(p.status), ready = publishReady(platform)
+    const destination = connection(platform)
+    // Saved posts omit their pinned destination; current connections cannot identify locked publications.
+    const accountName = !locked && !p.provider_post_id && destination?.status === 'connected' && destination.accounts?.length === 1 ? destination.accounts[0]?.name : ''
+    $('preview-name').textContent = typeof accountName === 'string' && accountName.trim() ? accountName : 'Akaun ' + C.PLATFORM[platform]
     $('post-dialog-title').textContent = p.version ? locked ? 'Semak kandungan' : 'Sunting kandungan' : 'Kandungan baharu'
     $('post-media-label').hidden = format === 'text'; $('post-save').textContent = $('post-state').value === 'planned' ? 'Simpan rancangan' : 'Simpan draf'
     $('post-count').textContent = platform === 'threads' ? new TextEncoder().encode(text).length + ' / 500 bait UTF-8' : platform === 'instagram' ? text.length + ' / 2,200 aksara' : text.length + ' aksara'
