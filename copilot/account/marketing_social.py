@@ -393,7 +393,9 @@ def _debug_access(platform, cfg, token, app_token, stamp, transport):
     return data
 
 
-def _bounded_expiry(debug, expiry, stamp):
+def _bounded_expiry(debug, expiry, stamp, *, require_expires_at=False):
+    if require_expires_at and 'expires_at' not in debug:
+        raise SocialError('Tempoh kebenaran platform tidak sah.', 409, 'authorization')
     for name in ('expires_at', 'data_access_expires_at'):
         value = debug.get(name, 0)
         if isinstance(value, bool) or not isinstance(value, (str, int)) or not re.fullmatch(r'[0-9]{1,16}', str(value)):
@@ -566,8 +568,20 @@ def _complete(conn, postgres, owner, payload, platform, stamp, transport=None):
     required = set(SCOPES[platform])
     if not required.issubset(scopes) or not required.issubset(user_debug['scopes']):
         raise SocialError('Kebenaran penerbitan belum diberikan. Sambungkan semula dan pilih kebenaran yang diperlukan.', 409, 'authorization')
-    expiry = int(stamp) + min(max(int(long_result.get('expires_in') or 3600), 60), 90 * 86400)
-    expiry = _bounded_expiry(user_debug, expiry, stamp)
+    expiry = int(stamp) + 90 * 86400
+    lifetime = 0
+    if 'expires_in' in long_result:
+        lifetime = long_result['expires_in']
+        if (isinstance(lifetime, bool) or not isinstance(lifetime, (str, int))
+                or not re.fullmatch(r'[0-9]{1,16}', str(lifetime))):
+            raise SocialError('Tempoh kebenaran platform tidak sah.', 409, 'authorization')
+        lifetime = int(lifetime)
+    if lifetime:
+        expiry = min(expiry, int(stamp) + lifetime)
+    # An absent or zero exchange lifetime gives no finite bound. Require explicit
+    # verified USER and PAGE expiry metadata instead, retaining the 90-day cap.
+    needs_debug_expiry = lifetime == 0
+    expiry = _bounded_expiry(user_debug, expiry, stamp, require_expires_at=needs_debug_expiry)
     fields = 'id,name,access_token,tasks'
     if platform == 'instagram':
         fields += ',instagram_business_account{id,username,name}'
@@ -600,7 +614,7 @@ def _complete(conn, postgres, owner, payload, platform, stamp, transport=None):
             page_profile = provider_call('GET', base + '/me', {'fields': 'id'}, page['access_token'], transport)
             if _numeric_id(page_profile.get('id')) != page_id:
                 raise SocialError('Akses Page tidak sepadan dengan Page pilihan.', 409, 'authorization')
-            page_expiry = _bounded_expiry(page_debug, expiry, stamp)
+            page_expiry = _bounded_expiry(page_debug, expiry, stamp, require_expires_at=needs_debug_expiry)
             # Stored grant capabilities combine separately verified purposes:
             # discovery is proved by the user's token + /me/permissions; Page
             # actions above are independently proved by the Page token itself.
