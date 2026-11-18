@@ -19,7 +19,7 @@ from pathlib import Path
 BASE_HASHES = {
     '/app/pelanggan_copilot.py': 'bf4ee5fe170955833ec5c552a5d607a6135e635f086dd55f03c5412a66dc1b7c',
     '/app/pelanggan_akaun.py': '064377cd793c5ad8750a4cde743f31d50f72719631d039af533c7b6f83d736b7',
-    '/app/akaun_pelayan.py': '3ef8967bd36f535a6032b94ce0446c293780da2c19ac21d3b3a746a623055914',
+    '/app/akaun_pelayan.py': 'c24fab7943cc48c78e0a4353f13cdf02c25026179fe652ad4f2417ff75dbdedb',
 }
 RELEASE_FILES = (
     'pelanggan_copilot.py', 'pelanggan_hasil.py', 'pelanggan_marketing.py',

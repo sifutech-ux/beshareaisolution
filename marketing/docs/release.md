@@ -111,10 +111,10 @@ python3 marketing/bin/release-preflight.py --container ACCOUNT_CONTAINER --candi
 ```
 
 Resolve `VERIFIED_BASE_REFERENCE` to the immutable base established above; keep
-the mapping recorded. The current baseline is the deployed `4f86a43` Marketing
-account layer. Its account router hash was intentionally updated from the
-pre-Marketing baseline; the account/authentication and HTTP baseline hashes are
-unchanged. Choose `CANDIDATE_IMAGE` through the existing release naming
+the mapping recorded. The current baseline is the deployed `1e980edf` Marketing
+account layer. Its HTTP server hash was intentionally updated from the
+`4f86a43` baseline to include the provider lifecycle routes; the account router
+and account/authentication baseline hashes are unchanged. Choose `CANDIDATE_IMAGE` through the existing release naming
 convention. The second probe requires the candidate to descend from the exact
 live image (or the explicitly verified dependency image) and preserve its
 runtime. It checks the unchanged account/authentication file plus the seven

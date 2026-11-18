@@ -89,6 +89,28 @@ class MarketingSocialTests(unittest.TestCase):
                               'instagram_business_account': {'id': '2001', 'username': 'kedai.satu'}}]}
         raise AssertionError('Unexpected endpoint')
 
+    def threads_transport(self, method, url, params, token):
+        if url.endswith('/oauth/access_token'):
+            self.assertEqual(params['client_id'], '67890')
+            self.assertEqual(params['client_secret'], 'secret-threads')
+            return {'access_token': APP_TOKEN if params.get('grant_type') == 'client_credentials' else USER_TOKEN,
+                    'user_id': '3001'}
+        if url.endswith('/access_token'):
+            return {'access_token': TOKEN, 'expires_in': 60 * 86400}
+        if url.endswith('/debug_token'):
+            self.assertEqual(token, APP_TOKEN)
+            self.assertEqual(params['input_token'], TOKEN)
+            # Documented Threads shape: app binding is enforced by the endpoint,
+            # not by an app_id field in its response.
+            return {'data': {'type': 'USER', 'application': 'Test Threads App',
+                             'user_id': '3001', 'is_valid': True, 'issued_at': NOW,
+                             'expires_at': NOW + 60 * 86400, 'data_access_expires_at': 0,
+                             'scopes': list(social.SCOPES['threads'])}}
+        if url.endswith('/me'):
+            self.assertEqual(token, TOKEN)
+            return {'id': '3001', 'username': 'kedai.threads'}
+        raise AssertionError('Unexpected endpoint')
+
     def connection(self, platform='facebook', owner=OWNER, account='1001'):
         conn = self.connect()
         try:
@@ -182,21 +204,58 @@ class MarketingSocialTests(unittest.TestCase):
         seen = []
         def transport(method, url, params, token):
             seen.append((method, url))
-            if url.endswith('/oauth/access_token'):
-                return {'access_token': 'app-token' if params.get('grant_type') == 'client_credentials' else 'short-token', 'user_id': '3001'}
-            if url.endswith('/access_token'):
-                return {'access_token': TOKEN, 'expires_in': 60 * 86400}
-            if url.endswith('/debug_token'):
-                self.assertEqual(token, 'app-token')
-                return {'data': {'app_id': '67890', 'user_id': '3001', 'is_valid': True,
-                                 'expires_at': NOW + 60 * 86400, 'scopes': social.SCOPES['threads']}}
-            return {'id': '3001', 'username': 'kedai.threads'}
+            return self.threads_transport(method, url, params, token)
         status, data = self.call('POST', '/complete', {'code': 'validcode', 'state': state}, transport=transport)
         self.assertEqual(status, 200, data)
         self.assertFalse(data['selection_required'])
         self.assertEqual(data['account']['account_id'], '3001')
         self.assertTrue(all('graph.threads.com' in url for _, url in seen))
         self.assertNotIn(TOKEN, json.dumps(data))
+        conn = self.connect()
+        self.assertEqual(conn.execute('SELECT provider_app_id,provider_user_id FROM marketing_connections').fetchall(),
+                         [('67890', '3001')])
+        conn.close()
+
+    def test_threads_debugger_failures_cannot_save_connections(self):
+        cases = ('missing_data', 'malformed_data', 'missing_validity', 'invalid_token',
+                 'non_boolean_validity', 'missing_user', 'wrong_user', 'cross_app_error')
+        for index, case in enumerate(cases):
+            with self.subTest(case=case):
+                stamp = NOW + index * 61
+                state = self.begin('threads', now=stamp)
+                seen = []
+                def transport(method, url, params, token):
+                    seen.append(url)
+                    data = self.threads_transport(method, url, params, token)
+                    if url.endswith('/debug_token'):
+                        if case == 'missing_data':
+                            return {}
+                        if case == 'malformed_data':
+                            return {'data': []}
+                        if case == 'missing_validity':
+                            del data['data']['is_valid']
+                        elif case == 'invalid_token':
+                            data['data']['is_valid'] = False
+                        elif case == 'non_boolean_validity':
+                            data['data']['is_valid'] = 1
+                        elif case == 'missing_user':
+                            del data['data']['user_id']
+                        elif case == 'wrong_user':
+                            data['data']['user_id'] = '9999'
+                        elif case == 'cross_app_error':
+                            return {'error': {'message': 'The App_id in the input_token did not match the Viewing App'}}
+                    return data
+                status, body = self.call('POST', '/complete', {'code': 'validcode', 'state': state},
+                                         now=stamp, transport=transport)
+                self.assertEqual(status, 502 if case == 'cross_app_error' else 409, body)
+                self.assertEqual(body['code'], 'provider' if case == 'cross_app_error' else 'authorization')
+                self.assertTrue(seen[-1].endswith('/me' if case in {'missing_user', 'wrong_user'} else '/debug_token'))
+                conn = self.connect()
+                self.assertEqual(conn.execute('SELECT COUNT(*) FROM marketing_connections').fetchone()[0], 0)
+                self.assertEqual(conn.execute('SELECT COUNT(*) FROM marketing_oauth_candidates').fetchone()[0], 0)
+                conn.close()
+                for private_value in (TOKEN, USER_TOKEN, APP_TOKEN, 'secret-threads', 'The App_id'):
+                    self.assertNotIn(private_value, json.dumps(body))
 
     def test_meta_grant_identity_and_page_token_must_both_be_verified(self):
         cases = ('empty_tasks', 'manage_only', 'wrong_app', 'wrong_user', 'missing_scope',
@@ -281,18 +340,17 @@ class MarketingSocialTests(unittest.TestCase):
 
     def test_threads_missing_publishing_grant_cannot_become_connected(self):
         state = self.begin('threads')
+        seen = []
         def transport(method, url, params, token):
-            if url.endswith('/oauth/access_token'):
-                return {'access_token': 'app-token' if params.get('grant_type') == 'client_credentials' else 'short-token', 'user_id': '3001'}
-            if url.endswith('/access_token'):
-                return {'access_token': TOKEN, 'expires_in': 60 * 86400}
+            seen.append(url)
+            data = self.threads_transport(method, url, params, token)
             if url.endswith('/debug_token'):
-                return {'data': {'app_id': '67890', 'user_id': '3001', 'is_valid': True,
-                                 'expires_at': NOW + 60 * 86400, 'scopes': ['threads_basic']}}
-            self.fail('Denied publish scope must fail before profile saving')
+                data['data']['scopes'] = ['threads_basic']
+            return data
         status, data = self.call('POST', '/complete', {'code': 'validcode', 'state': state}, transport=transport)
         self.assertEqual(status, 409, data)
         self.assertEqual(data['code'], 'authorization')
+        self.assertTrue(seen[-1].endswith('/debug_token'))
         conn = self.connect()
         self.assertEqual(conn.execute('SELECT COUNT(*) FROM marketing_connections').fetchone()[0], 0)
         conn.close()
