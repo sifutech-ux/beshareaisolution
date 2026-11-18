@@ -505,7 +505,11 @@ def _complete(conn, postgres, owner, payload, platform, stamp, transport=None):
         debug_result = provider_call('GET', _base(platform, cfg) + '/debug_token',
                                      {'input_token': token}, app_token, transport)
         debug = debug_result.get('data')
-        if not isinstance(debug, dict) or debug.get('is_valid') is not True or str(debug.get('app_id')) != cfg['app_id']:
+        # Threads does not return app_id in its documented debug response. The
+        # app token above authenticates this app; debug_token rejects input tokens
+        # belonging to another app before returning data.
+        # https://developers.facebook.com/documentation/threads/troubleshooting/debug-access-token/
+        if not isinstance(debug, dict) or debug.get('is_valid') is not True:
             raise SocialError('Kebenaran akaun Threads tidak dapat disahkan. Sambungkan semula.', 409, 'authorization')
         scopes = debug.get('scopes')
         if (not isinstance(scopes, list) or not all(isinstance(scope, str) for scope in scopes)
