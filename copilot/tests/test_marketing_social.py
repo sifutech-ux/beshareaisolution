@@ -295,6 +295,93 @@ class MarketingSocialTests(unittest.TestCase):
         self.assertEqual(conn.execute('SELECT COUNT(*) FROM marketing_oauth_candidates').fetchone()[0], 0)
         conn.close()
 
+    def test_meta_lifetime_uses_verified_bounds_without_inventing_one_hour(self):
+        day = 86400
+        # Debugger bounds are (token expiry, data-access expiry), relative to the
+        # callback; an explicit zero is retained as provider metadata.
+        cases = (
+            ('omitted', {}, (0, 60 * day), (0, 70 * day), 60 * day),
+            ('zero_integer', {'expires_in': 0}, (20 * day, 0), (0, 70 * day), 20 * day),
+            ('zero_string', {'expires_in': '0'}, (0, 60 * day), (15 * day, 0), 15 * day),
+            ('page_data_bound', {}, (0, 60 * day), (0, 10 * day), 10 * day),
+            ('local_cap', {}, (0, 0), (0, 0), 90 * day),
+            ('one_second', {'expires_in': 1}, (60 * day, 0), (60 * day, 0), 1),
+            ('positive_string', {'expires_in': '7200'}, (60 * day, 0), (60 * day, 0), 7200),
+            ('positive_debug_bound', {'expires_in': 60 * day}, (20 * day, 0), (10 * day, 0), 10 * day),
+        )
+        for platform_index, platform in enumerate(('facebook', 'instagram')):
+            for index, (case, exchange, user_bounds, page_bounds, expected) in enumerate(cases):
+                with self.subTest(platform=platform, case=case):
+                    stamp = NOW + (platform_index * len(cases) + index) * 61
+                    state = self.begin(platform, now=stamp)
+                    def transport(method, url, params, token):
+                        data = self.meta_transport(method, url, params, token)
+                        if params.get('grant_type') == 'fb_exchange_token':
+                            data.pop('expires_in')
+                            data.update(exchange)
+                        if url.endswith('/debug_token'):
+                            bounds = page_bounds if params.get('input_token') == TOKEN else user_bounds
+                            for field, seconds in zip(('expires_at', 'data_access_expires_at'), bounds):
+                                data['data'][field] = stamp + seconds if seconds else 0
+                        return data
+                    status, body = self.call('POST', '/complete', {'code': 'validcode', 'state': state},
+                                             now=stamp, transport=transport)
+                    self.assertEqual(status, 200, body)
+                    candidate = body['candidates'][0]['id']
+                    conn = self.connect()
+                    self.assertEqual(conn.execute('SELECT token_expires_at FROM marketing_oauth_candidates WHERE id=?',
+                                                  (candidate,)).fetchone()[0], stamp + expected)
+                    conn.close()
+                    status, body = self.call('POST', '/' + platform + '/select', {'candidate_id': candidate}, now=stamp)
+                    self.assertEqual(status, 200, body)
+                    conn = self.connect()
+                    self.assertEqual(conn.execute('SELECT token_expires_at FROM marketing_connections WHERE platform=?',
+                                                  (platform,)).fetchone()[0], stamp + expected)
+                    conn.close()
+                    self.assertNotIn(TOKEN, json.dumps(body))
+
+    def test_meta_missing_malformed_or_expired_lifetime_evidence_saves_nothing(self):
+        missing = object()
+        cases = [
+            ('missing_user_expiry', {}, 'USER', 'expires_at', missing),
+            ('missing_page_expiry', {}, 'PAGE', 'expires_at', missing),
+            ('zero_missing_user', {'expires_in': 0}, 'USER', 'expires_at', missing),
+            ('zero_missing_page', {'expires_in': '0'}, 'PAGE', 'expires_at', missing),
+            ('malformed_user_expiry', {}, 'USER', 'expires_at', True),
+            ('malformed_page_data_expiry', {}, 'PAGE', 'data_access_expires_at', 'invalid'),
+            ('expired_user', {}, 'USER', 'expires_at', NOW - 1),
+            ('expired_page', {'expires_in': 0}, 'PAGE', 'expires_at', NOW - 1),
+            ('expired_user_data', {}, 'USER', 'data_access_expires_at', NOW - 1),
+            ('expired_page_data', {'expires_in': '0'}, 'PAGE', 'data_access_expires_at', NOW - 1),
+        ]
+        for value in (None, False, True, -1, '-1', 1.5, '1.5', '', 'invalid', [], {}):
+            cases.append(('invalid_exchange_' + repr(value), {'expires_in': value}, None, None, None))
+        for platform_index, platform in enumerate(('facebook', 'instagram')):
+            for index, (case, exchange, kind, field, value) in enumerate(cases):
+                with self.subTest(platform=platform, case=case):
+                    stamp = NOW + (platform_index * len(cases) + index) * 61
+                    state = self.begin(platform, now=stamp)
+                    def transport(method, url, params, token):
+                        data = self.meta_transport(method, url, params, token)
+                        if params.get('grant_type') == 'fb_exchange_token':
+                            data.pop('expires_in')
+                            data.update(exchange)
+                        if url.endswith('/debug_token') and data['data']['type'] == kind:
+                            if value is missing:
+                                data['data'].pop(field)
+                            else:
+                                data['data'][field] = value
+                        return data
+                    status, body = self.call('POST', '/complete', {'code': 'validcode', 'state': state},
+                                             now=stamp, transport=transport)
+                    self.assertEqual(status, 409, body)
+                    self.assertEqual(body['code'], 'authorization')
+                    conn = self.connect()
+                    self.assertEqual(conn.execute('SELECT COUNT(*) FROM marketing_oauth_candidates').fetchone()[0], 0)
+                    self.assertEqual(conn.execute('SELECT COUNT(*) FROM marketing_connections').fetchone()[0], 0)
+                    conn.close()
+                    self.assertNotIn(TOKEN, json.dumps(body))
+
     def test_verified_authorizer_is_saved_on_candidates_connections_and_bindings(self):
         state = self.begin()
         status, data = self.call('POST', '/complete', {'code': 'validcode', 'state': state}, transport=self.meta_transport)
