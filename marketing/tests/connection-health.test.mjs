@@ -38,7 +38,7 @@ class Element {
   focus() {}
 }
 
-async function workspace({ health = () => response(checked()), connections = [connected], posts = [], enabled = true } = {}) {
+async function workspace({ health = () => response(checked()), connections = [connected], posts = [], enabled = true, threadsAccess = 'approved' } = {}) {
   const nodes = new Map(), get = id => { if (!nodes.has(id)) { const node = new Element(); node.id = id; nodes.set(id, node) } return nodes.get(id) }
   for (const [, tag, id, attributes] of html.matchAll(/<([a-z][\w-]*)\b[^>]*\bid="([^"]+)"([^>]*)>/g)) { const node = new Element(tag); node.id = id; node.hidden = /\bhidden\b/.test(attributes); nodes.set(id, node) }
   for (const prefix of ['ai', 'post', 'campaign', 'source', 'result']) get(prefix + '-form').children = [...nodes.entries()].filter(([id, node]) => id.startsWith(prefix + '-') && ['input', 'select', 'textarea'].includes(node.tag)).map(([, node]) => node)
@@ -63,7 +63,7 @@ async function workspace({ health = () => response(checked()), connections = [co
       const path = new URL(url).pathname; requests.push({ url, path, options })
       if (path.endsWith('/check')) { const call = { url, path, options }; checks.push(call); return health(call, checks.length) }
       if (options.method === 'GET' && path === '/api/akaun/saya') return response({ akaun_id: stored === sessionB ? 'owner-b' : 'owner-a', nama: 'Ujian kesihatan' })
-      if (options.method === 'GET' && path.endsWith('/workspace')) return response({ ok: true, campaigns: [campaign], posts: stored === sessionB ? [] : structuredClone(posts), sources: [], results: [], connections: stored === sessionB ? [] : structuredClone(connections), capabilities: { connection_health_checks: enabled, worker_enabled: true, auto_publish: true } })
+      if (options.method === 'GET' && path.endsWith('/workspace')) return response({ ok: true, campaigns: [campaign], posts: stored === sessionB ? [] : structuredClone(posts), sources: [], results: [], connections: stored === sessionB ? [] : structuredClone(connections), capabilities: { connection_health_checks: enabled, worker_enabled: true, auto_publish: true, threads_customer_access: threadsAccess } })
       if (options.method === 'PUT' && path.includes('/posts/')) { const payload = JSON.parse(options.body), record = { ...payload, id: path.split('/').pop(), version: payload.version + 1 }; saved.push(record); return response({ ok: true, post: record }) }
       throw Error('Unexpected request: ' + options.method + ' ' + url)
     },
@@ -162,6 +162,39 @@ test('a draft clearly identifies its single platform and saving never requests a
   assert.match(app.get('post-destination-note').textContent, /Facebook sahaja.*Page Perniagaan Ujian/)
   assert.match(app.get('post-list').textContent, /Draf disimpan · belum diterbitkan/)
   await app.save(); assert.equal(app.requests.some(call => call.path.endsWith('/schedule')), false)
+})
+
+test('new Threads connections show testing availability before redirect and let the user return', async () => {
+  const disconnected = { ...connected, provider: 'threads', platform: 'threads', status: 'disconnected', connected: false, publishable: false, accounts: [], message: '' }
+  const app = await workspace({ connections: [disconnected], threadsAccess: 'testing' })
+  assert.match(app.card('threads').textContent, /Akses terhad/)
+  assert.match(app.card('threads').textContent, /pelanggan baharu.*kelulusan Meta/)
+  const connect = app.card('threads').querySelectorAll('button').find(node => node.textContent.includes('Sambungkan akaun'))
+  assert.equal(connect.disabled, false, 'Eligible testers must retain a working connect action')
+  const connecting = connect.emit('click'); await tick()
+  assert.equal(app.get('confirm-dialog').open, true)
+  assert.equal(app.get('confirm-accept').textContent, 'Teruskan sebagai penguji')
+  assert.match(app.get('confirm-text').textContent, /tidak menghantar jemputan/)
+  await app.get('confirm-cancel').emit('click'); await connecting
+  assert.equal(app.get('confirm-dialog').open, false)
+  assert.equal(app.requests.some(call => call.path.endsWith('/begin')), false)
+})
+
+test('Threads testing availability does not disable an already connected tester or its draft scheduling', async () => {
+  const threads = { ...connected, provider: 'threads', platform: 'threads', accounts: [{ ...account, name: 'Penguji sedia ada' }] }
+  const app = await workspace({ connections: [threads], posts: [{ ...post, platform: 'threads' }], threadsAccess: 'testing', enabled: false })
+  assert.match(app.card('threads').textContent, /Disambungkan/)
+  assert.doesNotMatch(app.card('threads').textContent, /Akses terhad|pelanggan baharu/)
+  await app.openPost()
+  assert.equal(app.get('schedule-post').hidden, false)
+  assert.equal(app.get('schedule-post').disabled, false)
+  assert.equal(app.get('confirm-dialog').open, false)
+})
+
+test('approved Threads access removes the testing notice for new connections', async () => {
+  const app = await workspace({ connections: [{ ...connected, provider: 'threads', platform: 'threads', status: 'disconnected', accounts: [], message: '' }], threadsAccess: 'approved' })
+  assert.match(app.card('threads').textContent, /Belum disambungkan/)
+  assert.doesNotMatch(app.card('threads').textContent, /Akses terhad|kelulusan Meta|jemputan penguji/)
 })
 
 test('editing platform or time during schedule health preflight cannot confirm an obsolete post', async () => {

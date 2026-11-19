@@ -1,0 +1,12 @@
+# Add publication receipts to the verified account image. Existing publishing,
+# media dependencies, runtime user and entrypoint are inherited unchanged.
+ARG ACCOUNT_BASE_IMAGE
+FROM ${ACCOUNT_BASE_IMAGE}
+
+RUN echo 'e74fbca1bcdce79bc92af2828bfcc19879ae58baa0344f08e018d91765bcfed3  /app/marketing_social.py' | sha256sum -c - \
+ && echo '5702edf3680cecfc8377c34b1aa062f4386ebdbd4ee3b4be47260370b2e19d3a  /app/pelanggan_marketing.py' | sha256sum -c - \
+ && echo '7ff7dfc769dc59dde3d87a002eb36bb447ed0c9b5d44ab2293e7e11805e1c405  /app/marketing_lifecycle.py' | sha256sum -c - \
+ && echo '5469759c6b2af14e343ada7932546c55180d747f9afaf69c65e1844a09fe5127  /app/akaun_pelayan.py' | sha256sum -c -
+
+COPY copilot/account/marketing_social.py copilot/account/marketing_publication.py copilot/account/pelanggan_marketing.py copilot/account/marketing_lifecycle.py /app/
+RUN python -B -c 'import marketing_publication, marketing_lifecycle, pelanggan_marketing, marketing_social; assert marketing_social.capabilities()["publication_receipts"] is True'
