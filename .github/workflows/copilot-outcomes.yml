@@ -32,10 +32,29 @@ jobs:
           git fetch --depth=1 origin "$SOURCE_SHA"
           git checkout --detach FETCH_HEAD
       - name: Account and media test dependencies
+        shell: bash
         run: |
           python3 -m pip install psycopg2-binary cryptography -r marketing/requirements-media.txt
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ffmpeg
+          # Keep Ubuntu's existing signing keys and sources; prefer its Azure mirror.
+          grep -Fq 'mirror+file:/etc/apt/apt-mirrors.txt' /etc/apt/sources.list.d/ubuntu.sources
+          printf '%b' \
+            'https://azure.archive.ubuntu.com/ubuntu/\tpriority:1\n' \
+            'https://archive.ubuntu.com/ubuntu/\tpriority:2\n' \
+            'https://security.ubuntu.com/ubuntu/\tpriority:3\n' |
+            sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          apt_network=(-o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
+          if ! sudo timeout --kill-after=10s 120s apt-get "${apt_network[@]}" update; then
+            echo "::error::Ubuntu package index update failed or exceeded 120 seconds."
+            exit 1
+          fi
+          # Bound downloads before dpkg starts; installation then requires cached packages.
+          if ! sudo timeout --kill-after=10s 240s apt-get "${apt_network[@]}" install -y --no-install-recommends --download-only ffmpeg; then
+            echo "::error::FFmpeg dependency download failed or exceeded 240 seconds."
+            exit 1
+          fi
+          sudo apt-get install -y --no-install-recommends --no-download ffmpeg
+          command -v ffmpeg
+          command -v ffprobe
       - name: Account regressions, isolation, concurrency and retries on SQLite and PostgreSQL
         env:
           PYTHONPATH: copilot/account
