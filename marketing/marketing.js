@@ -8,7 +8,7 @@
   const count = n => new Intl.NumberFormat('ms-MY').format(n)
   const state = { owner: null, account: null, token: null, epoch: 0, load: 0, ready: false, campaigns: [], posts: [], sources: [], results: [], connections: [], capabilities: {}, view: 'ringkasan' }
   const today = C.malaysiaDate(), calendar = { year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)) - 1 }
-  let toastTimer, confirmResolve, aiController, aiSignature = '', aiKey = '', aiTarget = null
+  let toastTimer, confirmResolve, aiController, aiSignature = '', aiKey = '', aiTarget = null, aiDraftContext = null
   const headings = {
     ringkasan: ['RUANG PEMASARAN ANDA', 'Idea yang bergerak.', 'Rancang dengan jelas. Terbit dengan yakin. Fahami hasilnya.'],
     kempen: ['SATU MATLAMAT, SATU ARAH', 'Kempen anda.', 'Satukan tawaran, pelanggan sasaran dan rancangan pelaksanaan.'],
@@ -50,7 +50,7 @@
   function resetMemory() {
     state.epoch++; state.owner = null; state.account = null; state.token = null; state.ready = false
     for (const k of ['campaigns', 'posts', 'sources', 'results', 'connections']) state[k] = []
-    state.capabilities = {}; aiController?.abort(); aiController = null; aiSignature = ''; aiKey = ''; aiTarget = null
+    state.capabilities = {}; aiController?.abort(); aiController = null; aiSignature = ''; aiKey = ''; aiTarget = null; aiDraftContext = null
     for (const key of Object.keys(editors)) delete editors[key]
     document.querySelectorAll('dialog[open]').forEach(d => d.close())
     document.querySelectorAll('dialog form').forEach(f => f.reset())
@@ -59,7 +59,8 @@
     for (const kind of ['post', 'source', 'result']) $(kind + '-campaign-filter').replaceChildren(new Option('Semua kempen', ''))
     for (const kind of ['campaign', 'post', 'source', 'result', 'ai', 'links']) feedback(kind)
     $('preview-body').textContent = 'Teks kandungan anda akan muncul di sini.'; $('preview-name').textContent = 'Perniagaan anda'; message('')
-    $('ai-output').value = ''; $('ai-output-wrap').hidden = true; $('ai-use').disabled = true
+    $('ai-output').value = ''; $('ai-output-wrap').hidden = true; $('ai-use').disabled = true; $('ai-generate').disabled = false
+    $('ai-form').querySelectorAll('input,select,textarea').forEach(n => { n.disabled = false })
     $('account-name').textContent = 'Akaun BeShare'; $('account-detail').textContent = 'Satu akaun, semua peranti'; $('account-avatar').textContent = 'B'
     $('workspace-content').hidden = true; document.querySelectorAll('[data-new-campaign]').forEach(b => { b.disabled = true })
     $('nav-campaign-count').hidden = true
@@ -384,33 +385,45 @@
   function openAI() {
     const p = editors.post; if (!p || p.saving) return
     aiTarget = p.item.id; campaignOptions($('ai-campaign'), { current: $('post-campaign').value }); $('ai-platform').value = $('post-platform').value
-    $('ai-output-wrap').hidden = true; $('ai-output').value = ''; $('ai-use').disabled = true; feedback('ai'); showDialog('ai-dialog')
+    aiDraftContext = null; $('ai-output-wrap').hidden = true; $('ai-output').value = ''; $('ai-use').disabled = true; feedback('ai'); showDialog('ai-dialog')
   }
   async function generateAI(event) {
     event.preventDefault(); if (aiController || !state.ready || !$('ai-form').reportValidity()) return
+    if (!live(state.epoch, state.token)) { resetMemory(); bootstrap(); return }
     const c = state.campaigns.find(x => x.id === $('ai-campaign').value), platform = $('ai-platform').value
     if (!c) { feedback('ai', 'Pilih kempen yang sudah disimpan.', 'error'); return }
     const prompt = 'Bantu siapkan satu draf kandungan pemasaran dalam Bahasa Melayu untuk ' + C.PLATFORM[platform] + '. Gunakan hanya fakta kempen yang diberikan. Jangan reka harga, diskaun, testimoni, hasil terjamin atau stok. Jika fakta tidak cukup, nyatakan maklumat yang diperlukan. Berikan teks kandungan yang boleh disemak dan digunakan, tanpa menerbitkan apa-apa. ' + (platform === 'threads' ? 'Pastikan teks pendek, maksimum 450 aksara.' : platform === 'instagram' ? 'Kapsyen maksimum 2000 aksara.' : '') + '\n\n' + C.brief(c) + '\n\nArahan tambahan: ' + ($('ai-instruction').value.trim() || 'Nada jelas, mesra dan bersahaja. Satu ajakan tindakan.')
     if (aiSignature !== prompt || !aiKey) { aiSignature = prompt; aiKey = C.id() }
-    const controller = new AbortController(); aiController = controller; const epoch = state.epoch
-    $('ai-generate').disabled = true; $('ai-use').disabled = true; $('ai-output-wrap').hidden = true
-    $('ai-form').querySelectorAll('input,select,textarea').forEach(n => { n.disabled = true }); feedback('ai', 'Copilot sedang menyediakan draf berdasarkan kempen anda…')
+    const controller = new AbortController(); aiController = controller; const epoch = state.epoch, token = state.token
+    $('ai-generate').disabled = true; $('ai-use').disabled = true
+    $('ai-form').querySelectorAll('input,select,textarea').forEach(n => { n.disabled = true }); feedback('ai', 'Copilot sedang menyediakan draf berdasarkan kempen anda…' + (aiDraftContext ? ' Draf sebelumnya kekal dipaparkan.' : ''))
     try {
       const data = await request('/api/copilot/bijak', { ai: true, method: 'POST', body: { giliran: C.promptTurns(prompt) }, signal: controller.signal, key: aiKey })
-      if (epoch !== state.epoch || aiController !== controller) return
-      if (data.bukan_model !== false || typeof data.jawapan !== 'string' || !['openai', 'gemini', 'tersimpan'].includes(data.sumber)) throw Error('Draf AI belum dapat disahkan. Anda boleh terus menulis kandungan sendiri.')
+      if (epoch !== state.epoch || aiController !== controller || controller.signal.aborted) return
+      if (data.ok !== true || data.bukan_model !== false || typeof data.jawapan !== 'string' || !data.jawapan.trim() || !['openai', 'gemini', 'tersimpan'].includes(data.sumber) || (data.sumber === 'tersimpan' && data.main_semula !== true)) throw Error('Draf AI belum dapat disahkan. Anda boleh terus menulis kandungan sendiri.')
       const output = [data.jawapan, ...(Array.isArray(data.langkah) ? data.langkah.filter(x => typeof x === 'string') : [])].join('\n\n')
-      $('ai-output').value = output.slice(0, 5000); $('ai-output-wrap').hidden = false; $('ai-use').disabled = false
+      $('ai-output').value = output.slice(0, 5000); $('ai-output-wrap').hidden = false; aiDraftContext = { campaignId: c.id, platform }
+      aiSignature = ''; aiKey = ''
       feedback('ai', output.length > 5000 ? 'Draf diterima. Paparan dihadkan kepada 5,000 aksara; ringkaskan dan semak sebelum digunakan.' : 'Draf AI siap. Semak dan sunting sebelum menggunakannya.', 'success')
     } catch (error) {
-      if (epoch !== state.epoch) return
-      feedback('ai', error.message, 'error')
-      if (error.status === 409 || error.status === 422 || /profil|profile/i.test(error.message)) { const link = el('a', 'Lengkapkan profil dalam Copilot', 'text-link'); link.href = '../penasihat/#profil'; $('ai-feedback').append(document.createElement('br'), link) }
-    } finally { if (epoch === state.epoch && aiController === controller) { aiController = null; $('ai-generate').disabled = false; $('ai-form').querySelectorAll('input,select,textarea').forEach(n => { n.disabled = false }) } }
+      if (epoch !== state.epoch || aiController !== controller || controller.signal.aborted) return
+      if (!live(epoch, token)) { resetMemory(); bootstrap(); return }
+      const reason = error.data?.ralat
+      let text = error.message
+      if (reason === 'menunggu') text = 'Draf masih diproses. Tunggu sebentar, kemudian tekan Jana draf untuk menyemak permintaan yang sama.'
+      else if (reason === 'tidak_pasti') text = 'Hasil permintaan belum dapat disahkan. Tunggu sebentar, kemudian tekan Jana draf untuk menyemak permintaan yang sama.'
+      else if (reason === 'provider_failed' && error.data.retryable === true) {
+        aiSignature = ''; aiKey = ''
+        text = 'Penjanaan draf tadi tidak berjaya. Tekan Jana draf untuk membuat percubaan baharu.'
+      }
+      feedback('ai', text + (aiDraftContext ? ' Draf sebelumnya masih tersedia untuk ' + C.PLATFORM[aiDraftContext.platform] + '.' : ''), 'error')
+      if (reason === 'profil') { const link = el('a', 'Lengkapkan profil dalam Copilot', 'text-link'); link.href = '../penasihat/#profil'; $('ai-feedback').append(document.createElement('br'), link) }
+    } finally { if (epoch === state.epoch && aiController === controller) { aiController = null; $('ai-generate').disabled = false; $('ai-use').disabled = !aiDraftContext || !$('ai-output').value.trim(); $('ai-form').querySelectorAll('input,select,textarea').forEach(n => { n.disabled = false }) } }
   }
   function useAI() {
-    if ($('ai-use').disabled || !$('ai-output').value.trim()) return
-    const c = $('ai-campaign').value, platform = $('ai-platform').value, body = $('ai-output').value.trim(); $('ai-dialog').close()
+    if ($('ai-use').disabled || !aiDraftContext || !$('ai-output').value.trim()) return
+    if (!live(state.epoch, state.token)) { resetMemory(); bootstrap(); return }
+    const c = aiDraftContext.campaignId, platform = aiDraftContext.platform, body = $('ai-output').value.trim(); $('ai-dialog').close()
     if (!editors.post || editors.post.item.id !== aiTarget) openPost(null, { campaign_id: c, platform, body })
     else { $('post-campaign').value = c; $('post-platform').value = platform; $('post-body').value = body }
     dirty('post'); renderPostEditor(); feedback('post', 'Draf AI dimasukkan. Semak kandungan dan tekan Simpan apabila sedia.')

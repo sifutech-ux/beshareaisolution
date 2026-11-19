@@ -318,6 +318,63 @@ class KuotaCases:
         owners = {row[0] for row in self.q('SELECT owner_scope FROM copilot_usage_reservation')}
         self.assertEqual(owners, {user_a, user_b, 'public'})
 
+    def test_ulang_semasa_sending_menunggu_dan_boleh_baca_jawapan_kemudian(self):
+        token, user = self.profil('a@kedai.my')
+        status, reserved = self.copilot(token, 'idem-sending-ulang1')
+        self.assertEqual(status, 200, reserved)
+        self.assertEqual(self.kuota(HANTAR, {'rezab_id': reserved['rezab_id']}, token=token)[0], 200)
+        counters = self.q('SELECT scope, period, kind, amount FROM copilot_usage_counter ORDER BY scope, period, kind')
+        for _ in range(3):
+            status, pending = self.copilot(token, 'idem-sending-ulang1')
+            self.assertEqual(status, 409, pending)
+            self.assertEqual(pending['ralat'], 'menunggu')
+            self.assertNotIn('retryable', pending)
+        self.assertEqual(self.status_rezab(reserved['rezab_id']), 'sending')
+        self.assertEqual(self.q('SELECT COUNT(*) FROM copilot_usage_reservation')[0][0], 1)
+        self.assertEqual(self.q('SELECT scope, period, kind, amount FROM copilot_usage_counter ORDER BY scope, period, kind'), counters)
+        self.assertEqual(self.kuota(HANTAR, {'rezab_id': reserved['rezab_id']}, token=token)[0], 409)
+        status, settled = self.kuota(MUKTAMAD, {
+            'rezab_id': reserved['rezab_id'], 'hasil': 'settled',
+            'jawapan': 'Draf sudah tersedia.', 'langkah': [],
+        }, token=token)
+        self.assertEqual(status, 200, settled)
+        status, replay = self.copilot(token, 'idem-sending-ulang1')
+        self.assertEqual(status, 200, replay)
+        self.assertTrue(replay['main_semula'])
+        self.assertEqual(replay['jawapan'], 'Draf sudah tersedia.')
+        self.assertEqual(self.amount(user, self.hari()[0], 'copilot_day'), 1)
+        self.assertEqual(self.amount(user, 'live', 'copilot_inflight'), 0)
+
+    def test_gagal_pembekal_benarkan_permohonan_baru_tanpa_mengulang_rezab_lama(self):
+        token, user = self.profil('a@kedai.my')
+        status, reserved = self.copilot(token, 'idem-gagal-ulang1')
+        self.assertEqual(status, 200, reserved)
+        self.assertEqual(self.kuota(HANTAR, {'rezab_id': reserved['rezab_id']}, token=token)[0], 200)
+        self.assertEqual(self.kuota(MUKTAMAD, {
+            'rezab_id': reserved['rezab_id'], 'hasil': 'provider_failed',
+        }, token=token)[0], 200)
+        row = self.q('SELECT * FROM copilot_usage_reservation WHERE id = ?', (reserved['rezab_id'],))
+        counters = self.q('SELECT scope, period, kind, amount FROM copilot_usage_counter ORDER BY scope, period, kind')
+        for _ in range(3):
+            status, failed = self.copilot(token, 'idem-gagal-ulang1')
+            self.assertEqual(status, 503, failed)
+            self.assertEqual(failed['ralat'], 'provider_failed')
+            self.assertIs(failed.get('retryable'), True)
+            self.assertNotIn('belum pasti', failed['error'])
+        self.assertEqual(self.q('SELECT * FROM copilot_usage_reservation WHERE id = ?', (reserved['rezab_id'],)), row)
+        self.assertEqual(self.q('SELECT scope, period, kind, amount FROM copilot_usage_counter ORDER BY scope, period, kind'), counters)
+        self.assertEqual(self.q('SELECT COUNT(*) FROM copilot_usage_reservation')[0][0], 1)
+        status, mismatch = self.copilot(token, 'idem-gagal-ulang1', giliran=[{'dari': 'klien', 'teks': 'Soalan berlainan'}])
+        self.assertEqual(status, 409, mismatch)
+        self.assertEqual(mismatch['ralat'], 'kunci_berbeza')
+        self.assertNotIn('retryable', mismatch)
+        status, fresh = self.copilot(token, 'idem-gagal-baharu1')
+        self.assertEqual(status, 200, fresh)
+        self.assertNotEqual(fresh['rezab_id'], reserved['rezab_id'])
+        self.assertEqual(self.status_rezab(reserved['rezab_id']), 'provider_failed')
+        self.assertEqual(self.amount(user, self.hari()[0], 'copilot_day'), 2)
+        self.assertEqual(self.amount(user, 'live', 'copilot_inflight'), 1)
+
     def test_kuota_awam_dan_kongsi(self):
         token, _user = self.profil('a@kedai.my')
         lain, _lain = self.profil('b@kedai.my', 'Kedai Kedua')
@@ -417,6 +474,8 @@ class KuotaCases:
         status, ulang = self.copilot(token, 'idem-sending-0001', stamp=STAMP + 91)
         self.assertEqual(status, 503)
         self.assertEqual(ulang['ralat'], 'tidak_pasti')
+        self.assertNotIn('retryable', ulang)
+        self.assertEqual(self.status_rezab(reserved['rezab_id']), 'uncertain')
         self.assertEqual(self.amount(user, day, 'copilot_day'), 2)
 
     def test_gagal_pembekal_dan_tidak_pasti_sekali(self):
@@ -437,6 +496,13 @@ class KuotaCases:
         self.assertEqual(status, 200, tidak)
         self.assertEqual(self.amount(user, 'live', 'copilot_inflight'), 0)
         self.assertEqual(self.amount(user, self.hari()[0], 'copilot_day'), 2)
+        status, replay = self.copilot(token, 'idem-tidak-0000001')
+        self.assertEqual(status, 503, replay)
+        self.assertEqual(replay['ralat'], 'tidak_pasti')
+        self.assertNotIn('retryable', replay)
+        self.assertEqual(self.status_rezab(reserved['rezab_id']), 'uncertain')
+        self.assertEqual(self.amount(user, self.hari()[0], 'copilot_day'), 2)
+        self.assertEqual(self.amount(user, 'live', 'copilot_inflight'), 0)
 
     def test_litar_pangkalan_data_dan_bulan_utc(self):
         token, user = self.profil('a@kedai.my')

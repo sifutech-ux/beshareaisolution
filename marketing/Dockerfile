@@ -13,6 +13,7 @@ RUN echo 'bf4ee5fe170955833ec5c552a5d607a6135e635f086dd55f03c5412a66dc1b7c  /app
 # base image to contain cryptography; retain its runtime user and dependencies.
 RUN python -c 'from cryptography.fernet import Fernet; Fernet.generate_key()'
 COPY copilot/account/pelanggan_copilot.py copilot/account/pelanggan_hasil.py \
+     copilot/account/pelanggan_kuota.py \
      copilot/account/pelanggan_marketing.py copilot/account/marketing_social.py \
      copilot/account/marketing_worker.py copilot/account/akaun_pelayan.py \
      copilot/account/marketing_lifecycle.py /app/
