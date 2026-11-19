@@ -33,6 +33,7 @@ RESOURCES = {
 
 
 def ensure_marketing_schema(conn, postgres):
+    from marketing_media import ensure_media_schema
     cur = conn.cursor()
     cur.execute('''CREATE TABLE IF NOT EXISTS marketing_campaigns (
         id TEXT PRIMARY KEY, akaun_id TEXT NOT NULL, data_json TEXT NOT NULL,
@@ -57,6 +58,7 @@ def ensure_marketing_schema(conn, postgres):
         cur.execute(f'CREATE INDEX IF NOT EXISTS {table}_owner ON {table} (akaun_id, updated_at)')
     cur.execute('CREATE INDEX IF NOT EXISTS marketing_posts_due ON marketing_posts (status, scheduled_at)')
     cur.execute('CREATE INDEX IF NOT EXISTS marketing_posts_campaign ON marketing_posts (akaun_id, campaign_id)')
+    ensure_media_schema(conn, postgres)
 
 
 def _error(code, message, **extra):
@@ -196,13 +198,14 @@ def _campaign(payload):
 
 
 def _post(payload):
-    allowed = {'version', 'campaign_id', 'platform', 'format', 'body', 'media_url', 'scheduled_at', 'status'}
+    allowed = {'version', 'campaign_id', 'platform', 'format', 'body', 'media_url', 'media_id', 'scheduled_at', 'status'}
     _payload(payload, allowed, {'version', 'campaign_id', 'platform'})
     data = {'campaign_id': _identifier(payload.get('campaign_id')),
             'platform': _choice(payload.get('platform'), POST_PLATFORMS),
             'format': _choice(payload.get('format', 'text'), {'text', 'image', 'video'}),
             'body': _text(payload.get('body', ''), 5000),
             'media_url': _url(payload.get('media_url', '')),
+            'media_id': _identifier(payload.get('media_id', ''), True),
             'scheduled_at': _utc(payload.get('scheduled_at', ''), True),
             'status': _choice(payload.get('status', 'draft'), {'draft', 'planned'})}
     return data
@@ -277,6 +280,12 @@ def _save(conn, postgres, owner, resource, key, payload, stamp):
     data = VALIDATORS[resource](payload)
     version = _version(payload.get('version'))
     meja._kunci_akaun(conn, postgres, owner)
+    if resource == 'posts':
+        from marketing_media import MediaError, resolve_attachment
+        try:
+            data = resolve_attachment(conn, postgres, owner, data)
+        except MediaError as error:
+            _reject(str(error), error.code, error.status)
     if data.get('campaign_id'):
         _owned_campaign(conn, postgres, owner, data['campaign_id'])
     current = _read(conn, postgres, owner, resource, key)
@@ -284,7 +293,7 @@ def _save(conn, postgres, owner, resource, key, payload, stamp):
     ph = meja._ph(postgres)
     cur = conn.cursor()
     if current:
-        if (all(current.get(field) == value for field, value in data.items())
+        if (all(current.get(field, '' if field == 'media_id' else None) == value for field, value in data.items())
                 and version in {current['version'], current['version'] - 1}):
             return 200, {'ok': True, singular: current, 'replayed': True}
         if current['version'] != version:
@@ -331,6 +340,9 @@ def _save(conn, postgres, owner, resource, key, payload, stamp):
             ON CONFLICT (id) DO NOTHING''', tuple(columns.values()))
         if cur.rowcount != 1:
             return 404, _error('not_found', 'Rekod tidak ditemui dalam akaun ini.')
+    if resource == 'posts':
+        from marketing_media import bind_attachment
+        bind_attachment(conn, postgres, owner, key, data.get('media_id', ''), stamp)
     return 200, {'ok': True, singular: _read(conn, postgres, owner, resource, key)}
 
 
@@ -344,11 +356,12 @@ def _social():
 
 
 def _provider_status(conn, postgres, owner):
+    from marketing_media import capabilities as media_capabilities
     capabilities = {'campaigns': True, 'post_planning': True, 'manual_results': True,
                     'reference_notes': True, 'ai_drafts': True, 'external_research': False,
                     'auto_publish': False, 'worker_enabled': False,
                     'publishing_enabled': False, 'worker_configured': False, 'worker_health': 'not_checked',
-                    'ads': {'meta': False, 'google': False}}
+                    'ads': {'meta': False, 'google': False}, 'media_upload': media_capabilities()}
     provider = _social()
     if provider is None:
         return [], capabilities
@@ -382,6 +395,13 @@ def _schedule(conn, postgres, owner, key, payload, stamp):
         _reject('Kempen yang selesai atau diarkibkan tidak boleh menerima jadual baharu.', 'campaign_closed', 409)
     if (post['format'] == 'text' and not post['body']) or (post['format'] != 'text' and not post['media_url']):
         _reject('Lengkapkan teks atau pautan media yang diperlukan sebelum menjadualkan.')
+    if post.get('media_id'):
+        from marketing_media import MediaError, resolve_attachment, validate_platform_attachment
+        try:
+            resolve_attachment(conn, postgres, owner, post)
+            validate_platform_attachment(conn, postgres, owner, post)
+        except MediaError as error:
+            _reject(str(error), error.code, error.status)
     provider = _social()
     ready, reason = provider.check_schedule(conn, postgres, owner, post, scheduled_at, stamp) if provider else (False, 'Sambungan penerbitan belum tersedia.')
     if ready is not True:

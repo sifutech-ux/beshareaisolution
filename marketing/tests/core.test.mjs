@@ -90,3 +90,15 @@ test('long AI context keeps every fact within Copilot turn limits and preserves 
   assert.ok(!turns[0].teks.endsWith('\ud83d'))
   assert.throws(() => C.promptTurns('x'.repeat(3400 * 9)))
 })
+
+test('media preflight accepts only supported nonempty files within the advertised limits', () => {
+  const file = (name, type, size = 1024) => ({ name, type, size })
+  assert.equal(C.mediaFile(file('Tawaran.JPEG', 'image/jpeg')).format, 'image')
+  assert.equal(C.mediaFile(file('gambar.png', '')).mime_type, 'image/png')
+  assert.equal(C.mediaFile(file('video.MOV', 'video/quicktime')).format, 'video')
+  assert.equal(C.mediaFile(file('video.mp4', 'video/mp4', 100 * 1024 * 1024)).size_bytes, 100 * 1024 * 1024)
+  for (const invalid of [file('logo.svg', 'image/svg+xml'), file('photo.jpg', 'text/html'), file('script.html', 'image/jpeg'), file('animasi.gif', 'image/gif'), file('gambar.png', 'image/png', 0), file('video.mp4', 'video/mp4', 100 * 1024 * 1024 + 1), file('gambar.jpg', 'image/jpeg', 10 * 1024 * 1024 + 1)]) assert.throws(() => C.mediaFile(invalid))
+  assert.throws(() => C.mediaFile(file('video.mov', 'video/quicktime'), { accepted_mime_types: ['image/jpeg', 'video/mp4'] }))
+  assert.throws(() => C.mediaFile(file('gambar.jpg', 'image/jpeg', 1025), { max_image_bytes: 1024 }))
+  assert.equal(C.fileSize(10 * 1024 * 1024), '10 MB')
+})
