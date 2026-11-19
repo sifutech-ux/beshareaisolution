@@ -1,0 +1,24 @@
+# Extend the verified account service only. The social worker continues to
+# consume provider-fetchable media URLs and does not need this storage mount.
+ARG ACCOUNT_BASE_IMAGE
+FROM ${ACCOUNT_BASE_IMAGE}
+
+USER root
+RUN echo 'c24fab7943cc48c78e0a4353f13cdf02c25026179fe652ad4f2417ff75dbdedb  /app/akaun_pelayan.py' | sha256sum -c - \
+ && echo '73e235f32c12173409d44387e59efa527f216bea467a6be4eb3cc6db4c567d02  /app/pelanggan_marketing.py' | sha256sum -c - \
+ && echo '064377cd793c5ad8750a4cde743f31d50f72719631d039af533c7b6f83d736b7  /app/pelanggan_akaun.py' | sha256sum -c -
+
+# Use the current security-maintained distribution package for ffprobe and a
+# pinned binary Pillow release. No credential or application env file is copied.
+COPY marketing/requirements-media.txt /tmp/requirements-media.txt
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg \
+ && rm -rf /var/lib/apt/lists/* \
+ && python -m pip install --no-cache-dir --only-binary=:all: -r /tmp/requirements-media.txt \
+ && rm /tmp/requirements-media.txt
+
+COPY copilot/account/akaun_pelayan.py copilot/account/pelanggan_marketing.py \
+     copilot/account/marketing_media.py /app/
+USER nobody
+RUN python -c 'from PIL import Image; import marketing_media; import shutil; assert shutil.which("ffprobe")' \
+ && ffprobe -version >/dev/null

@@ -48,6 +48,7 @@
     } finally { clearTimeout(timeout); signal?.removeEventListener('abort', relay) }
   }
   function resetMemory() {
+    disposePostMedia(editors.post)
     state.epoch++; state.owner = null; state.account = null; state.token = null; state.ready = false
     for (const k of ['campaigns', 'posts', 'sources', 'results', 'connections']) state[k] = []
     state.capabilities = {}; aiController?.abort(); aiController = null; aiSignature = ''; aiKey = ''; aiTarget = null; aiDraftContext = null
@@ -240,6 +241,7 @@
     if (editor?.saving) { feedback(kind, 'Tunggu simpanan selesai dahulu.'); return }
     if (editor?.dirty && !await confirmAction('Tutup tanpa menyimpan?', 'Suntingan yang belum disimpan akan dibuang. Rekod yang sudah disimpan dalam akaun kekal tersedia.', 'Buang suntingan')) return
     if (kind === 'ai') aiController?.abort()
+    if (kind === 'post') disposePostMedia(editor)
     $(id).close(); if (editor) editor.dirty = false
   }
   function editorState(kind, item) { editors[kind] = { item: structuredClone(item), dirty: false, saving: false, conflict: null }; $(kind + '-conflict').hidden = true; feedback(kind); $(kind + '-save-state').textContent = item.version ? 'Disimpan dalam akaun' : 'Belum disimpan' }
@@ -269,15 +271,21 @@
   }
   function openPost(item, defaults = {}) {
     if (!state.ready || !ensureCampaign()) return
+    disposePostMedia(editors.post)
     const p = item || { id: C.id(), version: 0, campaign_id: defaults.campaign_id || $('post-campaign-filter').value || sorted(state.campaigns)[0]?.id || '', platform: 'facebook', format: 'text', body: '', media_url: '', scheduled_at: defaults.scheduled_at || '', status: defaults.scheduled_at ? 'planned' : 'draft', ...defaults }
     editorState('post', p); campaignOptions($('post-campaign'), { current: p.campaign_id })
+    editors.post.media = p.media_id ? { id: p.media_id, url: p.media_url, format: p.format === 'reel' ? 'video' : p.format } : null
+    editors.post.mediaNotice = ''; $('post-file').value = ''; $('post-media-url-options').open = !!p.media_url && !p.media_id
     setValues('post', { platform: p.platform, format: p.format === 'reel' ? 'video' : p.format, body: p.body, media: p.media_url, scheduled: C.malaysiaInput(p.scheduled_at), state: p.status === 'planned' ? 'planned' : 'draft' })
     $('post-dialog-title').textContent = p.version ? 'Sunting kandungan' : 'Kandungan baharu'; showDialog('post-dialog'); renderPostEditor()
   }
   function readPost() {
-    const body = $('post-body').value.trim(), platform = $('post-platform').value, campaign_id = $('post-campaign').value, format = $('post-format').value
+    const e = editors.post, body = $('post-body').value.trim(), platform = $('post-platform').value, campaign_id = $('post-campaign').value, format = $('post-format').value
+    if (mediaUploading(e)) throw Error('Tunggu muat naik selesai atau batalkan muat naik sebelum menyimpan.')
     if (!state.campaigns.some(c => c.id === campaign_id)) throw Error('Pilih kempen untuk kandungan ini.')
-    return { version: editors.post.item.version, campaign_id, platform, format, body, media_url: C.https($('post-media').value), scheduled_at: C.utcFromMalaysia($('post-scheduled').value), status: $('post-state').value }
+    const media_url = format === 'text' ? '' : C.https($('post-media').value), media_id = media_url && e.media?.url === media_url ? e.media.id : ''
+    if (media_id && e.media.format !== format) throw Error('Format tidak sepadan dengan lampiran. Pilih ' + (e.media.format === 'image' ? 'Gambar' : 'Video') + ' atau pilih fail baharu.')
+    return { version: e.item.version, campaign_id, platform, format, body, media_id, media_url, scheduled_at: C.utcFromMalaysia($('post-scheduled').value), status: $('post-state').value }
   }
   function renderPostEditor() {
     const e = editors.post; if (!e) return
@@ -287,30 +295,205 @@
     const accountName = !locked && !p.provider_post_id && destination?.status === 'connected' && destination.accounts?.length === 1 ? destination.accounts[0]?.name : ''
     $('preview-name').textContent = typeof accountName === 'string' && accountName.trim() ? accountName : 'Akaun ' + C.PLATFORM[platform]
     $('post-dialog-title').textContent = p.version ? locked ? 'Semak kandungan' : 'Sunting kandungan' : 'Kandungan baharu'
-    $('post-media-label').hidden = format === 'text'; $('post-save').textContent = $('post-state').value === 'planned' ? 'Simpan rancangan' : 'Simpan draf'
+    $('post-save').textContent = $('post-state').value === 'planned' ? 'Simpan rancangan' : 'Simpan draf'
     $('post-count').textContent = platform === 'threads' ? new TextEncoder().encode(text).length + ' / 500 bait UTF-8' : platform === 'instagram' ? text.length + ' / 2,200 aksara' : text.length + ' aksara'
     $('preview-platform').textContent = C.PLATFORM[platform] + ' · Pratonton'; $('preview-body').textContent = text || 'Teks kandungan anda akan muncul di sini.'
-    const media = $('preview-media'); media.hidden = format === 'text'; media.replaceChildren()
-    if (format !== 'text') { media.append(el('span', format === 'image' ? 'Pratonton gambar' : 'Pratonton video')); if ($('post-media').value) media.append(button('Muat pratonton', previewMedia, 'button quiet')) }
     $('post-connection-note').textContent = locked ? 'Status: ' + C.STATUS[p.status] + '. ' + (p.status === 'queued' ? 'Batalkan jadual untuk menyunting kandungan semula.' : p.status === 'published' ? 'Penerbitan telah direkod oleh saluran.' : 'Semak status penerbitan sebelum membuat perubahan.') : ready ? C.PLATFORM[platform] + ' disambungkan. Semak kandungan dan masa, kemudian pilih Lulus & jadualkan.' : connection(platform)?.status === 'connected' ? 'Akaun disambungkan. Penjadualan automatik belum tersedia. Anda masih boleh menyimpan rancangan.' : 'Saluran belum disambungkan. Kandungan boleh disimpan sebagai draf atau rancangan; ia belum diterbitkan.'
     if (platform === 'instagram' && format === 'text') $('post-connection-note').textContent += ' Instagram memerlukan gambar atau video.'
     $('post-form').querySelectorAll('input,select,textarea').forEach(n => { n.disabled = locked || e.saving })
-    $('post-ai').disabled = locked || e.saving; $('post-save').disabled = locked || e.saving; $('schedule-post').disabled = locked || e.saving || !ready
-    $('cancel-post-schedule').hidden = !['queued', 'planned', 'failed'].includes(p.status); $('cancel-post-schedule').disabled = e.saving
+    $('post-ai').disabled = locked || e.saving; $('post-save').disabled = locked || e.saving || mediaUploading(e); $('schedule-post').disabled = locked || e.saving || mediaUploading(e) || !ready
+    $('cancel-post-schedule').hidden = !['queued', 'planned', 'failed'].includes(p.status); $('cancel-post-schedule').disabled = e.saving || mediaUploading(e)
     $('cancel-post-schedule').textContent = p.status === 'queued' ? 'Batalkan jadual' : 'Batalkan rancangan'
+    renderMediaEditor(e, locked); previewMedia()
   }
   function previewMedia() {
-    try { const url = C.https($('post-media').value, true), format = $('post-format').value, target = $('preview-media'), media = el(format === 'image' ? 'img' : 'video'); if (format === 'image') media.alt = 'Media yang dilampirkan pada kandungan'; else { media.controls = true; media.preload = 'metadata' } media.referrerPolicy = 'no-referrer'; media.src = url; media.addEventListener('error', () => target.replaceChildren(el('span', 'Media belum dapat dipratonton. Semak pautan terus kepada fail.'))); target.replaceChildren(media) } catch (error) { feedback('post', error.message, 'error') }
+    const e = editors.post; if (!e) return
+    const pending = mediaUploading(e) ? e.upload : null, format = pending?.info.format || $('post-format').value, target = $('preview-media')
+    target.hidden = format === 'text'
+    let url = pending?.previewUrl || ''
+    if (!url && format !== 'text' && !e.previewWait) { try { url = C.https($('post-media').value) } catch {} }
+    const key = format + '|' + url
+    if (key === e.previewKey) return
+    e.previewKey = key; target.replaceChildren()
+    if (format === 'text') return
+    if (!url) { target.append(el('span', e.previewWait ? 'Mengemas kini pratonton…' : 'Pilih fail atau masukkan pautan untuk melihat pratonton.')); return }
+    const media = el(format === 'image' ? 'img' : 'video')
+    if (format === 'image') media.alt = pending ? 'Pratonton gambar yang sedang dimuat naik' : 'Gambar yang dilampirkan pada kandungan'
+    else { media.controls = true; media.preload = 'metadata'; media.playsInline = true; media.setAttribute('aria-label', pending ? 'Pratonton video yang sedang dimuat naik' : 'Video yang dilampirkan pada kandungan') }
+    media.referrerPolicy = 'no-referrer'; media.src = url
+    media.addEventListener('error', () => { if (editors.post === e && e.previewKey === key) target.replaceChildren(el('span', 'Media belum dapat dipratonton dalam pelayar ini. Semak fail atau pautan media.'), button('Cuba pratonton lagi', () => { e.previewKey = ''; previewMedia() }, 'button quiet')) })
+    target.replaceChildren(media)
+  }
+  function mediaUploading(editor) { return !!editor?.upload && ['uploading', 'checking'].includes(editor.upload.status) }
+  function mediaEditable(editor) { return !!editor && state.ready && !editor.saving && !['queued', 'publishing', 'published', 'uncertain'].includes(editor.item.status) }
+  function releasePreview(upload) { if (upload?.previewUrl) { URL.revokeObjectURL(upload.previewUrl); upload.previewUrl = '' } }
+  function cleanupMedia(id, epoch = state.epoch, token = state.token) {
+    // Cleanup is best effort; the server also expires abandoned uploads. Never use a new account's token.
+    if (id && live(epoch, token)) request(API + '/media/' + id, { method: 'DELETE' }).catch(() => {})
+  }
+  function abandonUpload(upload) {
+    if (!upload) return
+    upload.cancelled = true; upload.run++; upload.xhr?.abort(); releasePreview(upload); cleanupMedia(upload.id, upload.epoch, upload.token)
+  }
+  function disposePostMedia(editor) {
+    if (!editor) return
+    clearTimeout(editor.previewTimer); abandonUpload(editor.upload)
+    if (editor.media?.id && editor.media.id !== editor.item.media_id) cleanupMedia(editor.media.id, editor.mediaEpoch, editor.mediaToken)
+    editor.upload = null; editor.media = null; editor.previewKey = ''; editor.previewWait = false
+  }
+  function uploadCurrent(editor, upload, run) {
+    if (editors.post !== editor || editor.upload !== upload || upload.run !== run || upload.cancelled || !$('post-dialog').open) return false
+    if (!live(upload.epoch, upload.token)) { resetMemory(); bootstrap(); return false }
+    return true
+  }
+  function renderMediaEditor(editor, locked) {
+    const capability = state.capabilities.media_upload || {}, rules = C.mediaRules(capability), upload = editor.upload, busy = mediaUploading(editor), disabled = locked || editor.saving
+    const accepted = rules.accepted.map(type => C.MEDIA_TYPES[type].label), images = rules.accepted.filter(type => C.MEDIA_TYPES[type].format === 'image').map(type => C.MEDIA_TYPES[type].label), videos = rules.accepted.filter(type => C.MEDIA_TYPES[type].format === 'video').map(type => C.MEDIA_TYPES[type].label)
+    $('post-media-rules').textContent = images.join('/') + ' sehingga ' + C.fileSize(rules.image) + '. ' + videos.join('/') + ' sehingga ' + C.fileSize(rules.video) + ', ' + (capability.min_video_duration_seconds || 3) + '–' + (capability.max_video_duration_seconds || 300) + ' saat. Video H.264 atau HEVC; audio AAC jika ada. Satu fail bagi setiap kandungan.'
+    $('post-file').accept = rules.accepted.concat(rules.accepted.flatMap(type => C.MEDIA_TYPES[type].extensions.map(ext => '.' + ext))).join(',')
+    $('post-file').disabled = disabled || busy || !capability.enabled
+    $('post-file-choose').disabled = $('post-file').disabled
+    $('post-file-choose').textContent = $('post-media').value ? 'Pilih fail pengganti' : 'Pilih gambar atau video'
+    $('post-media-drop').setAttribute('aria-disabled', String($('post-file').disabled))
+    $('post-media-drop').dataset.uploading = String(busy)
+    $('post-media-drop').setAttribute('aria-busy', String(busy))
+    $('post-format').disabled = disabled || busy; $('post-media').disabled = disabled || busy
+    const file = upload?.info || editor.media
+    $('post-media-filename').textContent = file?.name ? file.name + (file.size_bytes ? ' · ' + C.fileSize(file.size_bytes) : '') : $('post-media').value ? 'Satu lampiran media dipilih' : 'Belum ada fail dipilih'
+    $('post-media-remove').hidden = !$('post-media').value && !upload; $('post-media-remove').disabled = disabled || busy
+    $('post-media-cancel').hidden = !busy; $('post-media-cancel').disabled = disabled
+    $('post-media-retry').hidden = !upload || !['error', 'cancelled'].includes(upload.status) || !upload.retryable
+    $('post-media-retry').disabled = disabled || busy || !capability.enabled
+    $('post-media-progress-wrap').hidden = !busy
+    const progress = $('post-media-progress')
+    if (upload?.status === 'checking' || upload?.progress === null) progress.removeAttribute('value')
+    else progress.value = upload?.progress || 0
+    $('post-media-progress-label').textContent = upload?.status === 'checking' ? 'Menyemak…' : (upload?.progress || 0) + '%'
+    const status = $('post-media-feedback')
+    status.dataset.kind = upload?.status === 'error' ? 'error' : editor.mediaNoticeKind || ''
+    status.textContent = busy ? upload.status === 'checking' ? 'Menyemak muat naik sebelumnya. Suntingan anda masih ada.' : upload.progress === 100 ? 'Fail telah dihantar. Menyediakan media untuk pratonton…' : 'Sedang memuat naik. Anda boleh terus menyunting teks.' : editor.mediaNotice || upload?.error || (!capability.enabled && !locked ? 'Muat naik belum tersedia. Anda masih boleh menggunakan pautan media sedia ada.' : '')
+    $('post-file').setAttribute('aria-label', 'Pilih satu fail ' + accepted.join(', '))
+  }
+  function uploadMediaBytes(upload, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest(); upload.xhr = xhr
+      xhr.open('PUT', services.akaun + API + '/media/' + upload.id + '?name=' + encodeURIComponent(upload.file.name))
+      xhr.timeout = 300000; xhr.withCredentials = false
+      xhr.setRequestHeader('Authorization', 'Bearer ' + upload.token); xhr.setRequestHeader('Content-Type', upload.info.mime_type)
+      xhr.upload.onprogress = event => onProgress(event.lengthComputable && event.total > 0 ? Math.min(100, Math.round(event.loaded / event.total * 100)) : null)
+      xhr.onload = () => {
+        let data = {}; try { data = JSON.parse(xhr.responseText) } catch {}
+        if (xhr.status < 200 || xhr.status >= 300 || data.ok !== true) reject(new RequestError(typeof data.error === 'string' ? data.error : 'Muat naik belum dapat disahkan. Cuba lagi untuk menyemak fail yang sama.', xhr.status, data))
+        else resolve(data)
+      }
+      xhr.onerror = () => reject(new RequestError('Sambungan terputus semasa muat naik. Semak internet dan cuba lagi.'))
+      xhr.ontimeout = () => reject(new RequestError('Muat naik mengambil masa terlalu lama. Cuba lagi untuk menyemak fail yang sama.', 408))
+      xhr.onabort = () => reject(new RequestError('Muat naik dibatalkan.', 499))
+      xhr.send(upload.file)
+    })
+  }
+  function finishMediaUpload(editor, upload, data) {
+    const media = data.media
+    if (!media || media.id !== upload.id || media.format !== upload.info.format || !Number.isSafeInteger(media.size_bytes) || media.size_bytes < 1) throw new RequestError('Media belum dapat disahkan. Cuba lagi untuk menyemak muat naik yang sama.')
+    const url = C.https(media.url, true), previous = editor.media
+    editor.media = { ...media, url }; editor.mediaEpoch = upload.epoch; editor.mediaToken = upload.token
+    editor.upload = null; releasePreview(upload)
+    $('post-media').value = url; $('post-format').value = media.format; $('post-media-url-options').open = false
+    clearTimeout(editor.previewTimer); editor.previewWait = false
+    dirty('post'); editor.mediaNotice = 'Muat naik selesai. Semak pratonton, kemudian simpan atau jadualkan.'; editor.mediaNoticeKind = 'success'
+    if (previous?.id && previous.id !== media.id && previous.id !== editor.item.media_id) cleanupMedia(previous.id, upload.epoch, upload.token)
+    renderPostEditor()
+  }
+  async function runMediaUpload(editor, upload, reconcile = false) {
+    const run = ++upload.run
+    editor.mediaNotice = ''; editor.mediaNoticeKind = ''
+    upload.cancelled = false; upload.status = reconcile ? 'checking' : 'uploading'; upload.error = ''; upload.progress = 0
+    upload.previousFormat = $('post-format').value; $('post-format').value = upload.info.format
+    dirty('post'); renderPostEditor()
+    try {
+      if (reconcile) {
+        try {
+          const existing = await request(API + '/media/' + upload.id)
+          if (uploadCurrent(editor, upload, run)) finishMediaUpload(editor, upload, existing)
+          return
+        } catch (error) {
+          if (!uploadCurrent(editor, upload, run)) return
+          if (error.status === 410 && error.data?.code === 'media_cancelled') upload.id = C.id()
+          else if (!(error.status === 404 && error.data?.code === 'media_not_found') && !(error.status === 409 && error.data?.code === 'upload_failed')) throw error
+        }
+      }
+      if (!uploadCurrent(editor, upload, run)) return
+      upload.status = 'uploading'; renderPostEditor()
+      const data = await uploadMediaBytes(upload, progress => { if (uploadCurrent(editor, upload, run)) { upload.progress = progress; renderMediaEditor(editor, false) } })
+      if (uploadCurrent(editor, upload, run)) finishMediaUpload(editor, upload, data)
+    } catch (error) {
+      if (!uploadCurrent(editor, upload, run)) return
+      if (error.status === 401) { expireSession(upload.token); return }
+      upload.status = 'error'; upload.retryable = ![413, 415, 422].includes(error.status)
+      upload.error = (error.data?.code === 'upload_in_progress' ? 'Muat naik sebelumnya masih diproses. Tunggu sebentar, kemudian cuba lagi.' : error.message) + ($('post-media').value ? ' Lampiran sebelumnya masih digunakan.' : ' Teks anda masih ada.')
+      $('post-format').value = upload.previousFormat
+      renderPostEditor()
+    }
+  }
+  async function choosePostFiles(files) {
+    const editor = editors.post
+    if (!mediaEditable(editor) || mediaUploading(editor) || !files?.length) return
+    if (!live(state.epoch, state.token)) { resetMemory(); bootstrap(); return }
+    try {
+      if (!state.capabilities.media_upload?.enabled) throw Error('Muat naik belum tersedia. Gunakan pautan media sedia ada buat masa ini.')
+      if (files.length !== 1) throw Error('Pilih satu gambar atau video bagi setiap kandungan.')
+      const file = files[0], info = C.mediaFile(file, state.capabilities.media_upload), previewUrl = URL.createObjectURL(file)
+      abandonUpload(editor.upload)
+      const upload = { id: C.id(), file, info, previewUrl, epoch: state.epoch, token: state.token, run: 0, retryable: true }
+      editor.upload = upload; editor.mediaNotice = ''; editor.mediaNoticeKind = ''
+      await runMediaUpload(editor, upload)
+    } catch (error) { if (editors.post === editor) { editor.mediaNotice = error.message; editor.mediaNoticeKind = 'error'; renderPostEditor() } }
+  }
+  async function retryMediaUpload() {
+    const editor = editors.post, upload = editor?.upload
+    if (!mediaEditable(editor) || mediaUploading(editor) || !upload?.retryable || !state.capabilities.media_upload?.enabled) return
+    if (!live(upload.epoch, upload.token)) { resetMemory(); bootstrap(); return }
+    const reconcile = upload.status === 'error'
+    if (!reconcile) upload.id = C.id()
+    if (!upload.previewUrl) upload.previewUrl = URL.createObjectURL(upload.file)
+    await runMediaUpload(editor, upload, reconcile)
+  }
+  function cancelMediaUpload() {
+    const editor = editors.post, upload = editor?.upload
+    if (!mediaEditable(editor) || !mediaUploading(editor)) return
+    abandonUpload(upload); upload.id = ''; upload.status = 'cancelled'; upload.retryable = true
+    upload.error = 'Muat naik dibatalkan.' + ($('post-media').value ? ' Lampiran sebelumnya masih digunakan.' : ' Teks anda masih ada.')
+    $('post-format').value = upload.previousFormat; renderPostEditor()
+  }
+  function removePostMedia() {
+    const editor = editors.post
+    if (!mediaEditable(editor) || mediaUploading(editor)) return
+    disposePostMedia(editor); $('post-media').value = ''; $('post-file').value = ''; $('post-format').value = 'text'
+    dirty('post'); editor.mediaNotice = 'Lampiran dibuang daripada suntingan ini. Simpan untuk mengemas kini kandungan.'; editor.mediaNoticeKind = ''
+    renderPostEditor()
+  }
+  function postMediaInput(event) {
+    const editor = editors.post; if (!editor) return
+    if (event.target?.id === 'post-media') {
+      if (editor.upload && !mediaUploading(editor)) { abandonUpload(editor.upload); editor.upload = null }
+      if (editor.media && $('post-media').value !== editor.media.url) {
+        if (editor.media.id !== editor.item.media_id) cleanupMedia(editor.media.id, editor.mediaEpoch, editor.mediaToken)
+        editor.media = null
+      }
+      editor.mediaNotice = ''; editor.mediaNoticeKind = ''; editor.previewWait = true
+      clearTimeout(editor.previewTimer); editor.previewTimer = setTimeout(() => { if (editors.post === editor) { editor.previewWait = false; previewMedia() } }, 450)
+    }
+    if (event.target?.id === 'post-format' && $('post-format').value === 'text' && ($('post-media').value || editor.upload)) removePostMedia()
   }
   async function schedulePost() {
-    const e = editors.post; if (!e || e.saving) return
+    const e = editors.post; if (!e || e.saving || mediaUploading(e)) return
     try {
       const p = readPost()
       if (!publishReady(p.platform)) throw Error('Sambungan penerbitan belum tersedia. Simpan kandungan sebagai rancangan dahulu.')
       if (!p.scheduled_at || new Date(p.scheduled_at).getTime() < Date.now() + 60000) throw Error('Pilih masa penerbitan sekurang-kurangnya satu minit dari sekarang.')
       if (!p.body && p.format === 'text') throw Error('Tulis kandungan sebelum menjadualkan penerbitan.')
       if (p.platform === 'instagram' && p.format === 'text') throw Error('Pilih gambar atau video untuk penerbitan Instagram.')
-      if (p.format !== 'text' && !p.media_url) throw Error('Masukkan pautan media sebelum menjadualkan penerbitan.')
+      if (p.format !== 'text' && !p.media_url) throw Error('Muat naik gambar atau video, atau masukkan pautan media sebelum menjadualkan penerbitan.')
       if (p.platform === 'threads' && new TextEncoder().encode(p.body).length > 500) throw Error('Ringkaskan teks Threads kepada maksimum 500 bait UTF-8.')
       if (p.platform === 'instagram' && p.body.length > 2200) throw Error('Ringkaskan kapsyen Instagram kepada maksimum 2,200 aksara.')
       if (!await confirmAction('Luluskan penerbitan ini?', C.PLATFORM[p.platform] + '\n' + C.displayDate(p.scheduled_at, true) + ' · waktu Malaysia\n\nKandungan yang diluluskan akan dihantar secara automatik pada waktu ini jika sambungan tersedia.', 'Lulus & jadualkan')) return
@@ -326,7 +509,7 @@
     finally { if (editors.post === e) { e.saving = false; renderPostEditor() } }
   }
   async function cancelPost() {
-    const e = editors.post; if (!e || e.saving) return
+    const e = editors.post; if (!e || e.saving || mediaUploading(e)) return
     const action = e.item.status === 'queued' ? 'Batalkan jadual' : 'Batalkan rancangan'
     if (!await confirmAction(action + ' kandungan?', 'Kandungan akan dikeluarkan daripada rancangan atau giliran jika penerbitan belum bermula.', action)) return
     try { e.saving = true; renderPostEditor(); const d = await request(API + '/posts/' + e.item.id + '/cancel', { method: 'POST', body: { version: e.item.version } }); upsert('post', d.post); openPost(d.post); feedback('post', 'Jadual dibatalkan. Anda boleh menyunting dan menyimpan sebagai draf.', 'success') } catch (error) { if (error.status === 409 && error.data?.current) showConflict('post', error.data.current); feedback('post', error.message, 'error') } finally { if (editors.post === e) e.saving = false; renderPostEditor() }
@@ -361,7 +544,9 @@
       if (editors[kind] !== e || !state.ready) return false
       if (!record?.id || !Number.isInteger(record.version)) throw Error('Simpanan belum dapat disahkan. Cuba simpan lagi menggunakan draf yang sama.')
       let unchanged = false; try { unchanged = payloadMatches(read(), payload) } catch {}
+      const previousMedia = kind === 'post' ? e.item.media_id : ''
       e.item = structuredClone(record); e.dirty = !unchanged; e.conflict = null; $(kind + '-conflict').hidden = true
+      if (previousMedia && previousMedia !== record.media_id) cleanupMedia(previousMedia)
       upsert(kind, record); $(kind + '-save-state').textContent = unchanged ? 'Disimpan dalam akaun' : 'Suntingan baharu belum disimpan'
       feedback(kind, unchanged ? 'Disimpan. Rekod ini boleh dibuka semula pada peranti lain.' : 'Versi tadi disimpan. Suntingan baharu masih belum disimpan.', unchanged ? 'success' : '')
       if (kind === 'campaign') { e.step = -1; showCampaignStep(); $('campaign-dialog-title').textContent = 'Sunting kempen' }
@@ -434,7 +619,7 @@
   document.querySelectorAll('dialog:not(#confirm-dialog)').forEach(d => d.addEventListener('cancel', e => { e.preventDefault(); closeDialog(d.id) }))
   $('confirm-cancel').addEventListener('click', () => finishConfirm(false)); $('confirm-accept').addEventListener('click', () => finishConfirm(true)); $('confirm-dialog').addEventListener('cancel', e => { e.preventDefault(); finishConfirm(false) })
   $('confirm-dialog').addEventListener('close', () => { if (confirmResolve) { const r = confirmResolve; confirmResolve = null; r(false) } })
-  for (const kind of Object.keys(plural)) $(kind + '-form').addEventListener('input', () => { dirty(kind); if (kind === 'post') renderPostEditor(); if (kind === 'campaign' && editors.campaign?.step === 2) showCampaignStep() })
+  for (const kind of Object.keys(plural)) $(kind + '-form').addEventListener('input', event => { if (kind === 'post' && event.target?.id === 'post-file') return; dirty(kind); if (kind === 'post') { postMediaInput(event); renderPostEditor() } if (kind === 'campaign' && editors.campaign?.step === 2) showCampaignStep() })
   $('campaign-form').addEventListener('submit', saveCampaign); $('campaign-prev').addEventListener('click', () => { if (editors.campaign.step > 0) { editors.campaign.step--; showCampaignStep() } })
   $('post-form').addEventListener('submit', e => { e.preventDefault(); save('post', readPost) }); $('source-form').addEventListener('submit', e => { e.preventDefault(); save('source', readSource) }); $('result-form').addEventListener('submit', e => { e.preventDefault(); save('result', readResult) })
   $('new-post').addEventListener('click', () => openPost()); $('new-source').addEventListener('click', () => openSource()); $('new-result').addEventListener('click', () => openResult())
@@ -446,6 +631,14 @@
   $('calendar-prev').addEventListener('click', () => moveMonth(-1)); $('calendar-next').addEventListener('click', () => moveMonth(1)); $('calendar-today').addEventListener('click', () => { const date = C.malaysiaDate(); calendar.year = Number(date.slice(0, 4)); calendar.month = Number(date.slice(5, 7)) - 1; renderCalendar() })
   $('source-type').addEventListener('change', () => { $('source-url').required = $('source-type').value === 'reference' })
   $('schedule-post').addEventListener('click', schedulePost); $('cancel-post-schedule').addEventListener('click', cancelPost)
+  $('post-file-choose').addEventListener('click', () => { if (!$('post-file').disabled) $('post-file').click() })
+  $('post-file').addEventListener('change', event => { const files = [...(event.target?.files || $('post-file').files || [])]; $('post-file').value = ''; return choosePostFiles(files) })
+  $('post-media-cancel').addEventListener('click', cancelMediaUpload); $('post-media-retry').addEventListener('click', retryMediaUpload); $('post-media-remove').addEventListener('click', removePostMedia)
+  $('post-dialog').addEventListener('close', () => { if (!$('post-dialog').open) disposePostMedia(editors.post) })
+  const mediaDrop = $('post-media-drop')
+  mediaDrop.addEventListener('dragover', event => { event.preventDefault(); if (!$('post-file').disabled) mediaDrop.classList.add('dragging') })
+  mediaDrop.addEventListener('dragleave', () => mediaDrop.classList.remove('dragging'))
+  mediaDrop.addEventListener('drop', event => { event.preventDefault(); mediaDrop.classList.remove('dragging'); if (!$('post-file').disabled) return choosePostFiles([...(event.dataTransfer?.files || [])]) })
   $('copy-post').addEventListener('click', () => copy($('post-body').value, 'post-feedback', $('post-body')))
   $('post-ai').addEventListener('click', openAI); $('ai-form').addEventListener('submit', generateAI); $('ai-use').addEventListener('click', useAI)
   $('export-results').addEventListener('click', () => { const rows = selectedResults(); if (rows.length) download('beshare-hasil-' + C.malaysiaDate() + '.csv', C.csv(rows, state.campaigns), 'text/csv;charset=utf-8') })

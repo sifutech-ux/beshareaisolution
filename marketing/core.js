@@ -37,6 +37,29 @@
     if (u.protocol !== 'https:' || u.username || u.password || !h.includes('.') || h === 'localhost' || /\.(local|localhost|internal|test)$/.test(h) || /^\[/.test(h) || /^(0|10|127|169\.254|192\.168|172\.(1[6-9]|2\d|3[01]))\./.test(h)) throw Error('Gunakan pautan HTTPS awam tanpa nama pengguna atau kata laluan.')
     return u.href
   }
+  const MEDIA_TYPES = {
+    'image/jpeg': { format: 'image', extensions: ['jpg', 'jpeg'], label: 'JPEG' },
+    'image/png': { format: 'image', extensions: ['png'], label: 'PNG' },
+    'video/mp4': { format: 'video', extensions: ['mp4'], label: 'MP4' },
+    'video/quicktime': { format: 'video', extensions: ['mov'], label: 'MOV' }
+  }
+  function mediaRules(capability = {}) {
+    const accepted = Array.isArray(capability.accepted_mime_types) ? capability.accepted_mime_types.filter(type => MEDIA_TYPES[type]) : Object.keys(MEDIA_TYPES)
+    const limit = (value, fallback) => Number.isSafeInteger(value) && value > 0 ? value : fallback
+    return { accepted, image: limit(capability.max_image_bytes, 10 * 1024 * 1024), video: limit(capability.max_video_bytes, 100 * 1024 * 1024) }
+  }
+  function fileSize(bytes) { return bytes < 1024 * 1024 ? Math.max(1, Math.ceil(bytes / 1024)) + ' KB' : Number((bytes / (1024 * 1024)).toFixed(1)) + ' MB' }
+  function mediaFile(file, capability = {}) {
+    const rules = mediaRules(capability), name = String(file?.name || ''), extension = name.split('.').pop().toLowerCase()
+    const supplied = String(file?.type || '').toLowerCase().split(';')[0].trim()
+    const mime_type = supplied || Object.keys(MEDIA_TYPES).find(type => MEDIA_TYPES[type].extensions.includes(extension))
+    const info = MEDIA_TYPES[mime_type]
+    if (!info || !rules.accepted.includes(mime_type) || !info.extensions.includes(extension)) throw Error('Pilih fail ' + rules.accepted.map(type => MEDIA_TYPES[type].label).join(', ') + ' yang disokong.')
+    if (!Number.isSafeInteger(file.size) || file.size <= 0) throw Error('Fail ini kosong atau saiznya tidak dapat dibaca. Pilih fail lain.')
+    const maximum = rules[info.format]
+    if (file.size > maximum) throw Error((info.format === 'image' ? 'Gambar' : 'Video') + ' melebihi had ' + fileSize(maximum) + '. Pilih fail yang lebih kecil.')
+    return { name, format: info.format, mime_type, size_bytes: file.size }
+  }
   function date(value, required = false) {
     const s = String(value || '')
     if (!s && !required) return ''
@@ -145,5 +168,5 @@
     if (!turns.length || turns.length > 8) throw Error('Maklumat terlalu panjang untuk satu permintaan. Ringkaskan kempen dahulu.')
     return turns
   }
-  return { CHANNELS, GOALS, PLATFORM, STATUS, id, money, cents, ringgit, integer, https, date, malaysiaDate, malaysiaInput, utcFromMalaysia, displayDate, campaign, result, metrics, utm, csvCell, csv, brief, monthDays, promptTurns }
+  return { CHANNELS, GOALS, PLATFORM, STATUS, MEDIA_TYPES, id, money, cents, ringgit, integer, https, mediaRules, mediaFile, fileSize, date, malaysiaDate, malaysiaInput, utcFromMalaysia, displayDate, campaign, result, metrics, utm, csvCell, csv, brief, monthDays, promptTurns }
 })

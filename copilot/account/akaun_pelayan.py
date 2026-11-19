@@ -48,6 +48,13 @@ class AkaunHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         self._kaedah('POST')
 
+    def do_HEAD(self):
+        from marketing_media import PUBLIC_PREFIX
+        if urllib.parse.urlsplit(self.path).path.startswith(PUBLIC_PREFIX):
+            self._marketing_media('HEAD')
+            return
+        _tulis(self, 404, None)
+
     def do_PUT(self):
         self._kaedah('PUT')
 
@@ -68,6 +75,10 @@ class AkaunHandler(BaseHTTPRequestHandler):
         _tulis(self, 404, {'error': 'Endpoint tidak ditemui.'})
 
     def _akaun(self, method):
+        from marketing_media import PREFIX as MEDIA_PREFIX
+        if urllib.parse.urlsplit(self.path).path.startswith(MEDIA_PREFIX + '/'):
+            self._marketing_media(method)
+            return
         from marketing_lifecycle import is_provider_path
         if is_provider_path(urllib.parse.urlsplit(self.path).path):
             self._marketing_provider(method)
@@ -102,6 +113,84 @@ class AkaunHandler(BaseHTTPRequestHandler):
             )
         except Exception:
             status, body = 503, {'error': 'Akaun tidak dapat dihubungi. Cuba semula.'}
+        _tulis(self, status, body)
+
+
+    def _marketing_media(self, method):
+        from marketing_media import (PUBLIC_PREFIX, MediaError, byte_range,
+                                     dispatch_media, error_body, public_file)
+        parsed = urllib.parse.urlsplit(self.path)
+        # Never interpret unread bytes from an early rejected binary request as
+        # another HTTP request on the same connection.
+        self.close_connection = True
+        if parsed.path.startswith(PUBLIC_PREFIX):
+            if method not in {'GET', 'HEAD'}:
+                _tulis(self, 405, {'ok': False, 'error': 'Kaedah media tidak disokong.'})
+                return
+            reader = None
+            try:
+                reader, row = public_file(parsed.path, self._connect, self._postgres())
+                size = row['size_bytes']
+                ranges = self.headers.get_all('Range') or []
+                try:
+                    if len(ranges) > 1:
+                        raise MediaError('Julat media tidak sah.', 416, 'invalid_range')
+                    start, end, partial = byte_range(ranges[0] if ranges else None, size)
+                except MediaError:
+                    self.send_response(416)
+                    self.send_header('Content-Range', 'bytes */' + str(size))
+                    self.send_header('Content-Length', '0')
+                    self.send_header('Cache-Control', 'no-store')
+                    self.end_headers()
+                    return
+                self.send_response(206 if partial else 200)
+                self.send_header('Content-Type', row['mime_type'])
+                self.send_header('Content-Length', str(end - start + 1))
+                self.send_header('Accept-Ranges', 'bytes')
+                if partial:
+                    self.send_header('Content-Range', f'bytes {start}-{end}/{size}')
+                self.send_header('Cache-Control', 'no-store')
+                self.send_header('X-Content-Type-Options', 'nosniff')
+                self.send_header('Referrer-Policy', 'no-referrer')
+                self.send_header('Content-Disposition', 'inline')
+                self.send_header('Content-Security-Policy', "default-src 'none'; sandbox")
+                self.end_headers()
+                if method != 'HEAD':
+                    self.connection.settimeout(30)
+                    reader.seek(start)
+                    remaining = end - start + 1
+                    while remaining:
+                        block = reader.read(min(65536, remaining))
+                        if not block:
+                            break
+                        self.wfile.write(block)
+                        remaining -= len(block)
+            except MediaError as error:
+                _tulis(self, error.status, None if method == 'HEAD' else error_body(error))
+            except (BrokenPipeError, ConnectionResetError, TimeoutError):
+                pass
+            except Exception:
+                if reader is None:
+                    _tulis(self, 503, None if method == 'HEAD' else {'ok': False, 'error': 'Media tidak tersedia.'})
+            finally:
+                if reader:
+                    reader.close()
+            return
+        try:
+            lengths = self.headers.get_all('Content-Length') or []
+            if self.headers.get('Transfer-Encoding') or len(lengths) > 1:
+                raise ValueError()
+            length = int(lengths[0]) if lengths else 0
+            if length < 0 or method == 'PUT' and not lengths:
+                raise ValueError()
+        except (ValueError, OverflowError):
+            _tulis(self, 400, {'ok': False, 'code': 'invalid_media', 'error': 'Saiz muat naik tidak sah.'})
+            return
+        self.connection.settimeout(30)
+        status, body = dispatch_media(method, parsed.path, parsed.query,
+            self.headers.get('Origin'), self.headers.get('Authorization'),
+            self.headers.get('Content-Type'), length, self.rfile,
+            self._connect, self._postgres(), account_secret(), set_timeout=self.connection.settimeout)
         _tulis(self, status, body)
 
 
@@ -179,8 +268,10 @@ def ikat(connect, postgres=True):
 
 def utama():
     from pelanggan_pangkalan import buka
+    from marketing_media import start_cleanup
     port = int(os.environ.get('ACCOUNT_PORT') or os.environ.get('PORT') or '8767')
     server = ThreadingHTTPServer(('0.0.0.0', port), ikat(buka, True))
+    start_cleanup(buka, True)
     server.serve_forever()
 
 
