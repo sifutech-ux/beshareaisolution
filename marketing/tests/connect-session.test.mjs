@@ -25,10 +25,10 @@ class Element {
   async click() { for (const listener of this.listeners.click || []) await listener() }
 }
 
-function callback({ stored = sessionA, fetcher = async () => response(choice), reads } = {}) {
+function callback({ stored = sessionA, fetcher = async () => response(choice), reads, returned = { code: 'synthetic-code', state: 's'.repeat(43) } } = {}) {
   const ids = Object.fromEntries(['status', 'title', 'intro', 'accounts', 'login'].map(id => [id, new Element()]))
   ids.login.hidden = true
-  const requests = [], listeners = {}, output = [], returned = { code: 'synthetic-code', state: 's'.repeat(43) }
+  const requests = [], listeners = {}, output = []
   let raw = stored, readCount = 0
   const context = vm.createContext({
     window: { BeshareOAuthReturn: returned, addEventListener(type, fn) { (listeners[type] ||= []).push(fn) } },
@@ -91,6 +91,30 @@ test('normal direct Threads completion remains usable', async () => {
   assert.match(app.ids.title.textContent, /berjaya disambungkan/)
   assert.equal(app.requests.length, 1)
   assert.equal(app.returned.code, '')
+})
+
+test('provider callback failures use allowlisted explanations without submitting or displaying provider details', async () => {
+  for (const [failure, heading] of [
+    ['cancelled', 'Sambungan dibatalkan.'],
+    ['tester_required', 'Akses penguji diperlukan.'],
+    ['temporary', 'Platform belum dapat menyambung.'],
+    ['provider', 'Sambungan belum berjaya.'],
+    ['__proto__', 'Sambungan belum berjaya.'],
+    ['raw-provider-diagnostic', 'Sambungan belum berjaya.'],
+  ]) {
+    const app = callback({ returned: { code: 'synthetic-code', state: 's'.repeat(43), failure, error_message: 'raw-provider-diagnostic', error_code: '1349245' } })
+    await app.finished
+    assert.equal(app.requests.length, 0)
+    assert.equal(app.buttons().length, 0)
+    assert.equal(app.ids.title.textContent, heading)
+    assert.match(app.ids.intro.textContent, /Akaun belum disambungkan/)
+    const visible = Object.values(app.ids).map(node => node.textContent).join(' ') + JSON.stringify(app.output)
+    for (const sensitive of ['raw-provider-diagnostic', '1349245', 'synthetic-code', 's'.repeat(43), bearerA]) assert.ok(!visible.includes(sensitive))
+    assert.equal(app.returned.code, '')
+    assert.equal(app.returned.state, '')
+    assert.equal(app.returned.failure, '')
+    if (failure === 'tester_required') assert.match(app.ids.status.textContent, /Semak dan terima jemputan penguji/)
+  }
 })
 
 test('a changed, removed or malformed session before the first fetch makes no request', async () => {

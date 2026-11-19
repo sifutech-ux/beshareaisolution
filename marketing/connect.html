@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-BNq8gN+2YXxaGpXAbgQMCmdA+GXD79IOgdVhYbsx/ls='; style-src 'self' 'unsafe-inline'; connect-src 'self' https://akaun.beshareaisolution.com https://akaun-staging.beshareaisolution.com http://127.0.0.1:8767; img-src 'self' data:; base-uri 'none'; form-action 'self'">
-  <script>(function(){const p=new URLSearchParams(location.search);window.BeshareOAuthReturn={code:p.get('code')||'',state:p.get('state')||'',denied:p.has('error')};history.replaceState(null,'',location.pathname);})();</script>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-HowOUnxU8N37Ng9YpJqh3tpLD6rO/CjK7SK5uq+YjGY='; style-src 'self' 'unsafe-inline'; connect-src 'self' https://akaun.beshareaisolution.com https://akaun-staging.beshareaisolution.com http://127.0.0.1:8767; img-src 'self' data:; base-uri 'none'; form-action 'self'">
+  <script>(function(){const p=new URLSearchParams(location.search),e=p.get('error'),c=p.get('error_code');const failure=c==='1349245'?'tester_required':e==='access_denied'?'cancelled':['temporarily_unavailable','server_error'].includes(e)?'temporary':p.has('error')||p.has('error_code')||p.has('error_message')?'provider':'';window.BeshareOAuthReturn={code:failure?'':p.get('code')||'',state:failure?'':p.get('state')||'',failure,denied:Boolean(failure)};history.replaceState(null,'',location.pathname);})();</script>
   <title>Sambungan akaun · BeShare AI Marketing</title>
   <style>
     :root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b0c17;color:#f2f2fb}
@@ -14,7 +14,7 @@
     main{max-width:640px;margin:84px auto 40px;padding:38px;border:1px solid #333046;border-radius:24px;background:linear-gradient(150deg,#19182c,#10131f);box-shadow:0 26px 80px #0004}.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#bda2ff;font-weight:700}h1{font-size:clamp(28px,5vw,39px);line-height:1.2;letter-spacing:-.035em;margin:16px 0}p{color:#b9bbce;line-height:1.65}#status{padding:16px 18px;background:#0e1021;border:1px solid #302e46;border-radius:12px;margin-top:24px}#status[data-error=true]{border-color:#995b65;color:#ffcad2}#accounts{display:grid;gap:12px;margin:22px 0}.account{display:flex;align-items:center;justify-content:space-between;gap:16px;text-align:left;background:#24213b;color:#fff;border:1px solid #55506c;border-radius:12px;padding:17px;width:100%;font:inherit;cursor:pointer}.account:hover{border-color:#b79aff;background:#302747}.account:focus-visible,a:focus-visible{outline:3px solid #c7b1ff;outline-offset:5px}.account:disabled{cursor:wait;opacity:.6}.account strong{display:block}.account small{display:block;margin-top:5px;color:#bab4cd}.arrow{font-size:22px}.footer{display:flex;gap:20px;flex-wrap:wrap;margin-top:28px;font-size:14px}.note{font-size:13px;color:#9b9db3;margin-top:24px}@media(max-width:520px){body{padding:24px 16px}header{font-size:12px}main{margin-top:48px;padding:25px}.brand{font-size:21px}}
   </style>
   <script src="../akaun-asal.js" defer></script>
-  <script src="connect.js" defer></script>
+  <script src="connect.js?v=20261119receipts1" defer></script>
 </head>
 <body>
   <header><a class="brand" href="/marketing/">BeShare <span>AI</span></a><span>MARKETING</span></header>

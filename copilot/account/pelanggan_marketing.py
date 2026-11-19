@@ -34,6 +34,7 @@ RESOURCES = {
 
 def ensure_marketing_schema(conn, postgres):
     from marketing_media import ensure_media_schema
+    from marketing_publication import ensure_publication_schema
     cur = conn.cursor()
     cur.execute('''CREATE TABLE IF NOT EXISTS marketing_campaigns (
         id TEXT PRIMARY KEY, akaun_id TEXT NOT NULL, data_json TEXT NOT NULL,
@@ -59,6 +60,7 @@ def ensure_marketing_schema(conn, postgres):
     cur.execute('CREATE INDEX IF NOT EXISTS marketing_posts_due ON marketing_posts (status, scheduled_at)')
     cur.execute('CREATE INDEX IF NOT EXISTS marketing_posts_campaign ON marketing_posts (akaun_id, campaign_id)')
     ensure_media_schema(conn, postgres)
+    ensure_publication_schema(conn, postgres)
 
 
 def _error(code, message, **extra):
@@ -259,14 +261,22 @@ def _read(conn, postgres, owner, resource, key):
     cur = conn.cursor()
     cur.execute(f'SELECT * FROM {table} WHERE id={ph} AND akaun_id={ph}', (key, owner))
     row = cur.fetchone()
-    return _record(cur, row) if row else None
+    item = _record(cur, row) if row else None
+    if item and resource == 'posts':
+        from marketing_publication import attach_cached
+        attach_cached(conn, postgres, owner, [item])
+    return item
 
 
 def _list(conn, postgres, owner, resource):
     table, _singular, limit = RESOURCES[resource]
     cur = conn.cursor()
     cur.execute(f'SELECT * FROM {table} WHERE akaun_id={meja._ph(postgres)} ORDER BY updated_at DESC,id LIMIT {limit}', (owner,))
-    return [_record(cur, row) for row in cur.fetchall()]
+    items = [_record(cur, row) for row in cur.fetchall()]
+    if resource == 'posts':
+        from marketing_publication import attach_cached
+        attach_cached(conn, postgres, owner, items)
+    return items
 
 
 def _owned_campaign(conn, postgres, owner, key):
@@ -359,6 +369,8 @@ def _provider_status(conn, postgres, owner):
     from marketing_media import capabilities as media_capabilities
     capabilities = {'campaigns': True, 'post_planning': True, 'manual_results': True,
                     'reference_notes': True, 'ai_drafts': True, 'external_research': False,
+                    'publication_receipts': True,
+                    'threads_customer_access': 'testing',
                     'auto_publish': False, 'worker_enabled': False,
                     'publishing_enabled': False, 'worker_configured': False, 'worker_health': 'not_checked',
                     'ads': {'meta': False, 'google': False}, 'media_upload': media_capabilities()}
@@ -463,6 +475,9 @@ def dispatch_marketing(method, path, conn, postgres, owner, payload, stamp):
             break
         key = suffix[0]
         if resource == 'posts' and len(suffix) == 2 and method == 'POST':
+            if suffix[1] == 'publication':
+                from marketing_publication import resolve
+                return resolve(conn, postgres, owner, key, payload, stamp)
             if suffix[1] == 'schedule':
                 return meja._dalam(conn, postgres, lambda: _schedule(conn, postgres, owner, key, payload, stamp))
             if suffix[1] == 'cancel':

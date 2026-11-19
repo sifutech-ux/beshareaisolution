@@ -285,9 +285,13 @@ def get_connections(conn, postgres, owner):
 
 def capabilities(conn=None, postgres=False, owner=None):
     providers = get_connections(conn, postgres, owner) if conn is not None and owner else []
+    # Operator-set review state for onboarding copy only. This is not a provider
+    # permission check and must not block connected accounts or approved testers.
+    threads_access = 'approved' if os.getenv('MARKETING_THREADS_CUSTOMER_ACCESS', '').strip() == 'approved' else 'testing'
     return {'auto_publish': _enabled(), 'worker_enabled': _enabled(), 'worker_configured': _enabled(),
             'publishing_enabled': _enabled(), 'worker_health': 'not_checked', 'providers': providers,
-            'connection_health_checks': True, 'ads': {'meta': False, 'google': False}}
+            'connection_health_checks': True, 'publication_receipts': True,
+            'threads_customer_access': threads_access, 'ads': {'meta': False, 'google': False}}
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):

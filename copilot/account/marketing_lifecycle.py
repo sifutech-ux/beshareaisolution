@@ -155,6 +155,7 @@ def _remove_owner_grants(conn, postgres, owner, scope, params, stamp):
         # request already in flight cannot be recalled; its post stays uncertain.
         cur.execute(f'DELETE FROM marketing_publish_attempts WHERE post_id={ph} AND akaun_id={ph}', (post_id, owner))
     cur.execute(f'DELETE FROM marketing_post_bindings WHERE {owner_scope}', values)
+    cur.execute(f'DELETE FROM marketing_publications WHERE {owner_scope}', values)
     cur.execute(f'SELECT state_hash FROM marketing_oauth_candidates WHERE {owner_scope}', values)
     states = [row[0] for row in cur.fetchall()]
     for state in states:
@@ -174,7 +175,7 @@ def apply_callback(conn, postgres, provider, app_id, user_id, receipt_hash, stam
             return 200, {'confirmation_code': previous[0]}
         scope, params = _scope(provider, app_id, user_id, postgres)
         owners = set()
-        for table in ('marketing_connections', 'marketing_oauth_candidates', 'marketing_post_bindings'):
+        for table in ('marketing_connections', 'marketing_oauth_candidates', 'marketing_post_bindings', 'marketing_publications'):
             cur.execute(f'SELECT DISTINCT akaun_id FROM {table} WHERE {scope}', params)
             owners.update(row[0] for row in cur.fetchall())
         # Consistent subject -> sorted owner order matches OAuth grant saves.

@@ -6,6 +6,7 @@
   const API = '/api/akaun/copilot/marketing', TOKEN_KEY = 'beshare-akaun'
   const editors = {}, plural = { campaign: 'campaigns', post: 'posts', source: 'sources', result: 'results' }
   const connectionChecks = new Map(), CONNECTION_CHECK_TTL = 60000
+  const publicationRequests = new Map()
   const count = n => new Intl.NumberFormat('ms-MY').format(n)
   const state = { owner: null, account: null, token: null, epoch: 0, load: 0, ready: false, campaigns: [], posts: [], sources: [], results: [], connections: [], capabilities: {}, view: 'ringkasan' }
   const today = C.malaysiaDate(), calendar = { year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)) - 1 }
@@ -51,13 +52,14 @@
   function resetMemory() {
     disposePostMedia(editors.post)
     resetConnectionChecks()
+    resetPublicationRequests()
     state.epoch++; state.owner = null; state.account = null; state.token = null; state.ready = false
     for (const k of ['campaigns', 'posts', 'sources', 'results', 'connections']) state[k] = []
     state.capabilities = {}; aiController?.abort(); aiController = null; aiSignature = ''; aiKey = ''; aiTarget = null; aiDraftContext = null
     for (const key of Object.keys(editors)) delete editors[key]
     document.querySelectorAll('dialog[open]').forEach(d => d.close())
     document.querySelectorAll('dialog form').forEach(f => f.reset())
-    for (const id of ['overview-metrics', 'overview-campaigns', 'next-actions', 'overview-channels', 'campaign-list', 'post-list', 'calendar-grid', 'source-list', 'result-metrics', 'result-funnel', 'result-table', 'connection-list', 'utm-links', 'preview-media', 'campaign-summary']) $(id).replaceChildren()
+    for (const id of ['overview-metrics', 'overview-campaigns', 'next-actions', 'overview-channels', 'campaign-list', 'post-list', 'calendar-grid', 'source-list', 'result-metrics', 'result-funnel', 'result-table', 'connection-list', 'utm-links', 'preview-media', 'campaign-summary', 'post-publication-links']) $(id).replaceChildren()
     for (const kind of ['post', 'source', 'result', 'ai']) $(kind + '-campaign').replaceChildren()
     for (const kind of ['post', 'source', 'result']) $(kind + '-campaign-filter').replaceChildren(new Option('Semua kempen', ''))
     for (const kind of ['campaign', 'post', 'source', 'result', 'ai', 'links']) feedback(kind)
@@ -81,7 +83,7 @@
   }
   async function bootstrap() {
     const s = session(), load = ++state.load
-    resetConnectionChecks(); state.checksSuspended = true
+    resetConnectionChecks(); resetPublicationRequests(); state.checksSuspended = true
     if (s?.token !== state.token && state.token) resetMemory()
     if (!s) { gate('Semua kerja pemasaran, satu tempat.', 'Log masuk dengan akaun BeShare untuk merancang kempen, menyediakan kandungan dan menyimpan hasil anda pada semua peranti.', { login: true }); return }
     if (!services?.akaun) { gate('Ruang kerja belum dapat disambungkan.', 'Buka Marketing melalui laman BeShare yang disokong. Akaun dan rekod anda belum dimuat.', { retry: true }); return }
@@ -168,8 +170,83 @@
       if (p.status === 'draft') card.append(el('p', 'Draf disimpan · belum diterbitkan', 'hint'))
       if (p.status === 'planned') card.append(el('p', 'Rancangan disimpan · belum dalam giliran penerbitan', 'hint'))
       if (p.last_error) card.append(el('p', safeProviderError(p.last_error), 'post-error'))
-      const actions = el('div', undefined, 'card-actions'); actions.append(button(['queued', 'publishing', 'published', 'uncertain'].includes(p.status) ? 'Lihat kandungan' : 'Sunting kandungan', () => openPost(p), 'button secondary')); if (p.status === 'published' && p.provider_post_id) actions.append(el('span', 'Penerbitan direkod oleh saluran', 'hint')); card.append(actions); host.append(card)
+      const actions = el('div', undefined, 'card-actions'); actions.append(button(['queued', 'publishing', 'published', 'uncertain'].includes(p.status) ? 'Lihat kandungan' : 'Sunting kandungan', () => openPost(p), 'button secondary')); card.append(actions)
+      if (p.status === 'published' && p.provider_post_id) { const receipt = el('div', undefined, 'publication-receipt'); renderPublication(p, receipt); card.append(receipt) }
+      host.append(card)
     }); renderCalendar(rows)
+  }
+  function safePublicationUrl(value, platform) {
+    const hosts = { facebook: ['facebook.com', 'www.facebook.com', 'm.facebook.com'], instagram: ['instagram.com', 'www.instagram.com'], threads: ['threads.com', 'www.threads.com', 'threads.net', 'www.threads.net'] }[platform]
+    if (!hosts || typeof value !== 'string' || !value || value.length > 2048 || /[\s\\\x00-\x1f\x7f]/.test(value)) return ''
+    try {
+      const url = new URL(value)
+      if (url.protocol !== 'https:' || url.username || url.password || url.port && url.port !== '443' || !hosts.includes(url.hostname) || url.hash || !url.pathname || url.pathname.startsWith('//')) return ''
+      if (['/l.php', '/away.php', '/redirect', '/flx/warn/'].includes(url.pathname.toLowerCase())) return ''
+      if ([...url.searchParams.keys()].some(key => /^(access_token|token|client_secret|appsecret_proof|code|state|oauth_token|redirect_uri|next|url|u|href)$/i.test(key))) return ''
+      return url.href
+    } catch { return '' }
+  }
+  function publicationReceipt(post) {
+    const receipt = post?.publication
+    if (post?.status !== 'published' || !post.provider_post_id || !receipt || receipt.platform !== post.platform || typeof receipt.account_id !== 'string' || !/^[0-9]{1,40}$/.test(receipt.account_id) || typeof receipt.account_name !== 'string' || !receipt.account_name.trim() || receipt.account_name.length > 200) return null
+    const postUrl = safePublicationUrl(receipt.post_url, post.platform), profileUrl = receipt.profile_url ? safePublicationUrl(receipt.profile_url, post.platform) : ''
+    if (!postUrl || receipt.profile_url && !profileUrl) return null
+    return { ...receipt, post_url: postUrl, profile_url: profileUrl }
+  }
+  function publicationLink(label, url) {
+    const link = el('a', label, 'button secondary'); link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer'; return link
+  }
+  function renderPublication(post, host) {
+    host.replaceChildren(); host.hidden = post.status !== 'published' || !post.provider_post_id
+    if (host.hidden) return
+    const receipt = publicationReceipt(post), check = publicationRequests.get(post.id), actions = el('div', undefined, 'publication-actions')
+    if (receipt) {
+      host.append(el('strong', 'Diterbitkan ke ' + receipt.account_name, 'publication-destination'))
+      actions.append(publicationLink('Buka hantaran ' + C.PLATFORM[post.platform], receipt.post_url))
+      if (receipt.profile_url) actions.append(publicationLink(post.platform === 'facebook' ? 'Buka Page' : 'Buka profil', receipt.profile_url))
+      host.append(actions)
+      return
+    }
+    const note = el('p', check?.pending ? 'Mendapatkan pautan asal daripada ' + C.PLATFORM[post.platform] + '…' : check?.error || 'Penerbitan direkod oleh ' + C.PLATFORM[post.platform] + '.', 'hint')
+    note.setAttribute('role', 'status'); host.append(note)
+    if (state.capabilities.publication_receipts) {
+      const action = button(check?.pending ? 'Menyemak pautan…' : check?.error ? 'Semak pautan semula' : 'Semak pautan hantaran', () => resolvePublication(post, { force: true }), 'button secondary', 'link')
+      action.disabled = !!check?.pending; actions.append(action); host.append(actions)
+    }
+  }
+  function resetPublicationRequests() { for (const check of publicationRequests.values()) check.controller.abort(); publicationRequests.clear() }
+  function currentPublicationRequest(post, check) {
+    if (publicationRequests.get(post.id) !== check || state.load !== check.load || state.owner !== check.owner) return false
+    if (!live(check.epoch, check.token)) { resetMemory(); bootstrap(); return false }
+    const current = state.posts.find(item => item.id === post.id)
+    return current?.status === 'published' && current.platform === post.platform && current.provider_post_id === post.provider_post_id
+  }
+  function renderPublicationState() { renderPosts(); if (editors.post && $('post-dialog').open) renderPostEditor() }
+  async function resolvePublication(post, { force = false } = {}) {
+    if (!state.ready || !state.capabilities.publication_receipts || post.status !== 'published' || !post.provider_post_id) return null
+    const cached = publicationReceipt(post); if (cached) return cached
+    const previous = publicationRequests.get(post.id)
+    if (previous?.pending) return previous.promise
+    if (previous && !force) return null
+    const check = { owner: state.owner, epoch: state.epoch, token: state.token, load: state.load, controller: new AbortController(), pending: true, error: '' }
+    publicationRequests.set(post.id, check); renderPublicationState()
+    check.promise = (async () => {
+      try {
+        const data = await request(API + '/posts/' + post.id + '/publication', { method: 'POST', body: {}, signal: check.controller.signal })
+        if (!currentPublicationRequest(post, check)) return null
+        const receipt = publicationReceipt({ ...post, publication: data.publication })
+        if (!receipt) throw Error('Pautan penerbitan tidak sah.')
+        state.posts = state.posts.map(item => item.id === post.id ? { ...item, publication: receipt } : item)
+        if (editors.post?.item.id === post.id && editors.post.item.provider_post_id === post.provider_post_id) editors.post.item.publication = receipt
+        return receipt
+      } catch {
+        if (currentPublicationRequest(post, check)) check.error = 'Penerbitan telah direkodkan. Pautannya belum dapat dimuat; cuba semak pautan sekali lagi.'
+        return null
+      } finally {
+        if (currentPublicationRequest(post, check)) { check.pending = false; renderPublicationState() }
+      }
+    })()
+    return check.promise
   }
   function renderCalendar(rows = selectedPosts()) {
     $('calendar-title').textContent = new Intl.DateTimeFormat('ms-MY', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(calendar.year, calendar.month, 1)))
@@ -263,14 +340,16 @@
     const host = $('connection-list'); host.replaceChildren()
     for (const p of ['facebook', 'instagram', 'threads', 'google_ads']) {
       const c = connection(p), connected = c?.status === 'connected', configured = c?.configured === true, connectable = configured && c?.connectable !== false && p !== 'google_ads'
+      const limitedThreads = p === 'threads' && state.capabilities.threads_customer_access === 'testing'
       const health = connectionHealth(p), check = connectionChecks.get(p), reconnect = ['expired', 'reconnect_required'].includes(c?.status) || health === 'invalid'
       const card = el('article', undefined, 'connection-card'), top = el('div', undefined, 'card-top')
       card.dataset.platform = p
-      const label = health === 'checking' ? 'Menyemak akses' : reconnect ? 'Sambung semula' : connected && health === 'unknown' ? 'Belum dapat disahkan' : connected ? 'Disambungkan' : configured ? 'Belum disambungkan' : p === 'google_ads' ? 'Perancangan sahaja' : 'Belum tersedia'
+      const label = health === 'checking' ? 'Menyemak akses' : reconnect ? 'Sambung semula' : connected && health === 'unknown' ? 'Belum dapat disahkan' : connected ? 'Disambungkan' : configured ? limitedThreads ? 'Akses terhad' : 'Belum disambungkan' : p === 'google_ads' ? 'Perancangan sahaja' : 'Belum tersedia'
       top.append(platformIcon(p), statusPill(health === 'checking' ? 'checking' : reconnect ? 'failed' : connected && health === 'unknown' ? 'uncertain' : connected ? 'connected' : 'draft', label)); card.append(top, el('h3', p === 'facebook' ? 'Facebook Page' : C.PLATFORM[p]))
       const fallback = p === 'google_ads' ? 'Catat rancangan dan hasil Google Ads dalam kempen. Pengurusan iklan automatik belum tersedia di ruang ini.' : configured ? ({ facebook: 'Sambungkan Page yang anda urus untuk menerbitkan kandungan perniagaan.', instagram: 'Sambungkan akaun Instagram profesional yang anda urus.', threads: 'Sambungkan profil Threads untuk menerbitkan teks dan media.' }[p]) : 'Sambungan saluran ini belum disediakan. Anda boleh menyimpan draf dan rancangan sementara menunggu sambungan tersedia.'
       const healthMessage = health === 'checking' ? 'Sedang menyemak akses dengan ' + C.PLATFORM[p] + '…' : check?.health?.message
       const details = el('p', healthMessage ? safeProviderError(healthMessage) : c?.message || fallback); details.setAttribute('role', 'status'); card.append(details)
+      if (configured && limitedThreads && (!connected || reconnect)) card.append(el('p', 'Sambungan Threads untuk pelanggan baharu masih menunggu kelulusan Meta. Buat masa ini, hanya akaun yang telah menerima dan mengesahkan jemputan penguji boleh menyambung.', 'connection-onboarding-note'))
       if (Array.isArray(c?.accounts) && c.accounts.length) { const accounts = el('div', undefined, 'connection-accounts'); if (reconnect) accounts.append(el('small', 'Akaun tersimpan · perlu sambung semula')); c.accounts.forEach(a => { const n = el('div', a.name || 'Akaun dipilih'); n.append(el('small', a.account_id || a.id || C.PLATFORM[p])); accounts.append(n) }); card.append(accounts) }
       if (connected && health === 'valid' && !publishReady(p)) card.append(el('p', 'Akaun disambungkan. Penjadualan automatik belum tersedia; draf masih boleh disimpan.', 'hint'))
       if (connected && health === 'unknown') card.append(el('p', 'Draf boleh disimpan sementara anda menyemak akses.', 'hint'))
@@ -291,6 +370,7 @@
       link.focus()
       return
     }
+    if (platform === 'threads' && state.capabilities.threads_customer_access === 'testing' && !await confirmAction('Akses Threads masih terhad', 'Sambungan untuk pelanggan baharu masih menunggu kelulusan Meta. Teruskan hanya jika akaun Threads anda telah menerima dan mengesahkan jemputan penguji. Langkah ini tidak menghantar jemputan.', 'Teruskan sebagai penguji')) return
     try { notify('Menyediakan sambungan akaun…'); const d = await request(API + '/connections/' + platform + '/begin', { method: 'POST', body: {} }), u = new URL(d.authorization_url); if (u.protocol !== 'https:' || !['facebook.com', 'instagram.com', 'threads.net', 'threads.com'].some(host => u.hostname === host || u.hostname.endsWith('.' + host))) throw Error('Pautan sambungan belum dapat disahkan. Cuba lagi.'); location.assign(u.href) } catch (error) { message(error.message) }
   }
   async function disconnect(platform) {
@@ -342,7 +422,7 @@
     editors.post.media = p.media_id ? { id: p.media_id, url: p.media_url, format: p.format === 'reel' ? 'video' : p.format } : null
     editors.post.mediaNotice = ''; $('post-file').value = ''; $('post-media-url-options').open = !!p.media_url && !p.media_id
     setValues('post', { platform: p.platform, format: p.format === 'reel' ? 'video' : p.format, body: p.body, media: p.media_url, scheduled: C.malaysiaInput(p.scheduled_at), state: p.status === 'planned' ? 'planned' : 'draft' })
-    $('post-dialog-title').textContent = p.version ? 'Sunting kandungan' : 'Kandungan baharu'; showDialog('post-dialog'); renderPostEditor(); checkConnection(p.platform)
+    $('post-dialog-title').textContent = p.version ? 'Sunting kandungan' : 'Kandungan baharu'; showDialog('post-dialog'); renderPostEditor(); checkConnection(p.platform); resolvePublication(editors.post.item)
   }
   function readPost() {
     const e = editors.post, body = $('post-body').value.trim(), platform = $('post-platform').value, campaign_id = $('post-campaign').value, format = $('post-format').value
@@ -356,14 +436,16 @@
     const e = editors.post; if (!e) return
     const p = e.item, platform = $('post-platform').value, format = $('post-format').value, text = $('post-body').value, locked = ['queued', 'publishing', 'published', 'uncertain'].includes(p.status), ready = publishReady(platform)
     const destination = connection(platform), health = connectionHealth(platform)
-    // Saved posts omit their pinned destination; current connections cannot identify locked publications.
-    const accountName = !locked && !p.provider_post_id && destination?.accounts?.length === 1 ? destination.accounts[0]?.name : ''
+    // A published post uses its server-owned receipt, never a newly selected connection.
+    const receipt = publicationReceipt(p)
+    const accountName = receipt?.account_name || (!locked && !p.provider_post_id && destination?.accounts?.length === 1 ? destination.accounts[0]?.name : '')
     $('preview-name').textContent = typeof accountName === 'string' && accountName.trim() ? accountName : 'Akaun ' + C.PLATFORM[platform]
     $('post-dialog-title').textContent = p.version ? locked ? 'Semak kandungan' : 'Sunting kandungan' : 'Kandungan baharu'
     $('post-state-label').hidden = locked; $('post-status-readonly').hidden = !locked; $('post-status-value').textContent = C.STATUS[p.status] || 'Perlu semakan'
-    $('post-destination-note').textContent = 'Kandungan ini untuk ' + C.PLATFORM[platform] + ' sahaja.' + (accountName ? ' ' + (health === 'invalid' ? 'Akaun tersimpan: ' : 'Akaun dipilih: ') + accountName + '.' : '')
+    $('post-destination-note').textContent = 'Kandungan ini untuk ' + C.PLATFORM[platform] + ' sahaja.' + (accountName ? ' ' + (receipt ? 'Destinasi penerbitan: ' : health === 'invalid' ? 'Akaun tersimpan: ' : 'Akaun dipilih: ') + accountName + '.' : '')
     const publicationNote = locked ? ({ queued: 'Kandungan berada dalam giliran dan belum disahkan terbit.', publishing: 'Kandungan sedang dihantar. Semak status penerbitan sebelum membuat pos baharu.', published: 'Penerbitan kandungan ini telah direkod oleh ' + C.PLATFORM[platform] + '.', uncertain: 'Hasil penerbitan belum dapat dipastikan. Semak saluran sebelum mencuba semula.' }[p.status]) : p.status === 'failed' ? 'Percubaan penerbitan gagal. Semak kandungan sebelum menjadualkan semula.' : $('post-state').value === 'planned' ? 'Rancangan ini belum diterbitkan. Pilih Lulus & jadualkan untuk meminta penerbitan.' : 'Draf ini belum diterbitkan. Simpan draf hanya menyimpan kandungan dalam akaun anda.'
     if ($('post-publication-note').textContent !== publicationNote) $('post-publication-note').textContent = publicationNote
+    renderPublication(p, $('post-publication-links'))
     $('post-save').hidden = locked; $('schedule-post').hidden = locked
     $('post-save').textContent = $('post-state').value === 'planned' ? 'Simpan rancangan' : 'Simpan draf'
     $('post-count').textContent = platform === 'threads' ? new TextEncoder().encode(text).length + ' / 500 bait UTF-8' : platform === 'instagram' ? text.length + ' / 2,200 aksara' : text.length + ' aksara'

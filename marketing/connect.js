@@ -30,6 +30,8 @@
   function clearReturn() {
     returned.code = ''
     returned.state = ''
+    returned.failure = ''
+    returned.denied = false
   }
   function clearCandidates() {
     for (const button of accounts.querySelectorAll('button')) button.disabled = true
@@ -112,9 +114,19 @@
     login.hidden = false
     return
   }
-  if (returned.denied) {
+  const returnedFailure = returned.failure || (returned.denied ? 'cancelled' : '')
+  if (returnedFailure) {
     clearReturn()
-    message('Kebenaran tidak diberikan. Anda boleh kembali dan menyambungkan semula apabila bersedia.', true)
+    const explanations = {
+      cancelled: ['Sambungan dibatalkan.', 'Kebenaran tidak diberikan. Kembali ke Marketing dan sambungkan semula apabila bersedia.'],
+      tester_required: ['Akses penguji diperlukan.', 'Platform belum membenarkan akaun ini menyambung. Semak dan terima jemputan penguji pada platform, kemudian mulakan sambungan baharu daripada Marketing.'],
+      temporary: ['Platform belum dapat menyambung.', 'Platform sedang mengalami gangguan sementara. Kembali ke Marketing dan cuba sambungkan semula sebentar lagi.'],
+      provider: ['Sambungan belum berjaya.', 'Platform tidak dapat menyelesaikan sambungan ini. Kembali ke Marketing untuk menyemak panduan saluran sebelum mencuba semula.'],
+    }
+    const [heading, explanation] = Object.hasOwn(explanations, returnedFailure) ? explanations[returnedFailure] : explanations.provider
+    title.textContent = heading
+    intro.textContent = 'Akaun belum disambungkan. Kandungan anda dalam BeShare kekal tersedia.'
+    message(explanation, true)
     return
   }
   if (typeof returned.code !== 'string' || returned.code.length > 8000 || !returned.code ||
