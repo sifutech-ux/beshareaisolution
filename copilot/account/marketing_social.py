@@ -11,6 +11,7 @@ import json
 import os
 import re
 import secrets
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -38,6 +39,7 @@ SCOPES = {
     'instagram': ['pages_show_list', 'pages_read_engagement', 'instagram_basic', 'instagram_content_publish'],
     'threads': ['threads_basic', 'threads_content_publish'],
 }
+_HEALTH_CHECK_SLOTS = threading.BoundedSemaphore(4)
 
 
 class SocialError(Exception):
@@ -276,7 +278,7 @@ def get_connections(conn, postgres, owner):
             'connectable': configured, 'publishable': configured and connected and not expired and _enabled(),
             'formats': sorted(FORMATS[platform]), 'message': message,
             'accounts': ([{'id': row['id'], 'name': row['account_name'], 'platform': platform,
-                           'account_id': row['account_id']}] if row and connected else []),
+                           'account_id': row['account_id']}] if row and status in {'connected', 'expired', 'reconnect_required'} else []),
         })
     return answer
 
@@ -285,7 +287,7 @@ def capabilities(conn=None, postgres=False, owner=None):
     providers = get_connections(conn, postgres, owner) if conn is not None and owner else []
     return {'auto_publish': _enabled(), 'worker_enabled': _enabled(), 'worker_configured': _enabled(),
             'publishing_enabled': _enabled(), 'worker_health': 'not_checked', 'providers': providers,
-            'ads': {'meta': False, 'google': False}}
+            'connection_health_checks': True, 'ads': {'meta': False, 'google': False}}
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -307,7 +309,7 @@ def _provider_error(body, status, method):
                        502, 'provider', ambiguous=ambiguous)
 
 
-def provider_call(method, url, params=None, token=None, transport=None):
+def provider_call(method, url, params=None, token=None, transport=None, *, timeout=20):
     """Only provider endpoints, bounded response, no redirects or error-body leaks."""
     parsed = urllib.parse.urlsplit(url)
     if (method not in {'GET', 'POST', 'DELETE'} or parsed.scheme != 'https'
@@ -344,7 +346,7 @@ def provider_call(method, url, params=None, token=None, transport=None):
         headers['Content-Type'] = 'application/x-www-form-urlencoded'
     request = urllib.request.Request(request_url, data=data, method=method, headers=headers)
     try:
-        with urllib.request.build_opener(_NoRedirect).open(request, timeout=20) as response:
+        with urllib.request.build_opener(_NoRedirect).open(request, timeout=timeout) as response:
             raw = response.read(2_000_001)
             if len(raw) > 2_000_000:
                 raise ValueError('oversize')
@@ -701,6 +703,139 @@ def _disconnect(conn, postgres, owner, platform, stamp):
     return meja._dalam(conn, postgres, remove)
 
 
+def _health_result(status, stamp, code, message, missing=()):
+    return {'status': status, 'checked_at': meja._iso(stamp), 'code': code,
+            'message': message, 'missing_permissions': sorted(missing)}
+
+
+def _inspect_grant(debug, connection, cfg, platform, stamp):
+    """Only explicit grant evidence can invalidate a saved connection."""
+    unknown = _health_result('unknown', stamp, 'health_unknown',
+                             'Status sambungan belum dapat disahkan. Cuba semak semula sebentar lagi.')
+    if not isinstance(debug, dict) or type(debug.get('is_valid')) is not bool:
+        return unknown
+    required = set(SCOPES[platform]) - (set() if platform == 'threads' else {'pages_show_list'})
+    scopes = debug.get('scopes')
+    scopes_valid = isinstance(scopes, list) and all(isinstance(scope, str) for scope in scopes)
+    missing = required - set(scopes) if scopes_valid else set()
+    if debug['is_valid'] is False:
+        return _health_result('invalid', stamp, 'grant_invalid',
+                              'Akses platform sudah tidak sah. Sambungkan semula dan benarkan semua kebenaran penerbitan.', missing)
+    if platform != 'threads':
+        try:
+            app_id = _numeric_id(debug.get('app_id'))
+        except SocialError:
+            return unknown
+        if not isinstance(debug.get('type'), str) or not debug['type']:
+            return unknown
+        mismatch = app_id != cfg['app_id'] or debug['type'] != 'PAGE'
+        for field, expected in (('profile_id', connection['page_id']), ('user_id', connection['provider_user_id'])):
+            if field in debug:
+                try:
+                    actual = _numeric_id(debug[field])
+                except SocialError:
+                    return unknown
+                mismatch = mismatch or actual != expected
+    else:
+        # The documented Threads debugger has no app_id. Its app token binds
+        # the lookup to this app; user_id must match the saved Threads account.
+        try:
+            user_id = _numeric_id(debug.get('user_id'))
+            app_id = _numeric_id(debug['app_id']) if debug.get('app_id') is not None else cfg['app_id']
+        except SocialError:
+            return unknown
+        mismatch = (user_id != connection['account_id'] or user_id != connection['provider_user_id']
+                    or app_id != cfg['app_id'])
+    if mismatch:
+        return _health_result('invalid', stamp, 'grant_identity_changed',
+                              'Akses tidak lagi sepadan dengan akaun yang dipilih. Sambungkan semula.')
+    if not scopes_valid:
+        return unknown
+    if missing:
+        return _health_result('invalid', stamp, 'permissions_missing',
+                              'Kebenaran penerbitan belum lengkap. Sambungkan semula dan benarkan semua kebenaran yang diminta.', missing)
+    if 'expires_at' not in debug:
+        return unknown
+    for field in ('expires_at', 'data_access_expires_at'):
+        value = debug.get(field, 0)
+        if isinstance(value, bool) or not isinstance(value, (str, int)) or not re.fullmatch(r'[0-9]{1,16}', str(value)):
+            return unknown
+        if int(value) and int(value) <= int(stamp):
+            return _health_result('invalid', stamp, 'grant_expired',
+                                  'Akses platform telah luput. Sambungkan akaun semula.')
+    return _health_result('valid', stamp, 'grant_valid',
+                          'Akses dan kebenaran penerbitan telah disahkan dengan platform.')
+
+
+def _check_connection(conn, postgres, owner, platform, payload, stamp, transport=None):
+    if payload not in ({}, None):
+        raise SocialError('Permintaan semakan sambungan tidak sah.', 400, 'validation')
+    ph = meja._ph(postgres)
+    cur = conn.cursor()
+    cur.execute(f'SELECT * FROM marketing_connections WHERE akaun_id={ph} AND platform={ph}', (owner, platform))
+    snapshot = _row(cur)
+    if not snapshot or snapshot['status'] not in {'connected', 'reconnect_required'} or not snapshot['token_cipher']:
+        raise SocialError('Tiada sambungan tersimpan untuk disemak. Sambungkan akaun dahulu.', 404, 'not_connected')
+    # Release the read transaction before network I/O. Revocation, re-selection
+    # and new OAuth grants must remain free to progress while a check is in flight.
+    conn.commit()
+    health = _health_result('unknown', stamp, 'health_unknown',
+                            'Platform belum dapat mengesahkan sambungan. Status tersimpan dikekalkan; cuba semak semula sebentar lagi.')
+    acquired = _HEALTH_CHECK_SLOTS.acquire(blocking=False)
+    if acquired:
+        try:
+            cfg = _config(platform)
+            if not _identity_matches(snapshot, cfg):
+                health = _health_result('unknown', stamp, 'configuration_changed',
+                                        'Tetapan aplikasi telah berubah. Sambungkan semula akaun yang dipilih.')
+            else:
+                token = _decrypt(snapshot['token_cipher'])
+                # Reuse the established app-credential flow. This grants no new
+                # user permissions and never exchanges or updates the saved token.
+                endpoint = ('https://graph.threads.com/oauth/access_token' if platform == 'threads'
+                            else _base(platform, cfg) + '/oauth/access_token')
+                app = provider_call('GET', endpoint, {'grant_type': 'client_credentials',
+                    'client_id': cfg['app_id'], 'client_secret': cfg['app_secret']}, transport=transport, timeout=8)
+                app_token = app.get('access_token')
+                if not isinstance(app_token, str) or not 1 <= len(app_token) <= 16000:
+                    raise ValueError('app-token')
+                result = provider_call('GET', _base(platform, cfg) + '/debug_token',
+                    {'input_token': token}, app_token, transport, timeout=8)
+                health = _inspect_grant(result.get('data'), snapshot, cfg, platform, stamp)
+        except (SocialError, ValueError, TypeError):
+            # An auth error at the debugger may concern its APP credential.
+            # A timeout, malformed result or that error is not proof that the
+            # customer's PAGE/Threads credential is invalid.
+            pass
+        finally:
+            _HEALTH_CHECK_SLOTS.release()
+    else:
+        health = _health_result('unknown', stamp, 'check_busy',
+                                'Semakan sambungan sedang sibuk. Cuba sebentar lagi.')
+    def apply():
+        meja._kunci_akaun(conn, postgres, owner)
+        c = conn.cursor()
+        c.execute(f'SELECT * FROM marketing_connections WHERE id={ph} AND akaun_id={ph}', (snapshot['id'], owner))
+        current = _row(c)
+        fields = ('platform', 'account_id', 'page_id', 'provider_app_id', 'provider_user_id',
+                  'authorization_started_at', 'token_cipher', 'status', 'updated_at')
+        result = health
+        if not current or any(current.get(field) != snapshot.get(field) for field in fields):
+            result = _health_result('unknown', stamp, 'connection_changed',
+                                    'Sambungan berubah semasa semakan. Semak semula sambungan terkini.')
+        elif result['status'] == 'invalid':
+            c.execute(f'''UPDATE marketing_connections SET status='reconnect_required',updated_at={ph}
+                WHERE id={ph} AND akaun_id={ph} AND token_cipher={ph} AND status={ph}''',
+                      (meja._iso(stamp), snapshot['id'], owner, snapshot['token_cipher'], snapshot['status']))
+        elif result['status'] == 'valid' and current['status'] == 'reconnect_required':
+            # A read-only check does not reconnect a previously invalidated grant.
+            result = _health_result('unknown', stamp, 'reconnection_required',
+                                    'Akses dapat dibaca, tetapi sambungan perlu dibuat semula sebelum menerbitkan.')
+        connection = next(item for item in get_connections(conn, postgres, owner) if item['platform'] == platform)
+        return 200, {'ok': True, 'platform': platform, 'connection': connection, 'health_check': result}
+    return meja._dalam(conn, postgres, apply)
+
+
 def dispatch_social(method, path, conn, postgres, owner, payload, stamp, transport=None):
     if not isinstance(owner, str) or not owner:
         return 401, {'ok': False, 'error': 'Sila masuk akaun dahulu.'}
@@ -709,7 +844,7 @@ def dispatch_social(method, path, conn, postgres, owner, payload, stamp, transpo
             return 200, {'ok': True, 'connections': get_connections(conn, postgres, owner), 'capabilities': capabilities(conn, postgres, owner)}
         if method == 'POST' and path == PREFIX + '/complete':
             return _complete(conn, postgres, owner, payload, None, stamp, transport)
-        match = re.fullmatch(re.escape(PREFIX) + r'/(facebook|instagram|threads)(?:/(begin|complete|select))?', path)
+        match = re.fullmatch(re.escape(PREFIX) + r'/(facebook|instagram|threads)(?:/(begin|complete|select|check))?', path)
         if match:
             platform, action = match.groups()
             if method == 'POST' and action == 'begin':
@@ -720,6 +855,8 @@ def dispatch_social(method, path, conn, postgres, owner, payload, stamp, transpo
                 return _complete(conn, postgres, owner, payload, platform, stamp, transport)
             if method == 'POST' and action == 'select':
                 return _select(conn, postgres, owner, platform, payload, stamp)
+            if method == 'POST' and action == 'check':
+                return _check_connection(conn, postgres, owner, platform, payload, stamp, transport)
             if method == 'DELETE' and not action:
                 return _disconnect(conn, postgres, owner, platform, stamp)
     except SocialError as error:

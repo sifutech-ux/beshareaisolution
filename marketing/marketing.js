@@ -5,6 +5,7 @@
   const services = window.BeshareAsal?.asalPerkhidmatan(location.origin)
   const API = '/api/akaun/copilot/marketing', TOKEN_KEY = 'beshare-akaun'
   const editors = {}, plural = { campaign: 'campaigns', post: 'posts', source: 'sources', result: 'results' }
+  const connectionChecks = new Map(), CONNECTION_CHECK_TTL = 60000
   const count = n => new Intl.NumberFormat('ms-MY').format(n)
   const state = { owner: null, account: null, token: null, epoch: 0, load: 0, ready: false, campaigns: [], posts: [], sources: [], results: [], connections: [], capabilities: {}, view: 'ringkasan' }
   const today = C.malaysiaDate(), calendar = { year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)) - 1 }
@@ -49,6 +50,7 @@
   }
   function resetMemory() {
     disposePostMedia(editors.post)
+    resetConnectionChecks()
     state.epoch++; state.owner = null; state.account = null; state.token = null; state.ready = false
     for (const k of ['campaigns', 'posts', 'sources', 'results', 'connections']) state[k] = []
     state.capabilities = {}; aiController?.abort(); aiController = null; aiSignature = ''; aiKey = ''; aiTarget = null; aiDraftContext = null
@@ -79,6 +81,7 @@
   }
   async function bootstrap() {
     const s = session(), load = ++state.load
+    resetConnectionChecks(); state.checksSuspended = true
     if (s?.token !== state.token && state.token) resetMemory()
     if (!s) { gate('Semua kerja pemasaran, satu tempat.', 'Log masuk dengan akaun BeShare untuk merancang kempen, menyediakan kandungan dan menyimpan hasil anda pada semua peranti.', { login: true }); return }
     if (!services?.akaun) { gate('Ruang kerja belum dapat disambungkan.', 'Buka Marketing melalui laman BeShare yang disokong. Akaun dan rekod anda belum dimuat.', { retry: true }); return }
@@ -97,12 +100,12 @@
       $('account-name').textContent = name; $('account-avatar').textContent = name.slice(0, 1).toUpperCase(); $('account-detail').textContent = 'Rekod dalam akaun'
       $('gate').hidden = true; $('workspace-content').hidden = false; $('workspace-state').lastChild.textContent = 'Ruang kerja disambungkan'; $('workspace-state').dataset.state = 'ready'
       document.querySelectorAll('[data-new-campaign]').forEach(b => { b.disabled = false })
-      message(''); renderAll(); navigate()
+      state.checksSuspended = false; message(''); renderAll(); navigate(); refreshConnectionChecks()
     } catch (error) {
       if (load !== state.load || error.status === 401 || error.status === 499) return
       if (state.ready) { message('Rekod terkini belum dapat dimuat. Salinan yang dipaparkan mungkin belum dikemas kini. Tekan Muat semula untuk mencuba lagi.'); $('workspace-state').dataset.state = 'error'; $('workspace-state').lastChild.textContent = 'Belum dikemas kini' }
       else gate('Ruang kerja belum dapat dimuat.', error.message || 'Akaun atau sambungan belum tersedia. Cuba lagi sebentar lagi.', { retry: true })
-    } finally { if (load === state.load) $('refresh-workspace').disabled = false }
+    } finally { if (load === state.load) { state.checksSuspended = false; $('refresh-workspace').disabled = false } }
   }
   function navigate() {
     const view = location.hash.slice(1); state.view = Object.hasOwn(headings, view) ? view : 'ringkasan'
@@ -110,6 +113,7 @@
     document.querySelectorAll('[data-view]').forEach(a => { if (a.dataset.view === state.view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current') })
     document.querySelectorAll('[data-panel]').forEach(p => { p.hidden = p.dataset.panel !== state.view })
     document.title = state.view[0].toUpperCase() + state.view.slice(1) + ' · Marketing — BeShare AI'
+    if (state.view === 'sambungan') refreshConnectionChecks()
   }
   function empty(title, text, action, run, symbol = 'target') { const n = el('div', undefined, 'empty-state'); n.append(icon(symbol), el('h3', title), el('p', text)); if (action) n.append(button(action, run, 'button secondary', 'plus')); return n }
   function sorted(rows) { return [...rows].sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || ''))) }
@@ -139,7 +143,7 @@
     rows.forEach(c => { const row = el('div', undefined, 'mini-campaign'), mark = el('span', undefined, 'campaign-mark'); mark.append(icon('target')); const text = el('div', undefined, 'mini-text'), b = button('', () => openCampaign(c), ''); b.append(el('h3', c.title)); text.append(b, el('p', C.GOALS[c.goal] || 'Kempen')); row.append(mark, text, statusPill(c.status)); host.append(row) })
     const tasks = [[state.campaigns.length > 0, 'Tetapkan satu kempen', 'Satu tawaran, pelanggan sasaran dan matlamat yang jelas.', 'Rancang kempen', () => openCampaign()], [state.posts.length > 0, 'Siapkan kandungan pertama', 'Tulis sendiri atau minta Copilot membantu draf anda.', 'Buka kandungan', () => { location.hash = 'kandungan' }], [state.results.length > 0, 'Catat apa yang berlaku', 'Simpan pertanyaan, pesanan dan belanja untuk belajar.', 'Catat hasil', () => openResult()]]
     $('next-actions').replaceChildren(...tasks.map((t, i) => { const n = el('div', undefined, 'next-step'), mark = el('span', t[0] ? undefined : String(i + 1), 'step-check' + (t[0] ? ' done' : '')); if (t[0]) mark.append(icon('check')); const content = el('div'); content.append(el('h3', t[1]), el('p', t[2])); if (!t[0]) content.append(button(t[3] + ' →', t[4], 'text-button')); n.append(mark, content); return n }))
-    $('overview-channels').replaceChildren(...['facebook', 'instagram', 'threads'].map(p => { const connected = connection(p)?.status === 'connected', chip = el('a', undefined, 'channel-chip'); chip.href = '#sambungan'; chip.dataset.connected = String(connected); chip.append(el('span', undefined, 'tiny-dot'), document.createTextNode(C.PLATFORM[p])); chip.title = connected ? 'Disambungkan' : 'Belum disambungkan'; return chip }))
+    $('overview-channels').replaceChildren(...['facebook', 'instagram', 'threads'].map(p => { const health = connectionHealth(p), connected = connection(p)?.status === 'connected' && health === 'valid', chip = el('a', undefined, 'channel-chip'); chip.href = '#sambungan'; chip.dataset.connected = String(connected); chip.append(el('span', undefined, 'tiny-dot'), document.createTextNode(C.PLATFORM[p])); chip.title = connected ? 'Disambungkan' : health === 'checking' ? 'Menyemak akses' : health === 'unknown' ? 'Akses belum dapat disahkan' : health === 'invalid' ? 'Sambung semula' : 'Belum disambungkan'; return chip }))
   }
   function renderCampaigns() {
     const term = $('campaign-search').value.toLocaleLowerCase(), status = $('campaign-status').value
@@ -161,6 +165,7 @@
     rows.forEach(p => {
       const card = el('article', undefined, 'post-card'), top = el('div', undefined, 'card-top'); top.append(platformBadge(p.platform), statusPill(p.status)); card.append(top, el('h3', campaignName(p.campaign_id)), el('p', p.body || 'Draf ini belum mempunyai teks.', 'post-copy'))
       card.append(el('p', p.scheduled_at ? C.displayDate(p.scheduled_at, true) + ' · MYT' : 'Masa belum ditetapkan', 'post-time'))
+      if (p.status === 'draft') card.append(el('p', 'Draf disimpan · belum diterbitkan', 'hint'))
       if (p.status === 'planned') card.append(el('p', 'Rancangan disimpan · belum dalam giliran penerbitan', 'hint'))
       if (p.last_error) card.append(el('p', safeProviderError(p.last_error), 'post-error'))
       const actions = el('div', undefined, 'card-actions'); actions.append(button(['queued', 'publishing', 'published', 'uncertain'].includes(p.status) ? 'Lihat kandungan' : 'Sunting kandungan', () => openPost(p), 'button secondary')); if (p.status === 'published' && p.provider_post_id) actions.append(el('span', 'Penerbitan direkod oleh saluran', 'hint')); card.append(actions); host.append(card)
@@ -199,21 +204,80 @@
     rows.forEach(r => { const row = el('tr'), title = el('td'); title.append(el('strong', C.displayDate(r.date)), el('small', campaignName(r.campaign_id))); row.append(title, el('td', C.PLATFORM[r.platform] || r.platform), el('td', C.ringgit(r.spend), 'money'), el('td', count(r.enquiries)), el('td', count(r.orders)), el('td', C.ringgit(r.revenue), 'money')); const action = el('td'); action.append(button('Sunting', () => openResult(r), 'text-button')); row.append(action); body.append(row) }); table.append(body); scroll.append(table); host.append(scroll)
   }
   function connection(platform) { return state.connections.find(c => (c.provider || c.platform) === platform) }
-  function publishReady(platform) { const c = connection(platform); return Boolean(c?.publishable && c.status === 'connected' && state.capabilities.worker_enabled && state.capabilities.auto_publish) }
+  function connectionFingerprint(value) { return JSON.stringify([value?.status, value?.configured, value?.publishable, value?.accounts || []]) }
+  function checkableConnection(value) { return !!value && (['connected', 'expired', 'reconnect_required'].includes(value.status) || value.accounts?.length > 0) }
+  function connectionHealth(platform) {
+    const current = connection(platform), check = connectionChecks.get(platform)
+    if (check?.pending) return 'checking'
+    if (['expired', 'reconnect_required'].includes(current?.status)) return 'invalid'
+    if (current?.status !== 'connected') return 'disconnected'
+    if (!state.capabilities.connection_health_checks) return 'valid'
+    return check?.fingerprint === connectionFingerprint(current) ? check.health?.status || 'unknown' : 'unknown'
+  }
+  function publishReady(platform) { const c = connection(platform); return Boolean(c?.publishable && c.status === 'connected' && connectionHealth(platform) === 'valid' && state.capabilities.worker_enabled && state.capabilities.auto_publish) }
   function safeProviderError(text) { return String(text).replace(/(?:access_token|Bearer)[\s=:]+[^\s]+/gi, '[dilindungi]').slice(0, 500) }
+  function resetConnectionChecks() { for (const check of connectionChecks.values()) check.controller?.abort(); connectionChecks.clear() }
+  function renderConnectionState() { renderConnections(); renderOverview(); if (editors.post && $('post-dialog').open) renderPostEditor() }
+  function currentConnectionCheck(platform, check) {
+    if (connectionChecks.get(platform) !== check || state.load !== check.load) return false
+    if (!live(check.epoch, check.token)) { resetMemory(); bootstrap(); return false }
+    return connection(platform) === check.snapshot
+  }
+  function refreshConnectionChecks() {
+    if (!state.ready || state.checksSuspended || !state.capabilities.connection_health_checks) return
+    for (const platform of ['facebook', 'instagram', 'threads']) if (checkableConnection(connection(platform))) checkConnection(platform)
+  }
+  async function checkConnection(platform, { force = false } = {}) {
+    const current = connection(platform), previous = connectionChecks.get(platform)
+    if (!state.ready || state.checksSuspended || !state.capabilities.connection_health_checks || !['facebook', 'instagram', 'threads'].includes(platform) || !checkableConnection(current)) return null
+    if (!live(state.epoch, state.token)) { resetMemory(); bootstrap(); return null }
+    if (previous?.pending) return previous.promise
+    const fingerprint = connectionFingerprint(current)
+    if (!force && previous?.fingerprint === fingerprint && Date.now() - previous.checkedAt < CONNECTION_CHECK_TTL) return previous.health
+    const check = { snapshot: current, fingerprint, epoch: state.epoch, token: state.token, load: state.load, controller: new AbortController(), pending: true, checkedAt: 0, health: null }
+    connectionChecks.set(platform, check); renderConnectionState()
+    check.promise = (async () => {
+      try {
+        const data = await request(API + '/connections/' + platform + '/check', { method: 'POST', body: {}, signal: check.controller.signal })
+        if (!currentConnectionCheck(platform, check)) return null
+        const updated = data.connection, health = data.health_check
+        if ((updated?.provider || updated?.platform) !== platform || !['connected', 'expired', 'reconnect_required', 'not_connected', 'not_configured'].includes(updated.status) || !['valid', 'invalid', 'unknown'].includes(health?.status)) throw Error('Jawapan semakan belum dapat disahkan.')
+        state.connections = state.connections.map(item => item === current ? updated : item)
+        check.snapshot = updated; check.fingerprint = connectionFingerprint(updated); check.health = health
+        return health
+      } catch (error) {
+        if (!currentConnectionCheck(platform, check)) return null
+        if (error.status === 404 && error.data?.code === 'not_connected') {
+          const updated = { ...current, status: 'not_connected', connected: false, publishable: false, accounts: [], message: 'Akaun belum disambungkan.' }
+          state.connections = state.connections.map(item => item === current ? updated : item); check.snapshot = updated; check.fingerprint = connectionFingerprint(updated)
+          check.health = { status: 'invalid', code: 'not_connected', message: 'Akaun belum disambungkan. Pilih Sambungkan akaun untuk meneruskan.' }
+        } else check.health = { status: 'unknown', code: 'check_unavailable', message: 'Akses belum dapat disahkan. Semak internet atau cuba Semak sambungan sekali lagi. Draf anda masih boleh disimpan.' }
+        return check.health
+      } finally {
+        if (currentConnectionCheck(platform, check)) { check.pending = false; check.checkedAt = Date.now(); renderConnectionState() }
+      }
+    })()
+    return check.promise
+  }
   function renderConnections() {
     const host = $('connection-list'); host.replaceChildren()
     for (const p of ['facebook', 'instagram', 'threads', 'google_ads']) {
       const c = connection(p), connected = c?.status === 'connected', configured = c?.configured === true, connectable = configured && c?.connectable !== false && p !== 'google_ads'
-      const reconnect = ['expired', 'reconnect_required'].includes(c?.status)
-      const card = el('article', undefined, 'connection-card'), top = el('div', undefined, 'card-top'); top.append(platformIcon(p), statusPill(connected ? 'connected' : reconnect ? 'failed' : 'draft', connected ? 'Disambungkan' : reconnect ? 'Sambung semula' : configured ? 'Belum disambungkan' : p === 'google_ads' ? 'Perancangan sahaja' : 'Belum tersedia')); card.append(top, el('h3', p === 'facebook' ? 'Facebook Page' : C.PLATFORM[p]))
+      const health = connectionHealth(p), check = connectionChecks.get(p), reconnect = ['expired', 'reconnect_required'].includes(c?.status) || health === 'invalid'
+      const card = el('article', undefined, 'connection-card'), top = el('div', undefined, 'card-top')
+      card.dataset.platform = p
+      const label = health === 'checking' ? 'Menyemak akses' : reconnect ? 'Sambung semula' : connected && health === 'unknown' ? 'Belum dapat disahkan' : connected ? 'Disambungkan' : configured ? 'Belum disambungkan' : p === 'google_ads' ? 'Perancangan sahaja' : 'Belum tersedia'
+      top.append(platformIcon(p), statusPill(health === 'checking' ? 'checking' : reconnect ? 'failed' : connected && health === 'unknown' ? 'uncertain' : connected ? 'connected' : 'draft', label)); card.append(top, el('h3', p === 'facebook' ? 'Facebook Page' : C.PLATFORM[p]))
       const fallback = p === 'google_ads' ? 'Catat rancangan dan hasil Google Ads dalam kempen. Pengurusan iklan automatik belum tersedia di ruang ini.' : configured ? ({ facebook: 'Sambungkan Page yang anda urus untuk menerbitkan kandungan perniagaan.', instagram: 'Sambungkan akaun Instagram profesional yang anda urus.', threads: 'Sambungkan profil Threads untuk menerbitkan teks dan media.' }[p]) : 'Sambungan saluran ini belum disediakan. Anda boleh menyimpan draf dan rancangan sementara menunggu sambungan tersedia.'
-      card.append(el('p', c?.message || fallback))
-      if (connected && Array.isArray(c.accounts) && c.accounts.length) { const accounts = el('div', undefined, 'connection-accounts'); c.accounts.forEach(a => { const n = el('div', a.name || 'Akaun dipilih'); n.append(el('small', a.account_id || a.id || C.PLATFORM[p])); accounts.append(n) }); card.append(accounts) }
-      if (connected && !publishReady(p)) card.append(el('p', 'Akaun disambungkan. Penjadualan automatik belum tersedia; draf masih boleh disimpan.', 'hint'))
+      const healthMessage = health === 'checking' ? 'Sedang menyemak akses dengan ' + C.PLATFORM[p] + '…' : check?.health?.message
+      const details = el('p', healthMessage ? safeProviderError(healthMessage) : c?.message || fallback); details.setAttribute('role', 'status'); card.append(details)
+      if (Array.isArray(c?.accounts) && c.accounts.length) { const accounts = el('div', undefined, 'connection-accounts'); if (reconnect) accounts.append(el('small', 'Akaun tersimpan · perlu sambung semula')); c.accounts.forEach(a => { const n = el('div', a.name || 'Akaun dipilih'); n.append(el('small', a.account_id || a.id || C.PLATFORM[p])); accounts.append(n) }); card.append(accounts) }
+      if (connected && health === 'valid' && !publishReady(p)) card.append(el('p', 'Akaun disambungkan. Penjadualan automatik belum tersedia; draf masih boleh disimpan.', 'hint'))
+      if (connected && health === 'unknown') card.append(el('p', 'Draf boleh disimpan sementara anda menyemak akses.', 'hint'))
       if (connected && publishReady(p) && state.capabilities.worker_health === 'not_checked') card.append(el('p', 'Penerbitan pelayan diaktifkan. Status proses penerbitan belum disemak; status setiap kandungan akan menunjukkan hasilnya.', 'hint'))
       const actions = el('div', undefined, 'actions')
-      if (connected) actions.append(button('Putuskan sambungan', () => disconnect(p), 'button quiet'))
+      if (state.capabilities.connection_health_checks && checkableConnection(c)) { const b = button(check?.pending ? 'Sedang menyemak…' : 'Semak sambungan', () => checkConnection(p, { force: true }), 'button secondary', 'refresh'); b.disabled = !!check?.pending; actions.append(b) }
+      if (connected && !reconnect) actions.append(button('Putuskan sambungan', () => disconnect(p), 'button quiet'))
       else { const b = button(connectable ? reconnect ? 'Sambung semula akaun' : 'Sambungkan akaun' : p === 'google_ads' ? 'Rancang dalam kempen' : 'Sambungan belum tersedia', () => p === 'google_ads' ? openCampaign() : beginConnect(p), p === 'google_ads' ? 'button quiet' : 'button secondary', p === 'google_ads' ? 'target' : 'link'); b.disabled = !connectable && p !== 'google_ads'; actions.append(b) }
       card.append(actions); host.append(card)
     }
@@ -231,6 +295,7 @@
   }
   async function disconnect(platform) {
     if (!await confirmAction('Putuskan sambungan?', 'BeShare akan berhenti menggunakan akses ' + C.PLATFORM[platform] + ' ini. Semak semula kandungan dalam giliran sebelum menjadualkan semula.', 'Putuskan sambungan')) return
+    connectionChecks.get(platform)?.controller?.abort(); connectionChecks.delete(platform)
     try { await request(API + '/connections/' + platform, { method: 'DELETE', body: {} }); await bootstrap(); notify('Sambungan BeShare telah diputuskan.') } catch (error) { message(error.message) }
   }
   function showDialog(id) { if (!$(id).open) $(id).showModal() }
@@ -277,7 +342,7 @@
     editors.post.media = p.media_id ? { id: p.media_id, url: p.media_url, format: p.format === 'reel' ? 'video' : p.format } : null
     editors.post.mediaNotice = ''; $('post-file').value = ''; $('post-media-url-options').open = !!p.media_url && !p.media_id
     setValues('post', { platform: p.platform, format: p.format === 'reel' ? 'video' : p.format, body: p.body, media: p.media_url, scheduled: C.malaysiaInput(p.scheduled_at), state: p.status === 'planned' ? 'planned' : 'draft' })
-    $('post-dialog-title').textContent = p.version ? 'Sunting kandungan' : 'Kandungan baharu'; showDialog('post-dialog'); renderPostEditor()
+    $('post-dialog-title').textContent = p.version ? 'Sunting kandungan' : 'Kandungan baharu'; showDialog('post-dialog'); renderPostEditor(); checkConnection(p.platform)
   }
   function readPost() {
     const e = editors.post, body = $('post-body').value.trim(), platform = $('post-platform').value, campaign_id = $('post-campaign').value, format = $('post-format').value
@@ -290,16 +355,23 @@
   function renderPostEditor() {
     const e = editors.post; if (!e) return
     const p = e.item, platform = $('post-platform').value, format = $('post-format').value, text = $('post-body').value, locked = ['queued', 'publishing', 'published', 'uncertain'].includes(p.status), ready = publishReady(platform)
-    const destination = connection(platform)
+    const destination = connection(platform), health = connectionHealth(platform)
     // Saved posts omit their pinned destination; current connections cannot identify locked publications.
-    const accountName = !locked && !p.provider_post_id && destination?.status === 'connected' && destination.accounts?.length === 1 ? destination.accounts[0]?.name : ''
+    const accountName = !locked && !p.provider_post_id && destination?.accounts?.length === 1 ? destination.accounts[0]?.name : ''
     $('preview-name').textContent = typeof accountName === 'string' && accountName.trim() ? accountName : 'Akaun ' + C.PLATFORM[platform]
     $('post-dialog-title').textContent = p.version ? locked ? 'Semak kandungan' : 'Sunting kandungan' : 'Kandungan baharu'
+    $('post-state-label').hidden = locked; $('post-status-readonly').hidden = !locked; $('post-status-value').textContent = C.STATUS[p.status] || 'Perlu semakan'
+    $('post-destination-note').textContent = 'Kandungan ini untuk ' + C.PLATFORM[platform] + ' sahaja.' + (accountName ? ' ' + (health === 'invalid' ? 'Akaun tersimpan: ' : 'Akaun dipilih: ') + accountName + '.' : '')
+    const publicationNote = locked ? ({ queued: 'Kandungan berada dalam giliran dan belum disahkan terbit.', publishing: 'Kandungan sedang dihantar. Semak status penerbitan sebelum membuat pos baharu.', published: 'Penerbitan kandungan ini telah direkod oleh ' + C.PLATFORM[platform] + '.', uncertain: 'Hasil penerbitan belum dapat dipastikan. Semak saluran sebelum mencuba semula.' }[p.status]) : p.status === 'failed' ? 'Percubaan penerbitan gagal. Semak kandungan sebelum menjadualkan semula.' : $('post-state').value === 'planned' ? 'Rancangan ini belum diterbitkan. Pilih Lulus & jadualkan untuk meminta penerbitan.' : 'Draf ini belum diterbitkan. Simpan draf hanya menyimpan kandungan dalam akaun anda.'
+    if ($('post-publication-note').textContent !== publicationNote) $('post-publication-note').textContent = publicationNote
+    $('post-save').hidden = locked; $('schedule-post').hidden = locked
     $('post-save').textContent = $('post-state').value === 'planned' ? 'Simpan rancangan' : 'Simpan draf'
     $('post-count').textContent = platform === 'threads' ? new TextEncoder().encode(text).length + ' / 500 bait UTF-8' : platform === 'instagram' ? text.length + ' / 2,200 aksara' : text.length + ' aksara'
     $('preview-platform').textContent = C.PLATFORM[platform] + ' · Pratonton'; $('preview-body').textContent = text || 'Teks kandungan anda akan muncul di sini.'
-    $('post-connection-note').textContent = locked ? 'Status: ' + C.STATUS[p.status] + '. ' + (p.status === 'queued' ? 'Batalkan jadual untuk menyunting kandungan semula.' : p.status === 'published' ? 'Penerbitan telah direkod oleh saluran.' : 'Semak status penerbitan sebelum membuat perubahan.') : ready ? C.PLATFORM[platform] + ' disambungkan. Semak kandungan dan masa, kemudian pilih Lulus & jadualkan.' : connection(platform)?.status === 'connected' ? 'Akaun disambungkan. Penjadualan automatik belum tersedia. Anda masih boleh menyimpan rancangan.' : 'Saluran belum disambungkan. Kandungan boleh disimpan sebagai draf atau rancangan; ia belum diterbitkan.'
+    $('post-connection-note').textContent = locked ? 'Status: ' + C.STATUS[p.status] + '. ' + (p.status === 'queued' ? 'Batalkan jadual untuk menyunting kandungan semula.' : p.status === 'published' ? 'Penerbitan telah direkod oleh saluran.' : 'Semak status penerbitan sebelum membuat perubahan.') : health === 'checking' ? 'Sedang menyemak akses ' + C.PLATFORM[platform] + '. Anda boleh terus menyunting dan menyimpan draf.' : health === 'invalid' ? 'Akses ' + C.PLATFORM[platform] + ' perlu disambungkan semula sebelum menjadualkan penerbitan. Draf anda masih boleh disimpan.' : health === 'unknown' ? 'Akses ' + C.PLATFORM[platform] + ' belum dapat disahkan. Semak sambungan sebelum meluluskan jadual baharu.' : ready ? C.PLATFORM[platform] + ' disambungkan. Semak kandungan dan masa, kemudian pilih Lulus & jadualkan.' : destination?.status === 'connected' ? 'Akaun disambungkan. Penjadualan automatik belum tersedia. Anda masih boleh menyimpan rancangan.' : 'Saluran belum disambungkan. Kandungan boleh disimpan sebagai draf atau rancangan; ia belum diterbitkan.'
     if (platform === 'instagram' && format === 'text') $('post-connection-note').textContent += ' Instagram memerlukan gambar atau video.'
+    if (!locked && health === 'unknown') $('post-connection-note').append(document.createTextNode(' '), button('Semak sambungan', () => checkConnection(platform, { force: true }), 'text-button'))
+    if (!locked && health === 'invalid') { const link = el('a', 'Buka Sambungan', 'text-link'); link.href = '#sambungan'; link.addEventListener('click', async event => { event.preventDefault(); await closeDialog('post-dialog'); if (!$('post-dialog').open) location.hash = 'sambungan' }); $('post-connection-note').append(document.createTextNode(' '), link) }
     $('post-form').querySelectorAll('input,select,textarea').forEach(n => { n.disabled = locked || e.saving })
     $('post-ai').disabled = locked || e.saving; $('post-save').disabled = locked || e.saving || mediaUploading(e); $('schedule-post').disabled = locked || e.saving || mediaUploading(e) || !ready
     $('cancel-post-schedule').hidden = !['queued', 'planned', 'failed'].includes(p.status); $('cancel-post-schedule').disabled = e.saving || mediaUploading(e)
@@ -489,6 +561,11 @@
     const e = editors.post; if (!e || e.saving || mediaUploading(e)) return
     try {
       const p = readPost()
+      if (state.capabilities.connection_health_checks) {
+        await checkConnection(p.platform)
+        if (editors.post !== e || !state.ready || !$('post-dialog').open) return
+        if (!payloadMatches(readPost(), p)) throw Error('Kandungan berubah semasa semakan sambungan. Suntingan anda dikekalkan; semak semula dan pilih Lulus & jadualkan sekali lagi.')
+      }
       if (!publishReady(p.platform)) throw Error('Sambungan penerbitan belum tersedia. Simpan kandungan sebagai rancangan dahulu.')
       if (!p.scheduled_at || new Date(p.scheduled_at).getTime() < Date.now() + 60000) throw Error('Pilih masa penerbitan sekurang-kurangnya satu minit dari sekarang.')
       if (!p.body && p.format === 'text') throw Error('Tulis kandungan sebelum menjadualkan penerbitan.')
@@ -548,7 +625,8 @@
       e.item = structuredClone(record); e.dirty = !unchanged; e.conflict = null; $(kind + '-conflict').hidden = true
       if (previousMedia && previousMedia !== record.media_id) cleanupMedia(previousMedia)
       upsert(kind, record); $(kind + '-save-state').textContent = unchanged ? 'Disimpan dalam akaun' : 'Suntingan baharu belum disimpan'
-      feedback(kind, unchanged ? 'Disimpan. Rekod ini boleh dibuka semula pada peranti lain.' : 'Versi tadi disimpan. Suntingan baharu masih belum disimpan.', unchanged ? 'success' : '')
+      const savedMessage = kind === 'post' ? record.status === 'planned' ? 'Rancangan disimpan. Kandungan belum berada dalam giliran penerbitan.' : 'Draf disimpan. Kandungan belum diterbitkan.' : 'Disimpan. Rekod ini boleh dibuka semula pada peranti lain.'
+      feedback(kind, unchanged ? savedMessage : 'Versi tadi disimpan. Suntingan baharu masih belum disimpan.', unchanged ? 'success' : '')
       if (kind === 'campaign') { e.step = -1; showCampaignStep(); $('campaign-dialog-title').textContent = 'Sunting kempen' }
       return unchanged
     } catch (error) { if (editors[kind] === e && error.status !== 401 && error.status !== 499) feedback(kind, error.status === 409 ? 'Salinan akaun telah berubah. Suntingan anda dikekalkan; semak salinan terkini di atas.' : error.message, 'error'); return false }
@@ -633,6 +711,7 @@
   $('schedule-post').addEventListener('click', schedulePost); $('cancel-post-schedule').addEventListener('click', cancelPost)
   $('post-file-choose').addEventListener('click', () => { if (!$('post-file').disabled) $('post-file').click() })
   $('post-file').addEventListener('change', event => { const files = [...(event.target?.files || $('post-file').files || [])]; $('post-file').value = ''; return choosePostFiles(files) })
+  $('post-platform').addEventListener('change', () => checkConnection($('post-platform').value))
   $('post-media-cancel').addEventListener('click', cancelMediaUpload); $('post-media-retry').addEventListener('click', retryMediaUpload); $('post-media-remove').addEventListener('click', removePostMedia)
   $('post-dialog').addEventListener('close', () => { if (!$('post-dialog').open) disposePostMedia(editors.post) })
   const mediaDrop = $('post-media-drop')
