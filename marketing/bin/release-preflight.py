@@ -22,7 +22,7 @@ BASE_HASHES = {
     '/app/akaun_pelayan.py': 'c24fab7943cc48c78e0a4353f13cdf02c25026179fe652ad4f2417ff75dbdedb',
 }
 RELEASE_FILES = (
-    'pelanggan_copilot.py', 'pelanggan_hasil.py', 'pelanggan_marketing.py',
+    'pelanggan_copilot.py', 'pelanggan_hasil.py', 'pelanggan_marketing.py', 'pelanggan_kuota.py',
     'marketing_social.py', 'marketing_worker.py',
     'akaun_pelayan.py', 'marketing_lifecycle.py',
 )

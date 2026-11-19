@@ -474,7 +474,13 @@ def _sedia(conn, row, jari):
     if status == 'settled':
         conn.commit()
         return 200, _main_semula(row)
-    if status in {'sending', 'uncertain', 'provider_failed'}:
+    if status == 'provider_failed':
+        conn.commit()
+        return 503, {
+            'ok': False, 'ralat': 'provider_failed', 'retryable': True,
+            'error': 'AI belum berjaya menyediakan jawapan. Anda boleh cuba menjana semula.',
+        }
+    if status == 'uncertain':
         conn.commit()
         return 503, {'ok': False, 'ralat': 'tidak_pasti', 'error': 'Keputusan permintaan ini belum pasti.'}
     conn.commit()
