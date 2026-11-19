@@ -1,0 +1,11 @@
+# Replace only the connection-health module on the verified media account image.
+# Dependencies, runtime user, entrypoint and media support are inherited unchanged.
+ARG ACCOUNT_BASE_IMAGE
+FROM ${ACCOUNT_BASE_IMAGE}
+
+RUN echo '7229bfccce8c67722bfb45d73b553b5a6c78561d7fa0c6ce80c6b280c05474ca  /app/marketing_social.py' | sha256sum -c - \
+ && echo '5702edf3680cecfc8377c34b1aa062f4386ebdbd4ee3b4be47260370b2e19d3a  /app/pelanggan_marketing.py' | sha256sum -c - \
+ && echo '5469759c6b2af14e343ada7932546c55180d747f9afaf69c65e1844a09fe5127  /app/akaun_pelayan.py' | sha256sum -c -
+
+COPY copilot/account/marketing_social.py /app/marketing_social.py
+RUN python -B -c 'import marketing_social; assert marketing_social.capabilities()["connection_health_checks"] is True'
