@@ -73,7 +73,7 @@ async function workspace(fetchAI) {
     setTimeout(fn, ms) { const id = ++timerId; timers.set(id, { fn, ms }); return id }, clearTimeout(id) { timers.delete(id) },
     fetch: async (url, options) => {
       requests.push({ url, options })
-      if (url.endsWith('/api/copilot/bijak')) { aiRequests.push({ url, options }); return fetchAI(url, options, aiRequests.length) }
+      if (url.endsWith('/api/marketing/draf')) { aiRequests.push({ url, options }); return fetchAI(url, options, aiRequests.length) }
       if (options.method === 'GET' && url.endsWith('/api/akaun/saya')) return response({ akaun_id: stored === sessionB ? 'owner-b' : 'owner-a', nama: 'Perniagaan contoh' })
       if (options.method === 'GET' && url.endsWith('/workspace')) return response({ ok: true, campaigns: [campaign], posts: [], sources: [], results: [], connections: [], capabilities: { worker_enabled: true, auto_publish: true } })
       throw Error('Unexpected request: ' + options.method + ' ' + url)
@@ -95,7 +95,7 @@ async function workspace(fetchAI) {
 
 function key(app, index) { return app.aiRequests[index].options.headers['Idempotency-Key'] }
 function assertNoPublication(app) {
-  assert.deepEqual(app.requests.filter(item => item.options.method !== 'GET').map(item => new URL(item.url).pathname), app.aiRequests.map(() => '/api/copilot/bijak'))
+  assert.deepEqual(app.requests.filter(item => item.options.method !== 'GET').map(item => new URL(item.url).pathname), app.aiRequests.map(() => '/api/marketing/draf'))
 }
 
 test('a successful draft can be regenerated deliberately and remains visible until its replacement arrives', async () => {

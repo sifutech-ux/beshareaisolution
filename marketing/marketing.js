@@ -398,7 +398,7 @@
     $('ai-generate').disabled = true; $('ai-use').disabled = true
     $('ai-form').querySelectorAll('input,select,textarea').forEach(n => { n.disabled = true }); feedback('ai', 'Copilot sedang menyediakan draf berdasarkan kempen anda…' + (aiDraftContext ? ' Draf sebelumnya kekal dipaparkan.' : ''))
     try {
-      const data = await request('/api/copilot/bijak', { ai: true, method: 'POST', body: { giliran: C.promptTurns(prompt) }, signal: controller.signal, key: aiKey })
+      const data = await request('/api/marketing/draf', { ai: true, method: 'POST', body: { giliran: C.promptTurns(prompt) }, signal: controller.signal, key: aiKey })
       if (epoch !== state.epoch || aiController !== controller || controller.signal.aborted) return
       if (data.ok !== true || data.bukan_model !== false || typeof data.jawapan !== 'string' || !data.jawapan.trim() || !['openai', 'gemini', 'tersimpan'].includes(data.sumber) || (data.sumber === 'tersimpan' && data.main_semula !== true)) throw Error('Draf AI belum dapat disahkan. Anda boleh terus menulis kandungan sendiri.')
       const output = [data.jawapan, ...(Array.isArray(data.langkah) ? data.langkah.filter(x => typeof x === 'string') : [])].join('\n\n')
