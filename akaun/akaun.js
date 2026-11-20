@@ -7,6 +7,16 @@ const DASHBOARD = typeof BeshareKembali !== 'undefined'
   ? BeshareKembali.target(location.search)
   : '../penasihat/#utama'
 
+if (DASHBOARD === '../marketing/') {
+  document.title = 'Log masuk — BeShare AI Marketing'
+  document.getElementById('akaun-tajuk').textContent = 'Akaun BeShare AI Marketing'
+  document.getElementById('akaun-penerangan').textContent = 'Masuk atau daftar menggunakan akaun BeShare yang sama. Anda akan terus ke ruang Marketing.'
+  document.getElementById('akaun-kembali').textContent = 'Kembali ke Marketing'
+  document.getElementById('akaun-kembali').href = '../marketing/'
+  document.getElementById('akaun-destinasi').textContent = 'Buka Dashboard Marketing'
+  document.getElementById('akaun-destinasi').href = '../marketing/'
+}
+
 const borang = document.getElementById('borang')
 const sudah = document.getElementById('sudah')
 const ralat = document.getElementById('ralat')
