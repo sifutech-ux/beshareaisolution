@@ -77,6 +77,15 @@
     $('workspace-state').dataset.state = retry ? 'error' : 'loading'
     document.querySelectorAll('[data-new-campaign]').forEach(b => { b.disabled = true })
   }
+  async function signOutMarketing() {
+    const hasUnsaved = Object.values(editors).some(item => item?.dirty || item?.saving)
+    if (hasUnsaved && !await confirmAction('Log keluar daripada BeShare?', 'Suntingan yang belum disimpan akan hilang. Rekod yang sudah disimpan kekal dalam akaun BeShare anda.', 'Log keluar')) return
+    // Invalidate in-flight account requests and clear account-owned UI before leaving.
+    state.load++
+    resetMemory()
+    try { localStorage.removeItem(TOKEN_KEY) } catch {}
+    location.assign('../akaun/?selepas=marketing')
+  }
   function expireSession(token) {
     if (session()?.token === token) { try { localStorage.removeItem(TOKEN_KEY) } catch {} }
     resetMemory(); gate('Ruang kerja anda menanti.', 'Log masuk semula untuk membuka kempen, kandungan dan rekod pemasaran yang disimpan dalam akaun anda.', { login: true })
@@ -804,6 +813,7 @@
   $('post-ai').addEventListener('click', openAI); $('ai-form').addEventListener('submit', generateAI); $('ai-use').addEventListener('click', useAI)
   $('export-results').addEventListener('click', () => { const rows = selectedResults(); if (rows.length) download('beshare-hasil-' + C.malaysiaDate() + '.csv', C.csv(rows, state.campaigns), 'text/csv;charset=utf-8') })
   $('refresh-workspace').addEventListener('click', bootstrap); $('gate-retry').addEventListener('click', bootstrap)
+  $('marketing-logout').addEventListener('click', signOutMarketing)
   window.addEventListener('hashchange', navigate)
   window.addEventListener('storage', e => { if (e.key === TOKEN_KEY || e.key === null) { resetMemory(); state.load++; bootstrap() } })
   window.addEventListener('beforeunload', e => { if (state.ready && Object.values(editors).some(x => x.dirty || x.saving)) { e.preventDefault(); e.returnValue = '' } })
