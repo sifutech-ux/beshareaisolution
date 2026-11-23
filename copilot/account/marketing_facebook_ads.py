@@ -1,4 +1,4 @@
-"""Facebook Ads for one owner-selected ad account. Only campaign creation can write to Meta."""
+"""Facebook Ads for one owner-selected ad account. Owner-scoped campaign reports and creation."""
 import json
 import secrets
 
@@ -163,11 +163,14 @@ def _create(conn, postgres, owner, payload, stamp, transport):
 
 
 def dispatch(method, action, conn, postgres, owner, payload, stamp, transport=None):
-    if method != 'POST' or action not in {'report', 'campaigns'}:
+    if method != 'POST' or action not in {'report', 'campaigns', 'post-preview', 'post-launch'}:
         return 404, {'ok': False, 'error': 'Endpoint tidak ditemui.'}
     if not isinstance(payload, dict) or not isinstance(payload.get('account_id'), str) or not social.PERSON_ID.fullmatch(payload['account_id']):
         return 400, {'ok': False, 'error': 'Akaun iklan tidak sah.'}
     try:
+        if action in {'post-preview', 'post-launch'}:
+            from marketing_post_ads import dispatch as dispatch_post
+            return dispatch_post(action, conn, postgres, owner, payload, stamp, transport)
         operation = _report if action == 'report' else _create
         return operation(conn, postgres, owner, payload, stamp, transport)
     except social.SocialError as error:

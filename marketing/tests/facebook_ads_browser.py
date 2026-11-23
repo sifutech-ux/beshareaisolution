@@ -32,6 +32,9 @@ def check(browser, width, height):
                      accounts=[{'name': 'Akaun Ujian', 'account_id': '6789'}])
         data['campaigns'] = [{'title': 'Produk Ujian', 'id': PLAN, 'version': 2, 'status': 'draft',
                               'goal': 'awareness', 'budget_total': '0.00', 'channels': ['facebook']}]
+        data['capabilities']['ads']['post_whatsapp_ads'] = True
+        data['posts'] = [{'id': 'b' * 32, 'campaign_id': PLAN, 'platform': 'facebook', 'status': 'published',
+                          'body': 'Menu hari ini', 'provider_post_id': '1001_987', 'format': 'text', 'version': 1}]
         route.fulfill(json=data)
 
     def report(route):
@@ -66,6 +69,37 @@ def check(browser, width, height):
     assert writes == [{'account_id': '6789', 'plan_id': PLAN, 'version': 2,
                        'objective': 'OUTCOME_TRAFFIC', 'ordinary_ad': True}]
     assert page.locator('#ads-manager').get_attribute('href').endswith('?act=6789')
+    assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), width
+    page.get_by_role('link', name='Pilih hantaran').click()
+    page.get_by_role('button', name='Jadikan iklan').click()
+    page.locator('#boost-budget').fill('60.09')
+    approvals = []
+    def preview_post(route):
+        body = route.request.post_data_json
+        assert body == {'account_id': '6789', 'post_id': 'b' * 32, 'days': 3, 'country': 'MY', 'budget': '60.09'}
+        route.fulfill(json={'ok': True, 'review_id': 'a' * 40, 'preview': {
+            'page_name': 'Kedai', 'account_name': 'Akaun Ujian', 'account_id': '6789',
+            'text': 'Menu hari ini', 'phone': '+60123456789', 'currency': 'MYR', 'budget_minor': 6009,
+            'country': 'MY', 'days': 3, 'post_url': 'https://www.facebook.com/1001/posts/987'}})
+    def launch_ad(route):
+        approvals.append(route.request.post_data_json)
+        route.fulfill(json={'ok': True, 'campaign_id': '1234'})
+    page.route('**/facebook-ads/post-preview', preview_post)
+    page.route('**/facebook-ads/post-launch', launch_ad)
+    page.locator('#boost-preview').click()
+    expect(page.locator('#boost-summary')).to_contain_text('60.09')
+    expect(page.locator('#boost-destination')).to_contain_text('+60123456789')
+    page.locator('#boost-edit').click()
+    expect(page.locator('#boost-review')).to_be_hidden()
+    page.locator('#boost-preview').click()
+    expect(page.locator('#boost-launch')).to_be_visible()
+    page.locator('#boost-launch').click()
+    assert not approvals
+    page.locator('#boost-ordinary').check()
+    page.locator('#boost-launch').click()
+    expect(page.locator('#boost-status')).to_contain_text('1234')
+    assert approvals == [{'account_id': '6789', 'post_id': 'b' * 32, 'review_id': 'a' * 40,
+                          'approve_spend': True, 'ordinary_ad': True}]
     assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), width
     assert not errors, errors
     page.close()

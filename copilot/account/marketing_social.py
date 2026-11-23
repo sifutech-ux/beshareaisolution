@@ -297,7 +297,7 @@ def capabilities(conn=None, postgres=False, owner=None):
     return {'auto_publish': _enabled(), 'worker_enabled': _enabled(), 'worker_configured': _enabled(),
             'publishing_enabled': _enabled(), 'worker_health': 'not_checked', 'providers': providers,
             'connection_health_checks': True, 'publication_receipts': True,
-            'threads_customer_access': threads_access, 'ads': {'meta': False, 'google': False, 'meta_paused_campaigns': True}}
+            'threads_customer_access': threads_access, 'ads': {'meta': False, 'google': False, 'meta_paused_campaigns': True, 'post_whatsapp_ads': True}}
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):

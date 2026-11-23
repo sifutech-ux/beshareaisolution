@@ -161,6 +161,10 @@ def _remove_owner_grants(conn, postgres, owner, scope, params, stamp):
     for state in states:
         cur.execute(f'DELETE FROM marketing_oauth_states WHERE state_hash={ph} AND akaun_id={ph}', (state, owner))
     cur.execute(f'DELETE FROM marketing_oauth_candidates WHERE {owner_scope}', values)
+    cur.execute(f'DELETE FROM marketing_post_ads WHERE {owner_scope}', values)
+    if 'facebook' in params[2:]:
+        cur.execute(f'DELETE FROM marketing_post_ads WHERE akaun_id={ph} AND page_app_id={ph} AND page_user_id={ph}',
+                    (owner, *params[:2]))
     cur.execute(f'DELETE FROM marketing_ads_creations WHERE {owner_scope}', values)
     cur.execute(f'DELETE FROM marketing_connections WHERE {owner_scope}', values)
 
@@ -176,8 +180,11 @@ def apply_callback(conn, postgres, provider, app_id, user_id, receipt_hash, stam
             return 200, {'confirmation_code': previous[0]}
         scope, params = _scope(provider, app_id, user_id, postgres)
         owners = set()
-        for table in ('marketing_connections', 'marketing_oauth_candidates', 'marketing_post_bindings', 'marketing_publications', 'marketing_ads_creations'):
+        for table in ('marketing_connections', 'marketing_oauth_candidates', 'marketing_post_bindings', 'marketing_publications', 'marketing_ads_creations', 'marketing_post_ads'):
             cur.execute(f'SELECT DISTINCT akaun_id FROM {table} WHERE {scope}', params)
+            owners.update(row[0] for row in cur.fetchall())
+        if provider == 'meta':
+            cur.execute(f'SELECT DISTINCT akaun_id FROM marketing_post_ads WHERE page_app_id={ph} AND page_user_id={ph}', (app_id, user_id))
             owners.update(row[0] for row in cur.fetchall())
         # Consistent subject -> sorted owner order matches OAuth grant saves.
         for owner in sorted(owners):

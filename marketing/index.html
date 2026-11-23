@@ -8,11 +8,12 @@
   <meta name="robots" content="noindex,nofollow">
   <title>Marketing — BeShare AI</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="marketing.css?v=facebook-ads1">
+  <link rel="stylesheet" href="marketing.css?v=post-ads1">
   <script src="../akaun-asal.js" defer></script>
   <script src="core.js?v=20261119receipts1" defer></script>
-  <script src="facebook-ads.js?v=1" defer></script>
-  <script src="marketing.js?v=facebook-ads1" defer></script>
+  <script src="facebook-ads.js?v=post-ads1" defer></script>
+  <script src="post-ads.js?v=1" defer></script>
+  <script src="marketing.js?v=post-ads1" defer></script>
   <link rel="stylesheet" href="group-manager.css?v=20261123groupconnect2">
   <script src="group-manager.js?v=20261123groupconnect2" defer></script>
 </head>
@@ -75,6 +76,11 @@
               </div>
             </section>
             <div id="ads-work" hidden>
+              <section id="ads-from-post" class="panel ads-panel" hidden>
+                <h2>Jadikan hantaran Facebook sebagai iklan</h2>
+                <p>Pilih hantaran yang sudah diterbitkan untuk mendapatkan mesej WhatsApp.</p>
+                <a class="button secondary" href="#kandungan">Pilih hantaran</a>
+              </section>
               <section class="panel ads-panel">
                 <h2>Prestasi kempen</h2>
                 <p>Angka daripada Meta merangkumi semua penempatan dalam akaun iklan pilihan.</p>
@@ -196,6 +202,29 @@
 
   <dialog id="links-dialog" class="editor-dialog" aria-labelledby="links-dialog-title"><div class="dialog-header"><div><p class="eyebrow">PAUTAN KEMPEN</p><h2 id="links-dialog-title">Kenal pasti sumber lawatan</h2></div><button class="icon-button" type="button" data-close="links-dialog" aria-label="Tutup pautan kempen"><svg><use href="#i-close"/></svg></button></div><div class="dialog-body"><p class="muted">Pautan UTM membezakan saluran yang membawa lawatan. Analitik destinasi perlu merekod parameter ini untuk menghasilkan laporan.</p><div id="utm-links"></div><p id="links-feedback" class="form-feedback" role="status"></p></div></dialog>
 
+  <dialog id="boost-dialog" class="editor-dialog" aria-labelledby="boost-title">
+    <div class="dialog-header"><h2 id="boost-title">Jadikan iklan</h2><button type="button" class="icon-button" data-close="boost-dialog" aria-label="Tutup"><svg><use href="#i-close"/></svg></button></div>
+    <div class="dialog-body">
+      <p><strong>Dapatkan mesej WhatsApp</strong></p>
+      <form id="boost-settings">
+        <label>Jumlah bajet sepanjang kempen <input id="boost-budget" type="number" min="0.01" step="0.01" placeholder="Contoh 60.00" required></label>
+        <div class="form-row"><label>Tempoh (hari) <input id="boost-days" type="number" min="1" max="30" value="3" required></label>
+          <label>Negara audiens <select id="boost-country"><option value="MY">Malaysia</option><option value="SG">Singapura</option><option value="BN">Brunei</option><option value="ID">Indonesia</option><option value="TH">Thailand</option><option value="AU">Australia</option><option value="GB">United Kingdom</option><option value="US">Amerika Syarikat</option></select></label></div>
+        <button class="button secondary" id="boost-preview" type="submit">Lihat pratonton</button>
+      </form>
+      <section id="boost-review" hidden aria-label="Pratonton iklan">
+        <h3 id="boost-page"></h3><p id="boost-copy"></p><img id="boost-picture" alt="Media hantaran Facebook" hidden>
+        <a id="boost-original" class="text-link" target="_blank" rel="noopener noreferrer">Buka hantaran asal</a>
+        <p id="boost-destination"></p><p id="boost-summary"></p>
+        <form id="boost-approval">
+          <label class="ads-confirm"><input type="checkbox" id="boost-ordinary" required> Saya mengesahkan iklan ini di luar kategori iklan khas Meta.</label>
+          <div class="actions"><button type="button" class="button quiet" id="boost-edit">Ubah tetapan</button><button type="submit" id="boost-launch" class="button primary">Luluskan belanja dan hantar iklan</button></div>
+        </form>
+      </section>
+      <p id="boost-status" class="form-feedback" role="status"></p>
+      <a id="boost-manage" class="text-link" hidden>Buka Facebook Ads</a>
+    </div>
+  </dialog>
   <dialog id="confirm-dialog" class="confirm-dialog" aria-labelledby="confirm-title"><div class="dialog-header"><h2 id="confirm-title">Sahkan tindakan</h2></div><div class="dialog-body"><p id="confirm-text"></p></div><div class="dialog-footer"><button type="button" class="button quiet" id="confirm-cancel">Kembali</button><button type="button" class="button primary" id="confirm-accept">Teruskan</button></div></dialog>
   <noscript><div class="noscript-note">Ruang pemasaran ini memerlukan JavaScript. Aktifkan JavaScript dalam pelayar anda untuk membuka akaun dan rekod.</div></noscript>
 </body>
