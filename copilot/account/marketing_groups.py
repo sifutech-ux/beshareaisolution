@@ -231,6 +231,10 @@ def _claim(conn, postgres, owner, gid, stamp, bot):
 
 
 def _schedule(conn, postgres, owner, payload, stamp):
+    # Fail closed: do not accumulate a hidden backlog while publishing is off.
+    # Otherwise old queued jobs could suddenly broadcast when the worker is enabled.
+    if os.getenv('MARKETING_GROUP_PUBLISH_ENABLED') != '1':
+        return _fail(503, 'Penerbitan Telegram belum diaktifkan pada pelayan.')
     if not isinstance(payload, dict) or set(payload) != {'id', 'destination_id', 'body', 'scheduled_at', 'approved'}:
         return _fail(400, 'Maklumat penerbitan tidak sah.')
     if payload['approved'] is not True:
