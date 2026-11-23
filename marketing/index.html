@@ -12,7 +12,7 @@
   <script src="../akaun-asal.js" defer></script>
   <script src="core.js?v=20261119receipts1" defer></script>
   <script src="facebook-ads.js?v=post-ads1" defer></script>
-  <script src="post-ads.js?v=1" defer></script>
+  <script src="post-ads.js?v=2" defer></script>
   <script src="marketing.js?v=post-ads1" defer></script>
   <link rel="stylesheet" href="group-manager.css?v=20261123groupconnect2">
   <script src="group-manager.js?v=20261123groupconnect2" defer></script>
@@ -78,7 +78,7 @@
             <div id="ads-work" hidden>
               <section id="ads-from-post" class="panel ads-panel" hidden>
                 <h2>Jadikan hantaran Facebook sebagai iklan</h2>
-                <p>Pilih hantaran yang sudah diterbitkan untuk mendapatkan mesej WhatsApp.</p>
+                <p>Pilih hantaran Facebook yang sudah diterbitkan dan tentukan ke mana pelanggan pergi selepas mengklik iklan.</p>
                 <a class="button secondary" href="#kandungan">Pilih hantaran</a>
               </section>
               <section class="panel ads-panel">
@@ -205,8 +205,18 @@
   <dialog id="boost-dialog" class="editor-dialog" aria-labelledby="boost-title">
     <div class="dialog-header"><h2 id="boost-title">Jadikan iklan</h2><button type="button" class="icon-button" data-close="boost-dialog" aria-label="Tutup"><svg><use href="#i-close"/></svg></button></div>
     <div class="dialog-body">
-      <p><strong>Dapatkan mesej WhatsApp</strong></p>
       <form id="boost-settings">
+        <label>Destinasi iklan <select id="boost-channel" required>
+          <option value="" selected disabled>Pilih destinasi</option>
+          <option value="whatsapp">WhatsApp Business</option>
+          <option value="messenger">Messenger Page Facebook</option>
+          <option value="link">Pautan aplikasi atau laman web</option>
+        </select></label>
+        <p id="boost-channel-hint" class="hint" hidden></p>
+        <label id="boost-link-field" hidden>Pautan destinasi
+          <input id="boost-url" type="url" maxlength="2048" placeholder="https://t.me/kedaianda" disabled>
+          <span class="hint">Gunakan pautan HTTPS, contohnya ke Telegram, Instagram, kedai dalam talian atau laman tempahan.</span>
+        </label>
         <label>Jumlah bajet sepanjang kempen <input id="boost-budget" type="number" min="0.01" step="0.01" placeholder="Contoh 60.00" required></label>
         <div class="form-row"><label>Tempoh (hari) <input id="boost-days" type="number" min="1" max="30" value="3" required></label>
           <label>Negara audiens <select id="boost-country"><option value="MY">Malaysia</option><option value="SG">Singapura</option><option value="BN">Brunei</option><option value="ID">Indonesia</option><option value="TH">Thailand</option><option value="AU">Australia</option><option value="GB">United Kingdom</option><option value="US">Amerika Syarikat</option></select></label></div>

@@ -22,6 +22,8 @@ class PostAdsTests(unittest.TestCase):
         self.body = {'account_id': '123', 'post_id': fixtures.POST, 'days': 3, 'budget': '60.09', 'country': 'MY'}
         self.page_phone = '+60 12-3456789'
         self.writes = []
+        self.page_fields = []
+        self.creative_target = None
         self.actual = {}
         self.reject = ''
         self.lose = ''
@@ -32,7 +34,11 @@ class PostAdsTests(unittest.TestCase):
             if endpoint == 'act_123':
                 return {'account_id': '123', 'name': 'Akaun', 'currency': 'MYR', 'account_status': 1}
             if endpoint == '1001':
-                return {'id': '1001', 'name': 'Page', 'whatsapp_number': self.page_phone}
+                self.page_fields.append(params['fields'])
+                profile = {'id': '1001', 'name': 'Page'}
+                if 'whatsapp_number' in params['fields'].split(','):
+                    profile['whatsapp_number'] = self.page_phone
+                return profile
             if endpoint == 'published_posts':
                 return {'data': [{'id': '1001_987', 'attachments': {'data': [{'target': {'id': '651'}}]}}]}
             if endpoint == '1001_987':
@@ -41,9 +47,15 @@ class PostAdsTests(unittest.TestCase):
             if endpoint == '911':
                 rows = [{'id': '912'}] if any(e[0] == 'adsets' for e in self.writes) else []
                 return {'status': 'PAUSED', 'adsets': {'data': rows}}
+            if endpoint == '913':
+                action = json.loads(dict(self.writes)['adcreatives']['call_to_action'])
+                if self.creative_target is not None:
+                    action['value']['link'] = self.creative_target
+                return {'call_to_action': action}
             if endpoint == '912':
-                return dict(campaign_id='911', lifetime_budget='6009', destination_type='WHATSAPP',
-                            promoted_object={'page_id': '1001', 'whatsapp_phone_number': '60123456789'},
+                adset = dict(self.writes)['adsets']
+                return dict(campaign_id='911', lifetime_budget='6009', destination_type=adset['destination_type'],
+                            promoted_object=json.loads(adset.get('promoted_object', '{}')),
                             end_time=datetime.fromtimestamp(fixtures.NOW + 3*86400, timezone.utc).isoformat(),
                             targeting={'geo_locations': {'countries': ['MY']}},
                             ads={'data': [{'id': '914', 'creative': {'id': '913','object_story_id': '1001_987'}}]}) | self.actual
@@ -106,6 +118,57 @@ class PostAdsTests(unittest.TestCase):
         self.actual = {'lifetime_budget': '9000'}
         self.assertEqual(self.ads('post-launch', self.review(), self.meta)[1]['code'], 'mismatch')
         self.assertEqual([e[0] for e in self.writes], ['campaigns','adsets','adcreatives','adcreatives','ads'])
+
+    def test_messenger_without_whatsapp(self):
+        self.page_phone = None
+        self.body['destination'] = 'messenger'
+        payload = self.review()
+        self.assertEqual(self.ads('post-launch', payload, self.meta)[0], 200)
+        self.assertEqual(set(self.page_fields), {'id,name'})
+        writes = dict(self.writes)
+        self.assertEqual(writes['campaigns']['objective'], 'OUTCOME_ENGAGEMENT')
+        self.assertEqual(writes['adsets']['destination_type'], 'MESSENGER')
+        self.assertEqual(json.loads(writes['adsets']['promoted_object']), {'page_id': '1001'})
+        cta = json.loads(writes['adcreatives']['call_to_action'])
+        self.assertEqual(cta, {'type': 'MESSAGE_PAGE', 'value': {'app_destination': 'MESSENGER', 'link': 'https://m.me/1001'}})
+
+    def test_link_without_whatsapp_and_stale_review(self):
+        self.page_phone = None
+        self.body['destination'] = 'messenger'
+        old = self.review()
+        self.body.update(destination='link', destination_url='https://t.me/kedai')
+        payload = self.review()
+        self.assertEqual(self.ads('post-launch', old, self.meta)[0], 409)
+        self.assertEqual(self.writes, [])
+        self.assertEqual(self.ads('post-launch', payload, self.meta)[0], 200)
+        self.assertEqual(set(self.page_fields), {'id,name'})
+        writes = dict(self.writes)
+        self.assertEqual(writes['campaigns']['objective'], 'OUTCOME_TRAFFIC')
+        self.assertEqual(writes['adsets']['destination_type'], 'WEBSITE')
+        self.assertEqual(writes['adsets']['optimization_goal'], 'LINK_CLICKS')
+        self.assertNotIn('promoted_object', writes['adsets'])
+        self.assertEqual(json.loads(writes['adcreatives']['call_to_action']),
+                         {'type': 'LEARN_MORE', 'value': {'link': 'https://t.me/kedai'}})
+
+    def test_invalid_or_changed_destination_never_activates(self):
+        for extra in ({'destination': ''}, {'destination': []}, {'destination': 'link'},
+                      {'destination': 'link', 'destination_url': 'tg://resolve?domain=kedai'},
+                      {'destination': 'link', 'destination_url': 'https://user@contoh.my'},
+                      {'destination_url': 'https://contoh.my'}):
+            self.assertEqual(self.ads('post-preview', self.body | extra, self.meta)[0], 400)
+        self.assertEqual(self.page_fields, [])
+        self.body.update(destination='link', destination_url='https://contoh.my')
+        self.creative_target = 'https://berbeza.my'
+        self.assertEqual(self.ads('post-launch', self.review(), self.meta)[1]['code'], 'mismatch')
+        self.assertNotIn('911', dict(self.writes))
+
+    def test_existing_whatsapp_review_still_launches(self):
+        payload = self.review()
+        with self.connect() as conn:
+            spec = json.loads(conn.execute('SELECT settings FROM marketing_post_ads').fetchone()[0])
+            del spec['destination']
+            conn.execute('UPDATE marketing_post_ads SET settings=?', (json.dumps(spec),))
+        self.assertEqual(self.ads('post-launch', payload, self.meta)[0], 200)
 
     def test_missing_phone_and_unpublished_post_block_review(self):
         self.page_phone = None
