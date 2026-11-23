@@ -354,10 +354,6 @@ final class AuthHttp
             $payload['state'] = $started['state'];
             return $this->respond($session, false, $payload);
         }
-        if ($action === 'peristiwa') {
-            $this->whatsapp->record($actor, $sessionKey, $body);
-            return $this->respond($session, false, $this->payload($this->actor($session)));
-        }
         if ($action === 'segera') {
             $key = 'segera|' . $actor['user_id'] . '|' . $remote;
             if ($this->rates->tooMany($key)) {
@@ -380,13 +376,20 @@ final class AuthHttp
             $payload['sync'] = $sync;
             return $this->respond($session, false, $payload);
         }
-        $key = 'tukar|' . $actor['user_id'] . '|' . $remote;
-        if ($this->rates->tooMany($key)) {
-            throw new AuthException('Terlalu banyak percubaan. Cuba lagi kemudian.', 429);
+        $state = $this->text($body, 'state');
+        if ($action === 'peristiwa') {
+            $this->whatsapp->record($actor, $sessionKey, $body);
+        } else {
+            $key = 'tukar|' . $actor['user_id'] . '|' . $remote;
+            if ($this->rates->tooMany($key)) {
+                throw new AuthException('Terlalu banyak percubaan. Cuba lagi kemudian.', 429);
+            }
+            $this->rates->hit($key);
+            $this->whatsapp->exchangeCode($actor, $sessionKey, $state, $this->text($body, 'code'), ($body['coexistence'] ?? false) === true);
         }
-        $this->rates->hit($key);
-        $this->whatsapp->exchangeCode($actor, $sessionKey, $this->text($body, 'state'), $this->text($body, 'code'));
-        return $this->respond($session, false, $this->payload($this->actor($session)));
+        $payload = $this->payload($this->actor($session));
+        $payload['attempt'] = $this->whatsapp->attemptResult($actor, $state, $sessionKey);
+        return $this->respond($session, false, $payload);
     }
 
     /**

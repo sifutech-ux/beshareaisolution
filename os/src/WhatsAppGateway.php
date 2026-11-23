@@ -107,7 +107,7 @@ final class WhatsAppGateway
     /**
      * @param array{user_id:int,business_id:int,role:string,owner_user_id:int,status:string} $actor
      */
-    public function exchangeCode(array $actor, string $sessionKey, string $state, string $code): void
+    public function exchangeCode(array $actor, string $sessionKey, string $state, string $code, bool $coexistence = false): void
     {
         $this->assertOwner($actor);
         if (preg_match('/\A[A-Za-z0-9_\-\.~]{8,1024}\z/', $code) !== 1) {
@@ -174,7 +174,29 @@ final class WhatsAppGateway
             }
             throw SqlGuard::translate($error);
         }
-        $this->bindIfHeld($actor, $state, $sessionKey);
+        $this->bindIfHeld($actor, $state, $sessionKey, !$coexistence);
+    }
+
+    /** @return array{status:string,note:string} */
+    public function attemptResult(array $actor, string $state, string $sessionKey): array
+    {
+        $query = $this->pdo->prepare(
+            'SELECT status, meta_error_code FROM onboarding_sessions
+             WHERE correlation_hash = ? AND session_hash = ? AND business_id = ? AND user_id = ?'
+        );
+        $query->execute([hash('sha256', $state), hash('sha256', $sessionKey), $actor['business_id'], $actor['user_id']]);
+        $row = $query->fetch();
+        if (!is_array($row)) {
+            throw new AuthException('Sesi sambungan tidak ditemui.', 403);
+        }
+        $status = (string) $row['status'];
+        $note = match ($status) {
+            'pending' => 'Menunggu kod kebenaran daripada Meta.',
+            'exchanging' => 'Kod kebenaran sedang diproses.',
+            'token_held' => 'Kod diterima. Menunggu pengesahan nombor daripada Meta.',
+            default => $this->noteFor((string) ($row['meta_error_code'] ?? ''), $status),
+        };
+        return ['status' => $status, 'note' => $note];
     }
 
     /**
@@ -189,7 +211,7 @@ final class WhatsAppGateway
                     display_phone, last_error_code, sync_deadline_at, disconnected_at
              FROM whatsapp_connections
              WHERE business_id = ? AND disconnected_at IS NULL
-             ORDER BY updated_at DESC, id DESC
+             ORDER BY id DESC
              LIMIT 1'
         );
         $statement->execute([$actor['business_id']]);
@@ -354,9 +376,9 @@ final class WhatsAppGateway
      *
      * @param array{user_id:int,business_id:int,role:string,owner_user_id:int,status:string} $actor
      */
-    private function bindIfHeld(array $actor, string $state, string $sessionKey): void
+    private function bindIfHeld(array $actor, string $state, string $sessionKey, bool $allowAssetFallback = true): void
     {
-        $opened = $this->openForBind($actor, $state, $sessionKey);
+        $opened = $this->openForBind($actor, $state, $sessionKey, $allowAssetFallback);
         if ($opened === null) {
             return;
         }
@@ -371,7 +393,7 @@ final class WhatsAppGateway
      * @param array{user_id:int,business_id:int,role:string,owner_user_id:int,status:string} $actor
      * @return array{row:array<string,mixed>,token:string,coexistence:bool}|null
      */
-    private function openForBind(array $actor, string $state, string $sessionKey): ?array
+    private function openForBind(array $actor, string $state, string $sessionKey, bool $allowAssetFallback): ?array
     {
         $this->pdo->beginTransaction();
         try {
@@ -382,7 +404,7 @@ final class WhatsAppGateway
                 $this->pdo->commit();
                 return ['row' => $row, 'token' => $token, 'coexistence' => $coexistence];
             }
-            if (!$this->canResolveFromToken($row)) {
+            if (!$allowAssetFallback || !$this->canResolveFromToken($row)) {
                 $this->pdo->commit();
                 return null;
             }

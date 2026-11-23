@@ -1973,11 +1973,11 @@ function signupPayload(origin, data) {
 }
 
 function signupResultNote(data) {
-  const connection = data && data.connection && typeof data.connection === "object" ? data.connection : null;
-  if (data && data.ok === true && connection && connection.linked === true) return "Sambungan WhatsApp disimpan.";
-  if (connection && typeof connection.note === "string" && connection.note) return connection.note;
-  if (data && data.ok === true) return "Hasil Meta belum lengkap. Sambungan tidak disimpan.";
-  return (data && data.error) || "Hasil Embedded Signup tidak diterima. Sambungan tidak disimpan.";
+  if (!data || data.ok !== true) return (data && data.error) || "Hasil Embedded Signup tidak diterima. Sambungan tidak disimpan.";
+  const attempt = data.attempt;
+  if (attempt && attempt.status === "completed") return "Sambungan WhatsApp disimpan.";
+  if (attempt && attempt.note) return attempt.note;
+  return "Hasil Meta belum lengkap. Sambungan belum disahkan.";
 }
 
 function signupClientHint(agent) {
@@ -2251,7 +2251,8 @@ function beginSignup(options) {
   window.clearTimeout(signupLaunchTimer);
   const pending = { code: "", finish: false };
   signupQueue = pending;
-  writeSignupRecord({ state: "", code: "", events: [], at: Date.now(), codeSent: false, finish: false, reported: false, hidden: false });
+  signupState = "";
+  writeSignupRecord({ coexistence: options.extras?.featureType === "whatsapp_business_app_onboarding", state: "", code: "", events: [], at: Date.now(), codeSent: false, finish: false, reported: false, hidden: false });
   const hint = document.getElementById("signup-hint");
   if (hint) hint.textContent = "Meminta tetingkap Meta. Jika tiada tetingkap muncul, benarkan pop-up atau buka workspace dalam pelayar biasa.";
   signupLaunchTimer = window.setTimeout(() => {
@@ -2314,19 +2315,26 @@ function exchangeSignupCode(code) {
     showSignupNote("Sesi sambungan tidak sah. Buka tetingkap Meta sekali lagi. Sambungan tidak disimpan.");
     return;
   }
-  callApi("tukar", { state, code }).then((data) => {
-    if (data && data.user) applyLive(data);
-    inboxLoad = "";
-    const linked = data && data.connection && data.connection.linked === true;
-    if (linked) clearSignupRecord();
-    else flushSignup();
-    showSignupNote(signupResultNote(data));
-  });
+  const coexistence = readSignupRecord()?.coexistence === true;
+  callApi("tukar", { state, code, coexistence }).then((data) => handleSignupResult(state, data));
+}
+
+function handleSignupResult(state, data) {
+  const record = readSignupRecord();
+  if (!record || record.state !== state) return;
+  if (data && data.user) applyLive(data);
+  inboxLoad = "";
+  if (data && data.ok === true && ["completed", "incomplete", "abandoned", "rejected", "expired"].includes(data.attempt?.status)) {
+    clearSignupRecord();
+    signupQueue = null;
+    signupState = "";
+  }
+  showSignupNote(signupResultNote(data));
 }
 
 window.addEventListener("message", (event) => {
   const parsed = signupPayload(event.origin, event.data);
-  if (!parsed) return;
+  if (!parsed || !readSignupRecord()) return;
   rememberSignupEvent(signupEventFields(parsed));
   flushSignup();
 });
@@ -2355,19 +2363,8 @@ window.addEventListener("focus", () => {
 });
 
 function sendSignupEvent(fields) {
-  callApi("peristiwa", Object.assign({ state: signupState }, fields)).then((result) => {
-    if (result && result.user) applyLive(result);
-    inboxLoad = "";
-    const linked = result && result.connection && result.connection.linked === true;
-    const note = result && result.connection && typeof result.connection.note === "string" ? result.connection.note : "";
-    if (linked) {
-      clearSignupRecord();
-      showSignupNote("Sambungan WhatsApp disimpan.");
-      return;
-    }
-    if (result && result.ok === true && !note) return;
-    showSignupNote(signupResultNote(result));
-  });
+  const state = signupState;
+  callApi("peristiwa", { ...fields, state }).then((data) => handleSignupResult(state, data));
 }
 
 async function boot() {

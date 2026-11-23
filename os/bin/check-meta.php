@@ -20,7 +20,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require dirname(__DIR__) . '/src/bootstrap.php';
-require dirname(__DIR__) . '/src/SqlScript.php';
+require_once dirname(__DIR__) . '/src/SqlScript.php';
 require dirname(__DIR__, 2) . '/whatsapp/sambungan/ids.php';
 
 $failures = 0;
@@ -714,8 +714,11 @@ $appState = (string) ($appStarted['body']['state'] ?? '');
 $appHeld = $http->handle('POST', 'tukar', $app, [
     'state' => $appState,
     'code' => 'app-code-abcdefghij',
+    'coexistence' => true,
 ], ['x-csrf-token' => $app['csrf']], $remote, $host, 'app-owner');
 $heldRow = latestOnboarding($pdo, 'Kedai Aplikasi');
+$check('code-first app signup holds the token until FINISH without resolving the previous assets',
+    ($appHeld['body']['attempt']['status'] ?? '') === 'token_held' && count($script->calls) === 1);
 $script->script = [
     debugResponse($appId, $appWaba),
     ['status' => 200, 'json' => ['id' => $appWaba, 'name' => 'Kedai Aplikasi']],
@@ -792,7 +795,10 @@ $earlyDone = $http->handle('POST', 'tukar', $app, [
 $earlyRow = $pdo->query('SELECT webhook_state, phone_number_id FROM whatsapp_connections WHERE phone_number_id = \'100000000000622\'')->fetch();
 $check(
     'coexistence event before the code stays pending and then binds',
-    $earlyCalls === []
+    ($earlyEvent['body']['connection']['linked'] ?? false) === true
+        && ($earlyEvent['body']['attempt']['status'] ?? '') === 'pending'
+        && ($earlyDone['body']['attempt']['status'] ?? '') === 'completed'
+        && $earlyCalls === []
         && is_array($earlyPending)
         && $earlyPending['status'] === 'pending'
         && $earlyPending['finish_event'] === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'
@@ -803,6 +809,11 @@ $check(
         && ($earlyDone['body']['connection']['phone'] ?? '') === '+60 12 300 0622'
         && coexistenceCallsAreSafe(callTargets($script->calls))
 );
+
+$pdo->prepare('UPDATE whatsapp_connections SET updated_at=DATE_ADD(UTC_TIMESTAMP(), INTERVAL 1 MINUTE) WHERE phone_number_id=?')->execute([$appPhone]);
+$appView = $http->handle('GET', 'sesi', $app, [], [], $remote, $host, 'app-owner');
+$check('activity on an earlier connection does not replace the newly bound dashboard number',
+    ($appView['body']['connection']['phone'] ?? '') === '+60 12 300 0622');
 
 $ambiguous = runCoexistence($http, $pdo, $script, $app, $remote, $host, 'app-owner', $appId, '100000000000631', 'EAA-ambiguous-token-not-real', 'ambiguous-code-abcdef', [
     coexistPhone('100000000000632', true, 'CLOUD_API', '+60 12 300 0632'),
