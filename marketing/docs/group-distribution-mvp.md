@@ -16,8 +16,8 @@ Status: source proposal only; publishing remains disabled by default. Do not dep
 
 1. Dedicated BotFather bot and private MARKETING_TELEGRAM_BOT_TOKEN stored server-side. Never reuse any existing AI OS Telegram bot.
 2. Polling with getUpdates needs exactly one worker and no webhook for this dedicated bot.
-3. Bot must be added as administrator in each permitted Telegram destination. Admin uses the one-time link while logged in on Telegram.
-4. Public groups/channels may use @username; private group identification currently requires a numeric chat ID. Improve private group onboarding before broad release.
+3. Bot must be added as administrator in each permitted Telegram destination. Admin uses the one-time link while logged in on Telegram. A signed-in BeShare owner alone cannot authorize group posting without a real Telegram admin.
+4. Public groups/channels may use @username. For a Telegram group, leave the reference blank to launch an official startgroup deep link and have a verified administrator select their group. Channels still require a known @username/ID and administrator confirmation.
 5. Deploy only on the validated account PostgreSQL database; never touch IPO, unrelated WhatsApp OS services, or existing database volumes.
 6. Existing marketing/Dockerfile changes require validation against the exact running base image before staging. Do not blindly deploy to VPS.
 
