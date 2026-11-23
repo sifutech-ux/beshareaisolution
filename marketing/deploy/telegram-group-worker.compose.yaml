@@ -1,0 +1,48 @@
+# Safe source fragment ONLY. Merge just this service into the reviewed, existing
+# /opt/beshare-copilot-production/docker-compose.override.yaml after validation.
+# Do not apply this fragment directly as a third production override.
+services:
+  marketing-telegram-worker:
+    image: ${MARKETING_TELEGRAM_WORKER_IMAGE:?Use the verified immutable Marketing account image}
+    pull_policy: never
+    user: nobody
+    working_dir: /app
+    init: true
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    env_file:
+      - ${MARKETING_TELEGRAM_WORKER_ENV_FILE:?Set absolute private Telegram worker env file}
+    environment:
+      # Fail closed on initial deployment; do not queue or send group messages.
+      MARKETING_GROUP_WORKER_ENABLED: "0"
+      MARKETING_GROUP_PUBLISH_ENABLED: "0"
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    entrypoint:
+      - python
+      - -c
+      - |
+        import os, sys
+        allowed = {
+          "ACCOUNT_DATABASE_URL", "ACCOUNT_DATABASE_NAME", "ACCOUNT_DATABASE_ROLE",
+          "IPO_DATABASE_NAME", "MARKETING_TELEGRAM_BOT_TOKEN",
+          "MARKETING_GROUP_WORKER_ENABLED", "MARKETING_GROUP_PUBLISH_ENABLED",
+          "PYTHONUNBUFFERED", "PYTHONDONTWRITEBYTECODE",
+          "PATH", "LANG", "LC_ALL", "TZ", "SSL_CERT_FILE", "SSL_CERT_DIR",
+        }
+        environment = {name: value for name, value in os.environ.items() if name in allowed}
+        os.execve(sys.executable, [sys.executable, "/app/marketing_group_worker.py", *sys.argv[1:]], environment)
+    command: ["--interval", "15", "--limit", "10"]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    healthcheck:
+      disable: true
+    networks: [data, edge]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
