@@ -6,6 +6,9 @@ on:
       - 'marketing/group-manager.css'
       - 'marketing/index.html'
       - 'marketing/tests/group-navigation.test.mjs'
+      - 'marketing/tests/test_telegram_group_deployment.py'
+      - 'marketing/deploy/telegram-group-worker.compose.yaml'
+      - 'marketing/docs/telegram-group-rollout.md'
       - 'copilot/account/marketing_groups.py'
       - 'copilot/account/marketing_group_worker.py'
       - 'copilot/tests/test_marketing_groups.py'
@@ -32,6 +35,7 @@ jobs:
           MARKETING_GROUP_PUBLISH_ENABLED: '0'
         run: |
           python3 -m unittest copilot.tests.test_marketing_groups -v
+          python3 -m unittest discover -s marketing/tests -p 'test_telegram_group_deployment.py' -v
           python3 -m py_compile copilot/account/marketing_groups.py copilot/account/marketing_group_worker.py
       - name: Group navigation and browser syntax
         run: |
