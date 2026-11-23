@@ -29,7 +29,7 @@ STORAGE = ROOT / 'marketing-media'
 TARGET = '/var/lib/beshare-marketing-media'
 MEDIA_ENV = {'MARKETING_MEDIA_ENABLED': '1', 'MARKETING_MEDIA_ROOT': TARGET,
              'MARKETING_MEDIA_PUBLIC_BASE_URL': 'https://akaun.beshareaisolution.com'}
-FILES = ('akaun_pelayan.py', 'pelanggan_marketing.py', 'marketing_media.py')
+FILES = ('akaun_pelayan.py', 'pelanggan_marketing.py', 'marketing_facebook_ads.py', 'marketing_media.py')
 BACKUP = None
 
 

@@ -22,7 +22,8 @@ import pelanggan_meja as meja
 
 PREFIX = '/api/akaun/copilot/marketing/connections'
 PLATFORMS = ('facebook', 'instagram', 'threads')
-LABELS = {'facebook': 'Facebook Page', 'instagram': 'Instagram Professional', 'threads': 'Threads'}
+OAUTH_PLATFORMS = (*PLATFORMS, 'facebook_ads')
+LABELS = {'facebook_ads': 'Facebook Ads', 'facebook': 'Facebook Page', 'instagram': 'Instagram Professional', 'threads': 'Threads'}
 HOSTS = frozenset({'graph.facebook.com', 'graph-video.facebook.com', 'graph.threads.com'})
 ID = re.compile(r'^[a-f0-9]{32}$')
 PROVIDER_ID = re.compile(r'^[0-9]{1,40}(?:_[0-9]{1,40})?$')
@@ -35,6 +36,7 @@ FORMATS = {
     'threads': {'text', 'link', 'image', 'video'},
 }
 SCOPES = {
+    'facebook_ads': ['ads_read', 'ads_management'],
     'facebook': ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts'],
     'instagram': ['pages_show_list', 'pages_read_engagement', 'instagram_basic', 'instagram_content_publish'],
     'threads': ['threads_basic', 'threads_content_publish'],
@@ -215,7 +217,7 @@ def _public_https(value):
 
 
 def _config(platform):
-    if platform not in PLATFORMS:
+    if platform not in OAUTH_PLATFORMS:
         raise SocialError('Platform tidak disokong.', 400, 'validation')
     stem = 'MARKETING_THREADS_' if platform == 'threads' else 'MARKETING_META_'
     cfg = {
@@ -226,6 +228,8 @@ def _config(platform):
                              'v1.0' if platform == 'threads' else 'v27.0').strip(),
         'login_config_id': os.getenv('MARKETING_META_LOGIN_CONFIG_ID', '').strip() if platform != 'threads' else '',
     }
+    if platform == 'facebook_ads':
+        cfg['login_config_id'] = os.getenv('MARKETING_META_ADS_LOGIN_CONFIG_ID', '').strip()
     if not cfg['app_id'].isdigit() or not cfg['app_secret'] or not VERSION.fullmatch(cfg['version']):
         raise SocialError('Aplikasi platform belum dikonfigurasi pada pelayan.', 503, 'configuration')
     if cfg['login_config_id'] and not cfg['login_config_id'].isdigit():
@@ -251,7 +255,7 @@ def get_connections(conn, postgres, owner):
     saved = {item['platform']: item for item in _rows(cur)}
     now = int(time.time())
     answer = []
-    for platform in PLATFORMS:
+    for platform in OAUTH_PLATFORMS:
         configured = True
         cfg = None
         try:
@@ -272,11 +276,13 @@ def get_connections(conn, postgres, owner):
             'not_connected': 'Pilih akaun melalui sambungan rasmi platform.',
             'not_configured': 'Aplikasi platform belum dikonfigurasi pada pelayan.',
         }[status]
+        if platform == 'facebook_ads' and status == 'connected':
+            message = 'Akaun iklan disambungkan.'
         answer.append({
             'provider': platform, 'platform': platform, 'label': LABELS[platform],
             'configured': configured, 'status': status, 'connected': connected and not expired,
-            'connectable': configured, 'publishable': configured and connected and not expired and _enabled(),
-            'formats': sorted(FORMATS[platform]), 'message': message,
+            'connectable': configured, 'publishable': platform in PLATFORMS and configured and connected and not expired and _enabled(),
+            'formats': sorted(FORMATS.get(platform, ())), 'message': message,
             'accounts': ([{'id': row['id'], 'name': row['account_name'], 'platform': platform,
                            'account_id': row['account_id']}] if row and status in {'connected', 'expired', 'reconnect_required'} else []),
         })
@@ -291,7 +297,7 @@ def capabilities(conn=None, postgres=False, owner=None):
     return {'auto_publish': _enabled(), 'worker_enabled': _enabled(), 'worker_configured': _enabled(),
             'publishing_enabled': _enabled(), 'worker_health': 'not_checked', 'providers': providers,
             'connection_health_checks': True, 'publication_receipts': True,
-            'threads_customer_access': threads_access, 'ads': {'meta': False, 'google': False}}
+            'threads_customer_access': threads_access, 'ads': {'meta': False, 'google': False, 'meta_paused_campaigns': True}}
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -573,6 +579,8 @@ def _complete(conn, postgres, owner, payload, platform, stamp, transport=None):
               if isinstance(item, dict) and item.get('status') == 'granted' and isinstance(item.get('permission'), str)]
     required = set(SCOPES[platform])
     if not required.issubset(scopes) or not required.issubset(user_debug['scopes']):
+        if platform == 'facebook_ads':
+            raise SocialError('Meta belum memberikan akses membaca dan mengurus iklan. Semak kebenaran aplikasi dan akaun iklan.', 409, 'authorization')
         raise SocialError('Kebenaran penerbitan belum diberikan. Sambungkan semula dan pilih kebenaran yang diperlukan.', 409, 'authorization')
     user_expiry = int(stamp) + 90 * 86400
     lifetime = 0
@@ -587,7 +595,16 @@ def _complete(conn, postgres, owner, payload, platform, stamp, transport=None):
     # Validate the current USER grant, including explicit debugger evidence when
     # the exchange supplies no finite lifetime. Its TTL does not bound the PAGE
     # credential retained for publication.
-    _bounded_expiry(user_debug, user_expiry, stamp, require_expires_at=lifetime == 0)
+    verified_expiry = _bounded_expiry(user_debug, user_expiry, stamp, require_expires_at=lifetime == 0)
+    if platform == 'facebook_ads':
+        from marketing_facebook_ads import account_candidates
+        candidates = account_candidates(base, user_token, verified_expiry, cfg['app_id'], user_id, started_at, transport)
+    else:
+        candidates = _page_candidates(platform, base, user_token, app_token, cfg, user_id, started_at, required, stamp, transport)
+    return _store_candidates(conn, postgres, owner, platform, digest, candidates, stamp)
+
+
+def _page_candidates(platform, base, user_token, app_token, cfg, user_id, started_at, required, stamp, transport):
     fields = 'id,name,access_token,tasks'
     if platform == 'instagram':
         fields += ',instagram_business_account{id,username,name}'
@@ -641,6 +658,10 @@ def _complete(conn, postgres, owner, payload, platform, stamp, transport=None):
     if not candidates:
         raise SocialError('Tiada Page yang layak ditemui.' if platform == 'facebook' else
                            'Tiada akaun Instagram Professional yang dipautkan kepada Page ditemui.', 409, 'authorization')
+    return candidates
+
+
+def _store_candidates(conn, postgres, owner, platform, digest, candidates, stamp):
     ph = meja._ph(postgres)
     def save_candidates():
         _guard_grant(conn, postgres, candidates[0])
@@ -655,7 +676,8 @@ def _complete(conn, postgres, owner, payload, platform, stamp, transport=None):
                            VALUES ({','.join([ph] * 14)})''',
                         (candidate['id'], owner, digest, platform, candidate['account_id'], candidate['account_name'],
                          candidate['page_id'], candidate['token_cipher'], candidate['token_expires_at'], candidate['scopes_json'],
-                         int(stamp) + 600, cfg['app_id'], user_id, started_at))
+                         int(stamp) + 600, candidate['provider_app_id'], candidate['provider_user_id'],
+                         candidate['authorization_started_at']))
         return 200, {'ok': True}
     meja._dalam(conn, postgres, save_candidates)
     return 200, {'ok': True, 'platform': platform, 'selection_required': True,
@@ -848,7 +870,7 @@ def dispatch_social(method, path, conn, postgres, owner, payload, stamp, transpo
             return 200, {'ok': True, 'connections': get_connections(conn, postgres, owner), 'capabilities': capabilities(conn, postgres, owner)}
         if method == 'POST' and path == PREFIX + '/complete':
             return _complete(conn, postgres, owner, payload, None, stamp, transport)
-        match = re.fullmatch(re.escape(PREFIX) + r'/(facebook|instagram|threads)(?:/(begin|complete|select|check))?', path)
+        match = re.fullmatch(re.escape(PREFIX) + r'/(facebook|instagram|threads|facebook_ads)(?:/(begin|complete|select|check))?', path)
         if match:
             platform, action = match.groups()
             if method == 'POST' and action == 'begin':
@@ -859,7 +881,7 @@ def dispatch_social(method, path, conn, postgres, owner, payload, stamp, transpo
                 return _complete(conn, postgres, owner, payload, platform, stamp, transport)
             if method == 'POST' and action == 'select':
                 return _select(conn, postgres, owner, platform, payload, stamp)
-            if method == 'POST' and action == 'check':
+            if method == 'POST' and action == 'check' and platform in PLATFORMS:
                 return _check_connection(conn, postgres, owner, platform, payload, stamp, transport)
             if method == 'DELETE' and not action:
                 return _disconnect(conn, postgres, owner, platform, stamp)

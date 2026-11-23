@@ -8,10 +8,11 @@
   <meta name="robots" content="noindex,nofollow">
   <title>Marketing — BeShare AI</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="marketing.css?v=20261120directauth1">
+  <link rel="stylesheet" href="marketing.css?v=facebook-ads1">
   <script src="../akaun-asal.js" defer></script>
   <script src="core.js?v=20261119receipts1" defer></script>
-  <script src="marketing.js?v=telegram-discovery1" defer></script>
+  <script src="facebook-ads.js?v=1" defer></script>
+  <script src="marketing.js?v=facebook-ads1" defer></script>
   <link rel="stylesheet" href="group-manager.css?v=20261123groupconnect2">
   <script src="group-manager.js?v=20261123groupconnect2" defer></script>
 </head>
@@ -39,6 +40,7 @@
       <nav class="nav" aria-label="Navigasi Marketing">
         <a href="#ringkasan" data-view="ringkasan" aria-current="page"><svg><use href="#i-grid"/></svg><span>Ringkasan</span></a>
         <a href="#kempen" data-view="kempen"><svg><use href="#i-target"/></svg><span>Kempen</span><span id="nav-campaign-count" class="nav-count" hidden></span></a>
+        <a href="#facebook-ads" data-view="facebook-ads"><svg><use href="#i-chart"/></svg><span>Facebook Ads</span></a>
         <a href="#kandungan" data-view="kandungan"><svg><use href="#i-calendar"/></svg><span>Kandungan</span></a>
         <a href="#kumpulan" data-view="kumpulan"><svg><use href="#i-grid"/></svg><span>Kumpulan &amp; Saluran</span></a>
         <a href="#kajian" data-view="kajian"><svg><use href="#i-search"/></svg><span>Kajian</span></a>
@@ -62,6 +64,40 @@
           </section>
           <section data-panel="kempen" hidden aria-label="Kempen"><div class="toolbar"><label class="search-field"><svg><use href="#i-search"/></svg><input id="campaign-search" type="search" placeholder="Cari kempen atau tawaran" aria-label="Cari kempen"></label><label class="filter-label"><span class="sr-only">Status kempen</span><select id="campaign-status"><option value="all">Semua status</option><option value="draft">Draf</option><option value="ready">Sedia digunakan</option><option value="active">Aktif</option><option value="completed">Selesai</option><option value="archived">Arkib</option></select></label></div><div id="campaign-list" class="campaign-grid"></div></section>
           <section data-panel="kandungan" hidden aria-label="Kandungan dan kalendar"><div class="toolbar"><div class="segmented" aria-label="Paparan kandungan"><button type="button" id="show-post-list" aria-pressed="true">Senarai</button><button type="button" id="show-calendar" aria-pressed="false">Kalendar</button></div><label class="filter-label"><span class="sr-only">Kempen kandungan</span><select id="post-campaign-filter"><option value="">Semua kempen</option></select></label><button type="button" class="button secondary" id="new-post"><svg><use href="#i-plus"/></svg>Kandungan baharu</button></div><div class="inline-note"><span class="tiny-dot"></span><p>“Dirancang” ialah rancangan anda. Penerbitan automatik hanya bermula selepas kelulusan dan sambungan saluran tersedia.</p></div><div id="post-list" class="post-grid"></div><div id="calendar-panel" class="panel" hidden><div class="calendar-heading"><div><h2 id="calendar-title"></h2><p class="muted">Waktu Malaysia · UTC+8</p></div><div class="actions"><button class="icon-button" type="button" id="calendar-prev" aria-label="Bulan sebelumnya">‹</button><button class="button quiet" type="button" id="calendar-today">Hari ini</button><button class="icon-button" type="button" id="calendar-next" aria-label="Bulan seterusnya">›</button></div></div><div class="calendar-weekdays" aria-hidden="true"><span>Isn</span><span>Sel</span><span>Rab</span><span>Kha</span><span>Jum</span><span>Sab</span><span>Ahd</span></div><div id="calendar-grid" class="calendar-grid"></div><p class="hint">Kandungan tanpa masa penerbitan kekal dalam paparan Senarai.</p></div></section>
+          <section data-panel="facebook-ads" hidden aria-label="Facebook Ads">
+            <section class="panel ads-panel">
+              <h2>Akaun iklan Meta</h2>
+              <p id="ads-account" role="status"></p>
+              <div class="actions">
+                <button type="button" class="button secondary" id="ads-connect">Sambungkan akaun iklan</button>
+                <button type="button" class="button quiet" id="ads-disconnect" hidden>Putuskan sambungan</button>
+                <a class="text-link" id="ads-manager" href="https://adsmanager.facebook.com/adsmanager/manage/campaigns" target="_blank" rel="noopener noreferrer">Buka Meta Ads Manager ↗</a>
+              </div>
+            </section>
+            <div id="ads-work" hidden>
+              <section class="panel ads-panel">
+                <h2>Prestasi kempen</h2>
+                <p>Angka daripada Meta merangkumi semua penempatan dalam akaun iklan pilihan.</p>
+                <div class="actions"><label>Tempoh laporan <select id="ads-period"><option value="last_7d">7 hari terakhir</option><option value="last_30d">30 hari terakhir</option></select></label>
+                  <button class="button secondary" type="button" id="ads-refresh">Muat semula laporan</button></div>
+                <div class="table-wrap" id="ads-table" hidden><table><thead><tr><th>Kempen</th><th>Status</th><th>Belanja</th><th>Paparan</th><th>Klik (semua)</th></tr></thead><tbody id="ads-rows"></tbody></table></div>
+                <p id="ads-report-status" role="status"></p>
+                <button type="button" class="button quiet" id="ads-more" hidden>Muat lagi</button>
+              </section>
+              <section class="panel ads-panel">
+                <h2>Cipta kempen daripada pelan BeShare</h2>
+                <p>Kempen dicipta di Meta dalam status Dijeda. Tetapkan bajet, audiens dan bahan iklan dalam Ads Manager sebelum mengaktifkannya.</p>
+                <form id="ads-form">
+                  <div class="form-row"><label>Pelan BeShare <select id="ads-plan" required></select></label>
+                    <label>Objektif Meta <select id="ads-objective" required><option value="OUTCOME_TRAFFIC">Trafik</option><option value="OUTCOME_AWARENESS">Kesedaran</option><option value="OUTCOME_ENGAGEMENT">Interaksi</option><option value="OUTCOME_LEADS">Prospek</option><option value="OUTCOME_SALES">Jualan</option></select></label></div>
+                  <label class="ads-confirm"><input id="ads-ordinary" type="checkbox" required> Saya mengesahkan kempen ini di luar kategori iklan khas Meta.</label>
+                  <p class="hint">Untuk kempen kategori khas seperti perumahan, pekerjaan, perkhidmatan kewangan atau politik, gunakan Ads Manager.</p>
+                  <div class="actions"><button type="submit" class="button primary" id="ads-create">Cipta kempen dijeda</button><a class="text-link" href="#kempen">Urus pelan BeShare</a></div>
+                </form>
+                <p id="ads-create-status" role="status"></p>
+              </section>
+            </div>
+          </section>
           <section data-panel="kumpulan" hidden aria-label="Kumpulan dan Saluran">
             <div class="group-grid">
               <div class="panel">

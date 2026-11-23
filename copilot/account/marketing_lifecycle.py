@@ -124,7 +124,7 @@ def verify_signed_form(raw, content_type, provider):
 
 def _scope(provider, app_id, user_id, postgres):
     ph = meja._ph(postgres)
-    platforms = ('threads',) if provider == 'threads' else ('facebook', 'instagram')
+    platforms = ('threads',) if provider == 'threads' else ('facebook', 'instagram', 'facebook_ads')
     sql = f'provider_app_id={ph} AND provider_user_id={ph} AND platform IN ({",".join([ph] * len(platforms))})'
     return sql, (app_id, user_id, *platforms)
 
@@ -161,6 +161,7 @@ def _remove_owner_grants(conn, postgres, owner, scope, params, stamp):
     for state in states:
         cur.execute(f'DELETE FROM marketing_oauth_states WHERE state_hash={ph} AND akaun_id={ph}', (state, owner))
     cur.execute(f'DELETE FROM marketing_oauth_candidates WHERE {owner_scope}', values)
+    cur.execute(f'DELETE FROM marketing_ads_creations WHERE {owner_scope}', values)
     cur.execute(f'DELETE FROM marketing_connections WHERE {owner_scope}', values)
 
 
@@ -175,7 +176,7 @@ def apply_callback(conn, postgres, provider, app_id, user_id, receipt_hash, stam
             return 200, {'confirmation_code': previous[0]}
         scope, params = _scope(provider, app_id, user_id, postgres)
         owners = set()
-        for table in ('marketing_connections', 'marketing_oauth_candidates', 'marketing_post_bindings', 'marketing_publications'):
+        for table in ('marketing_connections', 'marketing_oauth_candidates', 'marketing_post_bindings', 'marketing_publications', 'marketing_ads_creations'):
             cur.execute(f'SELECT DISTINCT akaun_id FROM {table} WHERE {scope}', params)
             owners.update(row[0] for row in cur.fetchall())
         # Consistent subject -> sorted owner order matches OAuth grant saves.

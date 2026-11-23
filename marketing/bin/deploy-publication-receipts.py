@@ -31,7 +31,7 @@ STORAGE = ROOT / 'marketing-media'
 TARGET = '/var/lib/beshare-marketing-media'
 MEDIA_ENV = {'MARKETING_MEDIA_ENABLED': '1', 'MARKETING_MEDIA_ROOT': TARGET,
              'MARKETING_MEDIA_PUBLIC_BASE_URL': 'https://akaun.beshareaisolution.com'}
-FILES = ('marketing_social.py', 'marketing_publication.py', 'pelanggan_marketing.py', 'marketing_lifecycle.py')
+FILES = ('marketing_social.py', 'marketing_publication.py', 'pelanggan_marketing.py', 'marketing_facebook_ads.py', 'marketing_lifecycle.py')
 UNCHANGED_HASHES = {
     'akaun_pelayan.py': '5469759c6b2af14e343ada7932546c55180d747f9afaf69c65e1844a09fe5127',
 }

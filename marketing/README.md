@@ -18,6 +18,29 @@ reported outcomes in one workflow.
    saved post for the publishing queue when server configuration is ready.
 6. Save research links, observations and hypotheses. Record daily results and
    export them to CSV. These are labelled manual records, not verified attribution.
+7. Open **Facebook Ads** to connect a Meta ad account, view its campaign results
+   across placements and create a paused campaign from a saved BeShare plan.
+   Finish the ad set, audience, budget, placements and creative in Meta Ads Manager.
+
+### Facebook Ads setup
+
+Use the existing Meta app, redirect URI and encrypted account service. Enable
+Marketing API access for the app and grant `ads_read` and `ads_management` to
+the user login. If using Facebook Login for Business, set
+`MARKETING_META_ADS_LOGIN_CONFIG_ID` on the account service to a **User access
+token** configuration with ad account asset selection and those permissions.
+When unset, the Ads flow requests both scopes explicitly. The Page publishing
+configuration remains independent. Check access for customer accounts in the
+Meta App Dashboard before rolling out. [Meta Marketing API](https://developers.facebook.com/docs/marketing-apis/)
+
+Build `marketing/Dockerfile.facebook-ads` on the current account image and
+release the account service before serving the static files. The additive
+`marketing_ads_creations` table records one creation per owner, ad account and
+BeShare plan. A lost provider response leaves an outstanding marker. Inspect
+Ads Manager before taking any further action. No worker or new secret key is
+needed. The campaign creation endpoint always requests `PAUSED`. Campaigns
+in a Meta special ad category use Ads Manager directly. Reports use the ad
+account currency and display missing values separately from zero.
 
 The frontend does not store marketing records or social tokens in localStorage.
 Only the existing BeShare account session uses the established session key.
