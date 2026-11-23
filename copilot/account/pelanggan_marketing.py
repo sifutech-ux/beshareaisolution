@@ -59,6 +59,8 @@ def ensure_marketing_schema(conn, postgres):
         cur.execute(f'CREATE INDEX IF NOT EXISTS {table}_owner ON {table} (akaun_id, updated_at)')
     cur.execute('CREATE INDEX IF NOT EXISTS marketing_posts_due ON marketing_posts (status, scheduled_at)')
     cur.execute('CREATE INDEX IF NOT EXISTS marketing_posts_campaign ON marketing_posts (akaun_id, campaign_id)')
+    cur.execute('''CREATE TABLE IF NOT EXISTS marketing_telegram_search_limits (
+        akaun_id TEXT PRIMARY KEY, day INTEGER NOT NULL, hits INTEGER NOT NULL)''')
     ensure_media_schema(conn, postgres)
     ensure_publication_schema(conn, postgres)
 
@@ -460,6 +462,9 @@ def dispatch_marketing(method, path, conn, postgres, owner, payload, stamp):
         connections, capabilities = _provider_status(conn, postgres, owner)
         return 200, {'ok': True, **{resource: _list(conn, postgres, owner, resource) for resource in RESOURCES},
                      'connections': connections, 'capabilities': capabilities}
+    if method == 'POST' and path == PREFIX + '/telegram-discovery':
+        from marketing_telegram_discovery import discover
+        return discover(conn, postgres, owner, payload, stamp)
     if path == PREFIX + '/groups' or path.startswith(PREFIX + '/groups/'):
         from marketing_groups import dispatch as dispatch_groups
         return dispatch_groups(method, path, conn, postgres, owner, payload, stamp)

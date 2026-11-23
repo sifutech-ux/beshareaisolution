@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="marketing.css?v=20261120directauth1">
   <script src="../akaun-asal.js" defer></script>
   <script src="core.js?v=20261119receipts1" defer></script>
-  <script src="marketing.js?v=20261123groupnavfix1" defer></script>
+  <script src="marketing.js?v=telegram-discovery1" defer></script>
   <link rel="stylesheet" href="group-manager.css?v=20261123groupconnect2">
   <script src="group-manager.js?v=20261123groupconnect2" defer></script>
 </head>
@@ -105,7 +105,27 @@
               <div id="group-jobs" class="group-list"></div>
             </div>
           </section>
-          <section data-panel="kajian" hidden aria-label="Kajian pemasaran"><div class="research-intro panel"><div class="research-icon"><svg><use href="#i-search"/></svg></div><div><h2>Asas yang baik bermula dengan pemerhatian.</h2><p>Simpan rujukan yang anda baca. Bezakan perkara yang dilihat dengan andaian yang masih perlu diuji.</p><span class="small-label">RUJUKAN & CATATAN MANUAL</span></div><button type="button" class="button secondary" id="new-source"><svg><use href="#i-plus"/></svg>Tambah rujukan</button></div><div class="toolbar"><label class="filter-label"><span class="sr-only">Kempen kajian</span><select id="source-campaign-filter"><option value="">Semua kempen</option></select></label><p class="muted toolbar-note">Pautan disimpan sebagai rujukan; kandungan laman tidak dibaca secara automatik.</p></div><div id="source-list" class="source-grid"></div></section>
+          <section data-panel="kajian" hidden aria-label="Kajian pemasaran"><div class="research-intro panel"><div class="research-icon"><svg><use href="#i-search"/></svg></div><div><h2>Asas yang baik bermula dengan pemerhatian.</h2><p>Simpan rujukan yang anda baca. Bezakan perkara yang dilihat dengan andaian yang masih perlu diuji.</p><span class="small-label">RUJUKAN & CATATAN MANUAL</span></div><button type="button" class="button secondary" id="new-source"><svg><use href="#i-plus"/></svg>Tambah rujukan</button></div><div class="toolbar"><label class="filter-label"><span class="sr-only">Kempen kajian</span><select id="source-campaign-filter"><option value="">Semua kempen</option></select></label><p class="muted toolbar-note">Pautan disimpan sebagai rujukan; kandungan laman tidak dibaca secara automatik.</p></div><div id="source-list" class="source-grid"></div>
+            <section class="panel media-editor" aria-labelledby="telegram-discovery-title">
+              <h2 id="telegram-discovery-title">Cari Komuniti Telegram</h2>
+              <p>Temui kumpulan dan saluran awam berdasarkan pelanggan yang ingin anda capai.</p>
+              <form id="telegram-discovery-form">
+                <label>Isi daripada kempen <select id="telegram-discovery-campaign"><option value="">Isi sendiri</option></select></label>
+                <div class="form-row">
+                  <label>Jenis bisnes atau produk <input name="business" required maxlength="160" placeholder="Contoh: Makanan frozen"></label>
+                  <label>Lokasi sasaran <input name="location" maxlength="160" placeholder="Contoh: Puchong"></label>
+                </div>
+                <div class="form-row">
+                  <label>Pelanggan sasaran <input name="audience" maxlength="160" placeholder="Contoh: Keluarga dan penduduk setempat"></label>
+                  <label>Bahasa komuniti <input name="language" maxlength="160" placeholder="Contoh: Bahasa Melayu"></label>
+                </div>
+                <p class="hint">Butiran borang ini digunakan untuk carian web melalui OpenAI. Semak peraturan komuniti sebelum memohon izin.</p>
+                <button type="submit" class="button primary">Cari komuniti</button>
+              </form>
+              <p id="telegram-discovery-status" role="status"></p>
+              <div id="telegram-discovery-results" class="source-grid"></div>
+            </section>
+          </section>
           <section data-panel="hasil" hidden aria-label="Hasil pemasaran"><div class="toolbar"><label class="filter-label"><span class="sr-only">Kempen hasil</span><select id="result-campaign-filter"><option value="">Semua kempen</option></select></label><div class="actions"><button type="button" class="button quiet" id="export-results"><svg><use href="#i-download"/></svg>Eksport CSV</button><button type="button" class="button secondary" id="new-result"><svg><use href="#i-plus"/></svg>Catat hasil</button></div></div><div class="inline-note"><span class="tiny-dot"></span><p>Angka di bawah datang daripada rekod manual anda. Ia belum membuktikan jualan berpunca daripada sesuatu kempen.</p></div><div id="result-metrics" class="metric-grid"></div><section class="panel funnel-panel"><div class="section-heading"><div><h2>Perjalanan pelanggan yang dicatat</h2><p class="muted">Jumlah daripada rekod pilihan, tanpa andaian atribusi.</p></div><span class="small-label">REKOD MANUAL</span></div><div id="result-funnel" class="result-funnel"></div></section><section class="panel table-panel"><div class="section-heading"><h2>Rekod harian</h2><span id="result-count" class="muted"></span></div><div id="result-table"></div></section></section>
           <section data-panel="sambungan" hidden aria-label="Sambungan saluran"><div class="connection-intro"><span class="small-label">AKAUN ANDA, KAWALAN ANDA</span><h2>Sambungkan tempat pelanggan anda berada.</h2><p>Benarkan BeShare menerbitkan kandungan melalui akaun yang anda pilih. Setiap saluran menunjukkan status sebenar sambungannya.</p></div><div id="connection-list" class="connection-grid"></div><section class="panel publishing-note"><svg><use href="#i-calendar"/></svg><div><h3>Rancang dahulu. Terbit selepas diluluskan.</h3><p>Draf boleh disiapkan sebelum akaun disambungkan. Penjadualan akan menyemak sambungan, kandungan dan waktu penerbitan sebelum memasukkan pos ke dalam giliran.</p></div></section></section>
         </div>

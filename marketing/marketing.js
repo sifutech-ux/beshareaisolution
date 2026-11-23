@@ -10,7 +10,7 @@
   const count = n => new Intl.NumberFormat('ms-MY').format(n)
   const state = { owner: null, account: null, token: null, epoch: 0, load: 0, ready: false, campaigns: [], posts: [], sources: [], results: [], connections: [], capabilities: {}, view: 'ringkasan' }
   const today = C.malaysiaDate(), calendar = { year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)) - 1 }
-  let toastTimer, confirmResolve, aiController, aiSignature = '', aiKey = '', aiTarget = null, aiDraftContext = null
+  let toastTimer, confirmResolve, aiController, aiSignature = '', aiKey = '', aiTarget = null, aiDraftContext = null, telegramSearch
   const headings = {
     ringkasan: ['RUANG PEMASARAN ANDA', 'Idea yang bergerak.', 'Rancang dengan jelas. Terbit dengan yakin. Fahami hasilnya.'],
     kempen: ['SATU MATLAMAT, SATU ARAH', 'Kempen anda.', 'Satukan tawaran, pelanggan sasaran dan rancangan pelaksanaan.'],
@@ -32,10 +32,10 @@
   function session() { try { const s = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null'); return typeof s?.token === 'string' && s.token ? s : null } catch { return null } }
   function live(epoch, token) { return epoch === state.epoch && token === session()?.token }
   class RequestError extends Error { constructor(text, status = 0, data = {}) { super(text); this.status = status; this.data = data } }
-  async function request(path, { method = 'GET', body, signal, ai = false, key } = {}) {
+  async function request(path, { method = 'GET', body, signal, ai = false, key, timeoutMs = ai ? 90000 : 22000 } = {}) {
     const token = session()?.token, epoch = state.epoch
     if (!token || !services) throw new RequestError('Log masuk ke akaun BeShare untuk meneruskan.', 401)
-    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), ai ? 90000 : 22000)
+    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), timeoutMs)
     const relay = () => controller.abort(); signal?.addEventListener('abort', relay, { once: true })
     try {
       const response = await fetch((ai ? services.nasihat : services.akaun) + path, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, ...(key ? { 'Idempotency-Key': key } : {}) }, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, credentials: 'omit', cache: 'no-store' })
@@ -54,6 +54,10 @@
     disposePostMedia(editors.post)
     resetConnectionChecks()
     resetPublicationRequests()
+    telegramSearch?.abort()
+    $('telegram-discovery-form').reset()
+    $('telegram-discovery-results').replaceChildren()
+    $('telegram-discovery-status').textContent = ''
     state.epoch++; state.owner = null; state.account = null; state.token = null; state.ready = false
     for (const k of ['campaigns', 'posts', 'sources', 'results', 'connections']) state[k] = []
     state.capabilities = {}; aiController?.abort(); aiController = null; aiSignature = ''; aiKey = ''; aiTarget = null; aiDraftContext = null
@@ -268,6 +272,8 @@
     })
   }
   function renderSources() {
+    const campaignSelect = $('telegram-discovery-campaign')
+    campaignOptions(campaignSelect, { emptyLabel: 'Isi sendiri', current: campaignSelect.value })
     const selected = $('source-campaign-filter').value, rows = sorted(state.sources).filter(s => !selected || s.campaign_id === selected), host = $('source-list'); host.replaceChildren()
     if (!rows.length) host.append(empty('Simpan perkara yang anda temui.', 'Pautan, pemerhatian pelanggan dan andaian boleh disimpan bersama kempen.', 'Tambah rujukan pertama', () => openSource(), 'search'))
     rows.forEach(s => {
@@ -688,6 +694,72 @@
     const s = item || { id: C.id(), version: 0, campaign_id: $('source-campaign-filter').value, title: '', url: '', observation: '', hypothesis: '', source_type: 'reference' }; editorState('source', s)
     campaignOptions($('source-campaign'), { emptyLabel: 'Rujukan umum', current: s.campaign_id }); setValues('source', { title: s.title, url: s.url, observation: s.observation, hypothesis: s.hypothesis, type: s.source_type }); $('source-dialog-title').textContent = item ? 'Sunting rujukan' : 'Tambah rujukan'; $('source-url').required = s.source_type === 'reference'; showDialog('source-dialog')
   }
+  async function discoverTelegram(event) {
+    event.preventDefault()
+    if (!state.ready || telegramSearch) return
+    const { epoch, token } = state
+    const form = event.currentTarget, submit = form.querySelector('button[type="submit"]')
+    const status = $('telegram-discovery-status'), host = $('telegram-discovery-results')
+    const controller = new AbortController()
+    telegramSearch = controller
+    submit.disabled = true
+    host.replaceChildren()
+    status.textContent = 'Mencari komuniti awam…'
+    try {
+      const body = Object.fromEntries(new FormData(form))
+      const data = await request(API + '/telegram-discovery', { method: 'POST', body, signal: controller.signal, timeoutMs: 45000 })
+      for (const row of data.results) {
+        const card = el('article', undefined, 'group-card')
+        card.append(el('h3', row.name), el('p', row.kind + ' · ' + row.handle), el('p', row.reason),
+          el('p', 'Peraturan promosi: ' + row.rule))
+        if (row.rule_evidence) card.append(el('p', row.rule_evidence))
+        for (const [index, url] of [...new Set([row.url, row.rule_source, ...row.sources].filter(Boolean))].entries()) {
+          const link = el('a', index === 0 ? 'Buka di Telegram' : 'Sumber ' + index, 'button quiet')
+          link.href = url
+          link.target = '_blank'
+          link.rel = 'noopener noreferrer'
+          card.append(link)
+        }
+        card.append(button('Simpan sebagai rujukan', () => {
+          if (!live(epoch, token)) return
+          openSource()
+          const campaign = $('telegram-discovery-campaign').value
+          if (campaign) $('source-campaign').value = campaign
+          $('source-title').value = row.name
+          $('source-url').value = row.url
+          $('source-observation').value = [row.reason, row.rule, row.rule_evidence, row.rule_source, ...row.sources].filter(Boolean).join('\n')
+        }))
+        card.append(button('Isi borang destinasi', () => {
+          if (!live(epoch, token)) return
+          location.hash = 'kumpulan'
+          navigate()
+          $('group-platform').value = 'telegram'
+          $('group-platform').dispatchEvent(new Event('change'))
+          $('group-ownership').value = 'partner'
+          $('group-name').value = row.name
+          $('group-chat').value = row.handle
+          $('group-approved').checked = false
+          $('group-name').focus()
+        }))
+        host.append(card)
+      }
+      status.textContent = data.results.length ? data.results.length + ' komuniti ditemui.' : 'Tiada komuniti dengan sumber awam yang sesuai. Cuba istilah atau kawasan lain.'
+    } catch (error) {
+      if (live(epoch, token)) status.textContent = error.message
+    } finally {
+      if (telegramSearch === controller) telegramSearch = null
+      submit.disabled = false
+    }
+  }
+  $('telegram-discovery-form').addEventListener('submit', discoverTelegram)
+  $('telegram-discovery-campaign').addEventListener('change', event => {
+    const campaign = state.campaigns.find(item => item.id === event.target.value)
+    if (!campaign) return
+    const fields = $('telegram-discovery-form').elements
+    fields.business.value = (campaign.product || campaign.title).slice(0, 160)
+    fields.audience.value = (campaign.audience || '').slice(0, 160)
+  })
+
   function readSource() { const source_type = $('source-type').value; return { version: editors.source.item.version, campaign_id: $('source-campaign').value, title: $('source-title').value.trim(), url: C.https($('source-url').value, source_type === 'reference'), observation: $('source-observation').value.trim(), hypothesis: $('source-hypothesis').value.trim(), source_type } }
   function openResult(item) {
     if (!state.ready || !ensureCampaign()) return
