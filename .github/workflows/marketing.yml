@@ -68,6 +68,7 @@ jobs:
           python3 -m unittest discover -s marketing/tests -p 'test_*.py' -v
           node --test marketing/tests/*.test.mjs copilot/tests/hasil-core.test.js
           node --check marketing/marketing.js
+          node --check marketing/group-manager.js
           node --check marketing/core.js
           node --check marketing/connect.js
           node --check akaun/akaun.js
