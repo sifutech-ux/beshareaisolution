@@ -5,7 +5,7 @@
   const BASE = '/api/akaun/copilot/marketing/groups'
   const sessions = 'beshare-akaun'
   const connected = window.BeshareAsal?.asalPerkhidmatan(location.origin)
-  let groups = [], jobs = [], loading = false, active = false, generation = 0
+  let groups = [], jobs = [], loading = false, active = false, generation = 0, telegramConfigured = false, publishingEnabled = false
 
   function element(tag, value, cls) {
     const node = document.createElement(tag)
@@ -53,7 +53,7 @@
   function pick() {
     const option = $('group-platform').value === 'telegram'
     $('group-chat-wrap').hidden = !option
-    $('group-chat').required = option
+    $('group-chat').required = false
     if (!option) $('group-chat').value = ''
   }
   async function refresh() {
@@ -69,7 +69,12 @@
       if (epoch !== generation || !active) return
       groups = Array.isArray(result.groups) ? result.groups : []
       jobs = Array.isArray(result.jobs) ? result.jobs : []
-      feedback('group-status', groups.length ? groups.length + ' destinasi tersimpan. Telegram auto-publish hanya dibenarkan bagi kumpulan yang disahkan.' : 'Belum ada kumpulan. Tambah destinasi pertama anda.')
+      telegramConfigured = result.telegram_configured === true
+      publishingEnabled = result.auto_publish_enabled === true
+      const readiness = !telegramConfigured ? 'Bot Telegram belum dikonfigurasi pada pelayan.' :
+                        !publishingEnabled ? 'Penerbitan Telegram masih dimatikan; pendaftaran group boleh disediakan.' :
+                        'Penerbitan Telegram tersedia untuk destinasi disahkan.'
+      feedback('group-status', (groups.length ? groups.length + ' destinasi tersimpan. ' : 'Belum ada kumpulan. ') + readiness)
       render()
     } catch (error) { if (epoch === generation) feedback('group-status', error.message, true) }
     finally { loading = false }
@@ -90,12 +95,14 @@
         'Belum disahkan · Pentadbir perlu menghubungkan bot.', 'group-note'))
       const actions = element('div', null, 'group-actions')
       if (group.platform === 'telegram' && group.status === 'pending') {
-        actions.append(button('Sahkan melalui Telegram', async () => {
+        actions.append(button(group.chat_ref ? 'Sahkan pentadbir Telegram' : 'Pilih group di Telegram', async () => {
           try {
             const result = await api('/' + group.id + '/verify', 'POST', {})
             const url = new URL(result.verification_url)
             if (url.protocol !== 'https:' || url.hostname !== 't.me') throw Error('Pautan pengesahan tidak sah.')
-            feedback('group-status', 'Buka Telegram, tekan Start sebagai pentadbir group tersebut, kemudian muat semula senarai.')
+            feedback('group-status', result.verification_mode === 'group_picker'
+              ? 'Dalam Telegram pilih group yang anda tadbir, berikan kebenaran bot sebagai admin dan sahkan pautan. Kemudian muat semula senarai.'
+              : 'Buka Telegram dan tekan Start sebagai pentadbir group/channel berkenaan. Kemudian muat semula senarai.')
             const link = element('a', 'Buka pautan pengesahan Telegram', 'text-link')
             link.href = url.href; link.target = '_blank'; link.rel = 'noopener noreferrer'
             $('group-status').append(document.createTextNode(' '), link)
@@ -104,15 +111,15 @@
       }
       if (group.platform === 'whatsapp') {
         actions.append(button('Sediakan perkongsian', () => {
-          const message = $('group-job-body').value.trim()
+          const message = $('group-share-body').value.trim()
           if (!message) {
-            feedback('group-job-feedback', 'Tulis teks promosi di bahagian Jadual Telegram dahulu untuk berkongsi secara manual.', true)
-            $('group-job-body').focus()
+            feedback('group-share-feedback', 'Tulis teks promosi WhatsApp dahulu.', true)
+            $('group-share-body').focus()
             return
           }
           const url = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(message)
           window.open(url, '_blank', 'noopener,noreferrer')
-          feedback('group-job-feedback', 'Pilih group yang membenarkan promosi dan tekan Send dalam WhatsApp. BeShare tidak menghantar mesej secara automatik.')
+          feedback('group-share-feedback', 'Pilih group yang membenarkan promosi dan tekan Send dalam WhatsApp. BeShare tidak menghantar mesej secara automatik.')
         }))
       }
       actions.append(button('Nyahaktif', async () => {
@@ -136,6 +143,9 @@
       return article
     }))
     if (!jobs.length) $('group-jobs').append(element('p', 'Belum ada penghantaran Telegram.', 'group-note'))
+    const submit = $('group-job-form').querySelector('button[type="submit"]')
+    submit.disabled = !publishingEnabled
+    submit.title = publishingEnabled ? '' : 'Auto Publish Telegram belum diaktifkan di pelayan.'
   }
   async function addGroup(event) {
     event.preventDefault()
@@ -176,7 +186,7 @@
   function navigation() {
     active = location.hash === '#kumpulan'
     if (active && session()) refresh()
-    if (!active) { generation++; groups = []; jobs = []; $('group-list').replaceChildren(); $('group-jobs').replaceChildren() }
+    if (!active) { generation++; groups = []; jobs = []; telegramConfigured = false; publishingEnabled = false; $('group-list').replaceChildren(); $('group-jobs').replaceChildren() }
   }
   $('group-platform').addEventListener('change', pick)
   $('group-add-form').addEventListener('submit', addGroup)
