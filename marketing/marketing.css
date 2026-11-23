@@ -17,3 +17,11 @@ input,select,textarea{display:block;width:100%;border:1px solid #39465c;backgrou
 .publication-receipt{border-top:1px solid var(--line);padding-top:15px;margin-top:16px;display:grid;gap:12px}.publication-receipt[hidden]{display:none}.publication-destination{font-size:12px;line-height:1.6;color:var(--text);overflow-wrap:anywhere}.publication-receipt .hint{margin:0}.publication-actions{display:flex;flex-wrap:wrap;gap:9px}.publication-actions .button{font-size:11px;min-height:39px;padding:9px 12px}.editor-publication-receipt{padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--surface);margin:0 0 22px}.editor-publication-receipt .publication-destination{font-size:13px}
 
 .connection-onboarding-note{padding:13px 15px;border:1px solid rgba(231,195,136,.28);border-radius:10px;background:rgba(231,195,136,.05);color:var(--amber);font-size:12px!important;line-height:1.7}
+
+.ads-panel { margin-bottom: 18px; }
+.ads-panel h2 { margin-top: 0; }
+.ads-panel p { color: var(--muted); }
+.ads-panel .actions { align-items: end; flex-wrap: wrap; }
+.ads-panel .table-wrap { margin-top: 18px; overflow-x: auto; }
+.ads-panel .ads-confirm { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+.ads-confirm input { width: 18px; min-height: 18px; }

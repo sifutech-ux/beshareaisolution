@@ -33,6 +33,10 @@ jobs:
           git remote add origin https://github.com/sifutech-ux/beshareaisolution.git
           git fetch --depth=1 origin "$SOURCE_SHA"
           git checkout --detach FETCH_HEAD
+      - name: Facebook Ads desktop and mobile flows
+        run: |
+          python3 -m pip install playwright cryptography
+          python3 marketing/tests/facebook_ads_browser.py
       - name: Test dependencies
         shell: bash
         run: |

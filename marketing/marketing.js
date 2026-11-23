@@ -15,6 +15,7 @@
     ringkasan: ['RUANG PEMASARAN ANDA', 'Idea yang bergerak.', 'Rancang dengan jelas. Terbit dengan yakin. Fahami hasilnya.'],
     kempen: ['SATU MATLAMAT, SATU ARAH', 'Kempen anda.', 'Satukan tawaran, pelanggan sasaran dan rancangan pelaksanaan.'],
     kandungan: ['KANDUNGAN DENGAN TUJUAN', 'Sedia untuk dikongsi.', 'Tulis, semak dan susun kandungan mengikut saluran.'],
+    'facebook-ads': ['IKLAN BERBAYAR', 'Facebook Ads', 'Urus kempen dan lihat prestasi akaun iklan Meta anda.'],
     kumpulan: ['DISTRIBUSI BERIZIN', 'Kumpulan & saluran.', 'Urus Telegram dan WhatsApp group dengan kebenaran pentadbir.'],
     kajian: ['FAHAMI SEBELUM MELANGKAH', 'Ruang untuk pemerhatian.', 'Kumpulkan rujukan dan andaian yang mahu anda uji.'],
     hasil: ['DARIPADA ANGKA KEPADA LANGKAH', 'Fahami hasil pemasaran.', 'Catat apa yang berlaku. Bina keputusan daripada rekod sebenar.'],
@@ -50,7 +51,9 @@
       throw new RequestError('Sambungan terputus. Semak internet dan cuba lagi.')
     } finally { clearTimeout(timeout); signal?.removeEventListener('abort', relay) }
   }
+  const ads = window.BeShareFacebookAds?.({ state, request, connection, beginConnect, disconnect, el, live, API })
   function resetMemory() {
+    ads?.reset()
     disposePostMedia(editors.post)
     resetConnectionChecks()
     resetPublicationRequests()
@@ -129,6 +132,7 @@
     document.querySelectorAll('[data-view]').forEach(a => { if (a.dataset.view === state.view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current') })
     document.querySelectorAll('[data-panel]').forEach(p => { p.hidden = p.dataset.panel !== state.view })
     document.title = state.view[0].toUpperCase() + state.view.slice(1) + ' · Marketing — BeShare AI'
+    if (state.view === 'facebook-ads' && state.ready) ads?.show()
     if (state.view === 'sambungan') refreshConnectionChecks()
   }
   function empty(title, text, action, run, symbol = 'target') { const n = el('div', undefined, 'empty-state'); n.append(icon(symbol), el('h3', title), el('p', text)); if (action) n.append(button(action, run, 'button secondary', 'plus')); return n }
@@ -390,7 +394,8 @@
     try { notify('Menyediakan sambungan akaun…'); const d = await request(API + '/connections/' + platform + '/begin', { method: 'POST', body: {} }), u = new URL(d.authorization_url); if (u.protocol !== 'https:' || !['facebook.com', 'instagram.com', 'threads.net', 'threads.com'].some(host => u.hostname === host || u.hostname.endsWith('.' + host))) throw Error('Pautan sambungan belum dapat disahkan. Cuba lagi.'); location.assign(u.href) } catch (error) { message(error.message) }
   }
   async function disconnect(platform) {
-    if (!await confirmAction('Putuskan sambungan?', 'BeShare akan berhenti menggunakan akses ' + C.PLATFORM[platform] + ' ini. Semak semula kandungan dalam giliran sebelum menjadualkan semula.', 'Putuskan sambungan')) return
+    const explanation = platform === 'facebook_ads' ? 'BeShare akan berhenti mengakses akaun iklan ini. Kempen anda di Meta terus mengikut tetapan Ads Manager.' : 'BeShare akan berhenti menggunakan akses ' + C.PLATFORM[platform] + ' ini. Semak semula kandungan dalam giliran sebelum menjadualkan semula.'
+    if (!await confirmAction('Putuskan sambungan?', explanation, 'Putuskan sambungan')) return
     connectionChecks.get(platform)?.controller?.abort(); connectionChecks.delete(platform)
     try { await request(API + '/connections/' + platform, { method: 'DELETE', body: {} }); await bootstrap(); notify('Sambungan BeShare telah diputuskan.') } catch (error) { message(error.message) }
   }

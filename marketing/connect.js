@@ -90,6 +90,10 @@
     clearCandidates()
     title.textContent = 'Akaun berjaya disambungkan.'
     intro.textContent = 'Anda boleh kembali ke Marketing untuk menyediakan dan menjadualkan siaran.'
+    if (data.platform === 'facebook_ads') {
+      intro.textContent = 'Kembali ke Facebook Ads untuk melihat kempen dan laporan akaun iklan ini.'
+      document.getElementById('return-marketing').href = '/marketing/#facebook-ads'
+    }
     const name = data.account && typeof data.account.name === 'string' ? data.account.name : 'Akaun platform'
     message(name + ' kini disambungkan kepada akaun BeShare anda.')
   }
@@ -140,12 +144,16 @@
     clearReturn()
     requireSession()
     if (!result.selection_required) { done(result); return }
-    if (!['facebook', 'instagram', 'threads'].includes(result.platform) || !Array.isArray(result.candidates) || !result.candidates.length) {
+    if (!['facebook', 'instagram', 'threads', 'facebook_ads'].includes(result.platform) || !Array.isArray(result.candidates) || !result.candidates.length) {
       throw new Error('Tiada akaun yang layak ditemui. Semak kebenaran pada platform dan cuba lagi.')
     }
     candidatePlatform = result.platform
     title.textContent = 'Pilih akaun untuk siaran.'
     message('Pilih satu akaun. Kandungan akan menggunakan akaun yang anda pilih apabila dijadualkan.')
+    if (candidatePlatform === 'facebook_ads') {
+      title.textContent = 'Pilih akaun iklan Meta.'
+      message('Laporan dan kempen Facebook Ads dalam BeShare akan menggunakan akaun iklan yang dipilih.')
+    }
     for (const candidate of result.candidates) {
       if (!candidate || typeof candidate.id !== 'string' || !/^[a-f0-9]{32}$/.test(candidate.id)) continue
       const candidateId = candidate.id
@@ -158,6 +166,7 @@
       name.textContent = typeof candidate.name === 'string' ? candidate.name : 'Akaun platform'
       const detail = document.createElement('small')
       detail.textContent = result.platform === 'instagram' ? 'Instagram Professional' : 'Facebook Page'
+      if (candidatePlatform === 'facebook_ads') detail.textContent = 'Akaun iklan · ' + candidate.account_id
       const arrow = document.createElement('span')
       arrow.className = 'arrow'
       arrow.textContent = '→'
