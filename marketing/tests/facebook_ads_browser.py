@@ -74,12 +74,20 @@ def check(browser, width, height):
     page.get_by_role('button', name='Jadikan iklan').click()
     page.locator('#boost-budget').fill('60.09')
     approvals = []
+    previews = []
     def preview_post(route):
         body = route.request.post_data_json
-        assert body == {'account_id': '6789', 'post_id': 'b' * 32, 'days': 3, 'country': 'MY', 'budget': '60.09'}
+        destination = body['destination']
+        expected = {'account_id': '6789', 'post_id': 'b' * 32, 'days': 3, 'country': 'MY', 'budget': '60.09',
+                    'destination': destination}
+        if destination == 'link':
+            expected['destination_url'] = 'https://t.me/kedai'
+        assert body == expected
+        previews.append(destination)
         route.fulfill(json={'ok': True, 'review_id': 'a' * 40, 'preview': {
             'page_name': 'Kedai', 'account_name': 'Akaun Ujian', 'account_id': '6789',
-            'text': 'Menu hari ini', 'phone': '+60123456789', 'currency': 'MYR', 'budget_minor': 6009,
+            'text': 'Menu hari ini', 'phone': '+60123456789', 'destination': destination,
+            'destination_url': body.get('destination_url'), 'currency': 'MYR', 'budget_minor': 6009,
             'country': 'MY', 'days': 3, 'post_url': 'https://www.facebook.com/1001/posts/987'}})
     def launch_ad(route):
         approvals.append(route.request.post_data_json)
@@ -87,11 +95,22 @@ def check(browser, width, height):
     page.route('**/facebook-ads/post-preview', preview_post)
     page.route('**/facebook-ads/post-launch', launch_ad)
     page.locator('#boost-preview').click()
-    expect(page.locator('#boost-summary')).to_contain_text('60.09')
-    expect(page.locator('#boost-destination')).to_contain_text('+60123456789')
-    page.locator('#boost-edit').click()
-    expect(page.locator('#boost-review')).to_be_hidden()
-    page.locator('#boost-preview').click()
+    assert not previews
+    for channel, recipient in [('whatsapp', '+60123456789'), ('link', 'https://t.me/kedai'), ('messenger', 'Messenger · Kedai')]:
+        page.locator('#boost-channel').select_option(channel)
+        if channel == 'link':
+            page.locator('#boost-preview').click()
+            assert previews == ['whatsapp']
+            page.locator('#boost-url').fill(recipient)
+        else:
+            expect(page.locator('#boost-url')).to_be_hidden()
+        page.locator('#boost-preview').click()
+        expect(page.locator('#boost-summary')).to_contain_text('60.09')
+        expect(page.locator('#boost-destination')).to_contain_text(recipient)
+        if channel != 'messenger':
+            page.locator('#boost-edit').click()
+            expect(page.locator('#boost-review')).to_be_hidden()
+    assert previews == ['whatsapp', 'link', 'messenger']
     expect(page.locator('#boost-launch')).to_be_visible()
     page.locator('#boost-launch').click()
     assert not approvals

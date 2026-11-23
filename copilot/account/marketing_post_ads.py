@@ -1,9 +1,10 @@
-"""Turn a published Facebook Page story into a capped click-to-WhatsApp ad."""
+"""Turn a published Facebook Page story into a capped ad with a reviewed destination."""
 import hashlib
 import json
 import re
 import secrets
 import time
+from urllib.parse import urlsplit
 
 import marketing_facebook_ads as ads
 import marketing_publication as publication
@@ -41,7 +42,36 @@ def source(conn, postgres, owner, body, stamp):
     return grant, account_url, post, page
 
 
+def destination(body):
+    # Older clients asked for WhatsApp without sending a destination field.
+    channel = body.get('destination', 'whatsapp')
+    if channel == 'link':
+        url = body.get('destination_url')
+        if (not social._public_https(url) or not url.startswith('https://') or '\\' in url
+                or '@' in urlsplit(url).netloc or any(ord(c) < 32 or ord(c) == 127 for c in url)):
+            fail('Masukkan pautan HTTPS awam untuk aplikasi atau laman web.')
+        return {'destination': channel, 'destination_url': url}
+    if channel not in ('whatsapp', 'messenger') or 'destination_url' in body:
+        fail('Pilih destinasi iklan yang sah.')
+    return {'destination': channel}
+
+
+def delivery(spec):
+    channel = spec['destination']
+    if channel == 'link':
+        return 'OUTCOME_TRAFFIC', 'LINK_CLICKS', 'WEBSITE', {}, {
+            'type': 'LEARN_MORE', 'value': {'link': spec['destination_url']}}
+    promoted = {'page_id': spec['page_id']}
+    if channel == 'messenger':
+        return 'OUTCOME_ENGAGEMENT', 'CONVERSATIONS', 'MESSENGER', promoted, {
+            'type': 'MESSAGE_PAGE', 'value': {'app_destination': 'MESSENGER', 'link': 'https://m.me/' + spec['page_id']}}
+    promoted['whatsapp_phone_number'] = spec['phone'][1:]
+    return 'OUTCOME_ENGAGEMENT', 'CONVERSATIONS', 'WHATSAPP', promoted, {
+        'type': 'WHATSAPP_MESSAGE', 'value': {'app_destination': 'WHATSAPP', 'link': 'https://wa.me/' + spec['phone'][1:]}}
+
+
 def context(conn, postgres, owner, body, stamp, transport):
+    target = destination(body)
     grant, account_url, post, page = source(conn, postgres, owner, body, stamp)
     conn.rollback()
     account = social.provider_call('GET', account_url, {'fields': 'account_id,name,currency,account_status'},
@@ -53,10 +83,15 @@ def context(conn, postgres, owner, body, stamp, transport):
     page_id = social._numeric_id(page['account_id'])
     def read(node, fields):
         return social.provider_call('GET', page['base'] + '/' + node, {'fields': fields}, page['token'], transport)
-    profile = read(page_id, 'id,name,whatsapp_number')
-    phone = re.sub(r'[ ()-]', '', str(profile.get('whatsapp_number') or '')).lstrip('+')
-    if str(profile.get('id')) != page_id or not re.fullmatch(r'[1-9][0-9]{6,14}', phone):
-        fail('Pautkan nombor WhatsApp Business pada Facebook Page asal, kemudian buka semula pratonton.', 'whatsapp', 409)
+    whatsapp = target['destination'] == 'whatsapp'
+    profile = read(page_id, 'id,name,whatsapp_number' if whatsapp else 'id,name')
+    if str(profile.get('id')) != page_id:
+        fail('Facebook Page telah berubah. Buka semula pratonton.', 'stale', 409)
+    if whatsapp:
+        phone = re.sub(r'[ ()-]', '', str(profile.get('whatsapp_number') or '')).lstrip('+')
+        if not re.fullmatch(r'[1-9][0-9]{6,14}', phone):
+            fail('Pautkan nombor WhatsApp Business pada Facebook Page ini atau pilih destinasi lain.', 'whatsapp', 409)
+        target['phone'] = '+' + phone
     raw = social._provider_id(post['provider_post_id'])
     story_id = raw if '_' in raw else page_id + '_' + raw
     # Facebook can return a photo/video ID instead of a Page post ID. Find the
@@ -90,7 +125,7 @@ def context(conn, postgres, owner, body, stamp, transport):
         fail('Meta belum mengesahkan hantaran Page ini sebagai hantaran yang telah diterbitkan.', 'story', 409)
     return {'page_id': page_id, 'page_name': str(profile.get('name') or page_id),
             'account_id': body['account_id'], 'account_name': str(account.get('name') or body['account_id']),
-            'currency': account['currency'], 'phone': '+' + phone, 'story_id': story_id,
+            'currency': account['currency'], **target, 'story_id': story_id,
             'text': str(story.get('message') or ''), 'post_url': publication._url(story.get('permalink_url'), 'facebook'),
             'picture': str(story.get('full_picture') or ''), 'updated': str(story.get('updated_time') or '')}
 
@@ -104,7 +139,7 @@ def settings(body, ctx):
     if minor < 1 or type(days) is not int or not 1 <= days <= 30 or not isinstance(country, str) or country not in COUNTRIES:
         fail('Semak bajet, negara audiens dan tempoh 1 hingga 30 hari.')
     creative = hashlib.sha256(json.dumps([ctx['text'], ctx['post_url'], ctx['updated']]).encode()).hexdigest()
-    return {k: ctx[k] for k in ('page_id', 'story_id', 'currency', 'phone')} | {
+    return {k: ctx[k] for k in ('page_id', 'story_id', 'currency', 'destination', 'phone', 'destination_url') if k in ctx} | {
         'creative_hash': creative, 'budget_minor': minor, 'days': days, 'country': country}
 
 
@@ -116,7 +151,7 @@ def record(conn, postgres, key):
 
 
 def preview(conn, postgres, owner, body, stamp, transport):
-    if set(body) != {'account_id', 'post_id', 'budget', 'days', 'country'}:
+    if set(body) - {'destination', 'destination_url'} != {'account_id', 'post_id', 'budget', 'days', 'country'}:
         fail('Semak maklumat pratonton.')
     ctx = context(conn, postgres, owner, body, stamp, transport)
     spec = settings(body, ctx)
@@ -132,7 +167,7 @@ def preview(conn, postgres, owner, body, stamp, transport):
         if old and old['phase'] == 'sending':
             fail(CHECK, 'check_meta', 409)
         nonce = secrets.token_hex(20)
-        resume = old and old['settings'] == data
+        resume = old and ({'destination': 'whatsapp'} | json.loads(old['settings'])) == spec
         ids = [old[k] if resume else '' for k in ('campaign_id', 'adset_id', 'creative_id', 'ad_id')]
         if old:
             conn.cursor().execute('DELETE FROM marketing_post_ads WHERE ' + WHERE.format(ph, ph, ph), key)
@@ -173,7 +208,7 @@ def launch(conn, postgres, owner, body, stamp, transport):
     if isinstance(reserved, dict):
         return status, reserved
     row, base, token = reserved
-    spec = json.loads(row['settings'])
+    spec = {'destination': 'whatsapp'} | json.loads(row['settings'])
     def save(field, value):
         cur = conn.cursor()
         cur.execute(f"UPDATE marketing_post_ads SET {field}={ph} WHERE nonce={ph} AND akaun_id={ph} AND phase='sending'",
@@ -190,12 +225,13 @@ def launch(conn, postgres, owner, body, stamp, transport):
             raise social.SocialError(CHECK, 409, 'check_meta', ambiguous=True)
         save(field, reply['id'])
     try:
-        ctx = context(conn, postgres, owner, body, stamp, transport)
+        ctx = context(conn, postgres, owner, body | spec, stamp, transport)
         verify = settings({'budget': '%d.%02d' % divmod(spec['budget_minor'], 100), **spec}, ctx)
         if verify != spec:
-            fail('Hantaran, mata wang atau destinasi WhatsApp berubah. Buka pratonton semula.', 'stale', 409)
+            fail('Hantaran, mata wang atau destinasi iklan berubah. Buka pratonton semula.', 'stale', 409)
         name = ('BeShare · ' + (ctx['text'].strip() or ctx['page_name']))[:100]
-        create('campaign_id', 'campaigns', {'name': name, 'objective': 'OUTCOME_ENGAGEMENT', 'buying_type': 'AUCTION',
+        objective, optimization, meta_destination, promoted, cta = delivery(spec)
+        create('campaign_id', 'campaigns', {'name': name, 'objective': objective, 'buying_type': 'AUCTION',
                'status': 'PAUSED', 'special_ad_categories': '[]', 'is_adset_budget_sharing_enabled': 'false'})
         api = base.rsplit('/', 1)[0]
         def check_parent():
@@ -207,28 +243,34 @@ def launch(conn, postgres, owner, body, stamp, transport):
                     or ids != ([row['adset_id']] if row['adset_id'] else [])):
                 fail('Kempen ini telah diubah di Meta. Semak status dan set iklannya dalam Ads Manager.', 'mismatch', 409)
         check_parent()
-        create('adset_id', 'adsets', {'name': name, 'campaign_id': row['campaign_id'], 'destination_type': 'WHATSAPP',
-               'billing_event': 'IMPRESSIONS', 'optimization_goal': 'CONVERSATIONS', 'bid_strategy': 'LOWEST_COST_WITHOUT_CAP',
-               'promoted_object': json.dumps({'page_id': spec['page_id'], 'whatsapp_phone_number': spec['phone'].lstrip('+')}),
+        create('adset_id', 'adsets', {'name': name, 'campaign_id': row['campaign_id'], 'destination_type': meta_destination,
+               'billing_event': 'IMPRESSIONS', 'optimization_goal': optimization, 'bid_strategy': 'LOWEST_COST_WITHOUT_CAP',
+               **({'promoted_object': json.dumps(promoted)} if promoted else {}),
                'targeting': json.dumps({'geo_locations': {'countries': [spec['country']]}, 'publisher_platforms': ['facebook']}),
                'lifetime_budget': spec['budget_minor'], 'end_time': stamp + spec['days'] * 86400, 'status': 'ACTIVE'})
         create('creative_id', 'adcreatives', {'name': name, 'object_story_id': spec['story_id'],
-               'call_to_action': json.dumps({'type': 'WHATSAPP_MESSAGE', 'value': {'app_destination': 'WHATSAPP',
-                                             'link': 'https://wa.me/' + spec['phone'][1:]}})})
+               'call_to_action': json.dumps(cta)})
         create('ad_id', 'ads', {'name': name, 'adset_id': row['adset_id'],
                'creative': json.dumps({'creative_id': row['creative_id']}), 'status': 'ACTIVE'})
         # The parent is activated last, after the capped set and destination ad exist.
         check_parent()
         actual = social.provider_call('GET', api + '/' + row['adset_id'],
                                      {'fields': 'campaign_id,lifetime_budget,promoted_object,destination_type,end_time,targeting,ads.limit(2){id,creative{id,object_story_id}}'}, token, transport)
-        promoted = actual.get('promoted_object') or {}
+        remote_promoted = dict(actual.get('promoted_object') or {})
+        if spec['destination'] == 'whatsapp':
+            remote_promoted['whatsapp_phone_number'] = re.sub(r'[^0-9]', '', str(remote_promoted.get('whatsapp_phone_number') or ''))
+        if spec['destination'] == 'link':
+            creative = social.provider_call('GET', api + '/' + row['creative_id'], {'fields': 'call_to_action'}, token, transport)
+            action = creative.get('call_to_action') or {}
+            if action.get('type') != cta['type'] or (action.get('value') or {}).get('link') != spec['destination_url']:
+                fail('Meta tidak mengesahkan pautan pilihan anda. Semak kempen dijeda dalam Ads Manager.', 'mismatch', 409)
         children = actual.get('ads') or {'data': []}
         children_match = ads._rows(children) == [{'id': row['ad_id'], 'creative': {
             'id': row['creative_id'], 'object_story_id': spec['story_id']}}]
         if (not children_match or children.get('paging', {}).get('next')
                 or str(actual.get('campaign_id')) != row['campaign_id'] or str(actual.get('lifetime_budget')) != str(spec['budget_minor'])
-                or actual.get('destination_type') != 'WHATSAPP' or str(promoted.get('page_id')) != spec['page_id']
-                or re.sub(r'[^0-9]', '', str(promoted.get('whatsapp_phone_number') or '')) != spec['phone'][1:]
+                or actual.get('destination_type') != meta_destination
+                or any(str(remote_promoted.get(k)) != v for k, v in promoted.items())
                 or (actual.get('targeting') or {}).get('geo_locations', {}).get('countries') != [spec['country']]
                 or not stamp < (social._epoch(actual.get('end_time')) or 0) <= stamp + spec['days'] * 86400):
             fail('Butiran set iklan Meta tidak sepadan dengan pratonton. Semak kempen dijeda dalam Ads Manager.', 'mismatch', 409)

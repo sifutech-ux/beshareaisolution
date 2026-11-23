@@ -2,9 +2,29 @@
 window.BeSharePostAds = function ({ state, request, connection, live, API }) {
   const $ = id => document.getElementById('boost-' + id)
   let session = null
+  function updateDestination() {
+    const channel = $('channel').value
+    const link = channel === 'link'
+    $('link-field').hidden = !link
+    $('url').disabled = !link
+    $('url').required = link
+    const hints = {
+      whatsapp: 'Pelanggan boleh menghantar mesej ke nombor WhatsApp Business yang dipautkan pada Page.',
+      messenger: 'Pelanggan boleh menghantar mesej ke peti masuk Messenger Page ini.',
+      link: 'Iklan ini dioptimumkan untuk klik ke pautan pilihan anda.'
+    }
+    $('channel-hint').textContent = hints[channel] || ''
+    $('channel-hint').hidden = !channel
+  }
+  function lockSettings(locked) {
+    for (const id of ['channel', 'budget', 'country', 'days', 'preview']) $(id).disabled = locked
+    $('url').disabled = locked || $('channel').value !== 'link'
+  }
   function reset() {
     session = null
     $('settings').reset()
+    updateDestination()
+    lockSettings(false)
     $('approval').reset()
     $('settings').hidden = false
     $('review').hidden = true
@@ -45,15 +65,20 @@ window.BeSharePostAds = function ({ state, request, connection, live, API }) {
     event.preventDefault()
     const s = session
     if (!s?.account || $('preview').disabled) return
-    $('preview').disabled = true
-    $('status').textContent = 'Menyemak hantaran, nombor WhatsApp dan akaun iklan dengan Meta…'
+    const destination = $('channel').value
+    $('status').textContent = 'Menyemak hantaran dan destinasi iklan dengan Meta…'
     const body = { account_id: s.account, post_id: s.post, days: Number($('days').value),
-      budget: $('budget').value, country: $('country').value }
+      budget: $('budget').value, country: $('country').value, destination }
+    if (destination === 'link') body.destination_url = $('url').value.trim()
+    lockSettings(true)
     try {
       const result = await request(API + '/facebook-ads/post-preview', { method: 'POST', body, timeoutMs: 80000 })
       if (!current(s)) return
       if (result.already_submitted) { submitted(result.campaign_id); return }
       const p = result.preview
+      if (p.destination !== destination || (destination === 'link' && p.destination_url !== body.destination_url)) {
+        throw new Error('Destinasi dalam pratonton berbeza daripada pilihan anda. Semak semula tetapan.')
+      }
       s.review = result.review_id
       $('page').textContent = p.page_name
       $('copy').textContent = p.text
@@ -65,7 +90,12 @@ window.BeSharePostAds = function ({ state, request, connection, live, API }) {
         $('picture').src = p.picture
         $('picture').hidden = false
       }
-      $('destination').textContent = 'Mesej WhatsApp ke ' + p.phone
+      const labels = {
+        whatsapp: 'WhatsApp Business · ' + p.phone,
+        messenger: 'Messenger · ' + p.page_name,
+        link: 'Pautan · ' + p.destination_url
+      }
+      $('destination').textContent = labels[destination]
       const name = new Intl.DisplayNames(['ms'], { type: 'region' }).of(p.country)
       const total = new Intl.NumberFormat('ms-MY', { style: 'currency', currency: p.currency, currencyDisplay: 'code' }).format(p.budget_minor / 100)
       $('summary').textContent = 'Akaun ' + p.account_name + ' (' + p.account_id + ') · Facebook · ' + name + ' · ' + p.days + ' hari · Jumlah bajet ' + total
@@ -75,7 +105,7 @@ window.BeSharePostAds = function ({ state, request, connection, live, API }) {
       $('status').textContent = 'Semak hantaran, destinasi dan jumlah belanja sebelum meluluskan.'
     } catch (err) {
       if (current(s)) $('status').textContent = err.message
-    } finally { if (current(s)) $('preview').disabled = false }
+    } finally { if (current(s)) lockSettings(false) }
   }
   async function launch(event) {
     event.preventDefault()
@@ -103,8 +133,9 @@ window.BeSharePostAds = function ({ state, request, connection, live, API }) {
     $('launch').disabled = false
     $('settings').hidden = false
     $('status').textContent = ''
-    $('budget').focus()
+    $('channel').focus()
   })
+  $('channel').addEventListener('change', updateDestination)
   $('settings').addEventListener('submit', preview)
   $('approval').addEventListener('submit', launch)
   return { open, reset }
