@@ -84,7 +84,7 @@ class GroupsTest(unittest.TestCase):
         self.assertEqual(self.call('POST', '/jobs', payload)[0], 201)
         self.assertEqual(self.call('POST', '/jobs', payload)[1]['replayed'], True)
         self.assertEqual(self.call('POST', '/jobs', {**payload, 'id': 'e'*32})[0], 409)
-        self.assertEqual(self.call('POST', '/jobs', {**payload, 'id': 'f'*32, 'scheduled_at': STAMP+86400})[0], 201)
+        self.assertEqual(self.call('POST', '/jobs', {**payload, 'id': 'f'*32, 'scheduled_at': STAMP+86700})[0], 201)
         self.assertEqual(self.call('DELETE', '/' + GROUP)[0], 200)
         con = self.connect()
         statuses = {r[0] for r in con.execute('SELECT status FROM marketing_group_jobs').fetchall()}
