@@ -3,6 +3,7 @@ const BeshareBijak = (() => {
   const $ = id => document.getElementById(id)
   let memoryVersion = null, dirty = false, generation = 0, context = null
   let voice = null, voiceGeneration = 0, starting = false
+  const voiceReady = 'Anda boleh bercakap seperti biasa. Copilot akan menjawab dengan suara.'
   const proposalCache = new Map()
   function button(label, action) {
     const el = document.createElement('button')
@@ -155,6 +156,104 @@ const BeshareBijak = (() => {
     if (voice || starting) closeVoice()
     if ($('suara-panel').open) $('suara-panel').close()
   }
+  function stopVoiceAudio(current) {
+    const speech = current.speech
+    if (!speech) return
+    current.speech = null
+    speech.abort.abort()
+    if (speech.url) {
+      const audio = $('audio-bijak')
+      audio.onended = null
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+      URL.revokeObjectURL(speech.url)
+    }
+    $('suara-main').hidden = true
+  }
+  async function playVoiceAudio(current, speech) {
+    try {
+      await $('audio-bijak').play()
+      if (voice === current && current.speech === speech) {
+        $('suara-main').hidden = true
+        $('suara-status').textContent = 'Copilot sedang menjawab…'
+      }
+    } catch {
+      if (voice === current && current.speech === speech) {
+        $('suara-main').hidden = false
+        $('suara-status').textContent = 'Tekan Dengar audio Copilot untuk mendengar jawapan.'
+      }
+    }
+  }
+  async function speakVoice(current, transcript) {
+    stopVoiceAudio(current)
+    const speech = { abort: new AbortController() }
+    current.speech = speech
+    $('suara-status').textContent = 'Menyediakan suara Copilot…'
+    try {
+      const response = await fetch(SUARA_API, {
+        method: 'POST', headers: current.headers,
+        body: JSON.stringify({ jawapan: transcript, langkah: [] }), signal: speech.abort.signal,
+      })
+      const data = await response.json()
+      if (voice !== current || current.speech !== speech) return
+      if (!response.ok || data.audioProvider !== 'elevenlabs' || data.mime !== 'audio/mpeg' || typeof data.audio !== 'string' || !data.audio) throw new Error()
+      const bytes = Uint8Array.from(atob(data.audio), char => char.charCodeAt(0))
+      speech.url = URL.createObjectURL(new Blob([bytes], { type: data.mime }))
+      const audio = $('audio-bijak')
+      audio.src = speech.url
+      audio.onended = () => {
+        if (voice !== current || current.speech !== speech || !audio.ended) return
+        stopVoiceAudio(current)
+        $('suara-status').textContent = voiceReady
+      }
+      await playVoiceAudio(current, speech)
+    } catch {
+      if (voice !== current || current.speech !== speech) return
+      stopVoiceAudio(current)
+      $('suara-status').textContent = 'Suara jawapan belum dapat dimainkan. Anda boleh baca transkrip atau terus bercakap.'
+    }
+  }
+  function appendVoiceTurn(current, user, transcript) {
+    const line = document.createElement('article'); line.className = 'baris-transkrip'
+    current.entries.push({ speaker: user ? 'user' : 'assistant', text: transcript })
+    line.append(text('strong', user ? 'Anda' : 'Copilot'), text('p', transcript))
+    if (user) line.append(button('Jadikan arahan dalam sembang', () => {
+      closeVoicePanel(); tulis.value = transcript.slice(0, 600); tulis.focus()
+      status.textContent = 'Semak transkrip, kemudian tekan Hantar. Tindakan akan memerlukan pengesahan.'
+    }))
+    $('suara-transkrip').append(line)
+    $('suara-catatan').hidden = false; $('suara-bilangan').textContent = `${current.entries.length} mesej`
+    $('suara-salin').textContent = 'Salin transkrip'
+    if ($('suara-catatan').open) line.scrollIntoView({ block: 'nearest' })
+  }
+  function handleVoiceEvent(current, data) {
+    if (data.type === 'error') { closeVoice('Sesi suara terganggu. Cuba sambung semula.', 'error'); return }
+    if (data.type === 'input_audio_buffer.speech_started') {
+      current.userSpeaking = true
+      current.reply = null
+      stopVoiceAudio(current)
+      $('suara-status').textContent = 'Copilot sedang mendengar…'
+    } else if (data.type === 'input_audio_buffer.speech_stopped') {
+      current.userSpeaking = false
+    } else if (data.type === 'conversation.item.input_audio_transcription.completed') {
+      const transcript = typeof data.transcript === 'string' && data.transcript.trim()
+      const id = data.item_id || data.event_id
+      if (!transcript || current.seen.has(id)) return
+      current.seen.add(id)
+      appendVoiceTurn(current, true, transcript)
+    } else if (data.type === 'response.created' && !current.userSpeaking && data.response?.id) {
+      current.reply = { id: data.response.id, parts: new Map() }
+    } else if (data.type === 'response.output_text.done' && current.reply && current.reply.id === data.response_id && typeof data.text === 'string') {
+      current.reply.parts.set(`${data.output_index}:${data.content_index}`, data.text)
+    } else if (data.type === 'response.done' && current.reply && current.reply.id === data.response?.id) {
+      const transcript = [...current.reply.parts.values()].join('\n').trim()
+      current.reply = null
+      if (data.response.status !== 'completed' || !transcript) return
+      appendVoiceTurn(current, false, transcript)
+      void speakVoice(current, transcript)
+    }
+  }
   function closeVoice(message = 'Perbualan suara ditamatkan.', state = 'ended', suppressSummary = false) {
     voiceGeneration += 1; starting = false
     const current = voice; voice = null
@@ -162,7 +261,7 @@ const BeshareBijak = (() => {
       if (!suppressSummary && current.owner === akaunId) BeshareHasil.offerVoice(current.entries, state === 'error')
       current.abort?.abort(); clearTimeout(current.timer)
       current.media?.getTracks().forEach(t => t.stop()); current.channel?.close(); current.peer?.close()
-      $('audio-bijak').srcObject = null
+      stopVoiceAudio(current)
       if (current.id) fetch(`${NASIHAT}/api/copilot/suara`, { method: 'POST', headers: current.headers,
         body: JSON.stringify({ henti: current.id }), keepalive: true }).catch(() => {})
     }
@@ -180,58 +279,37 @@ const BeshareBijak = (() => {
     $('suara-henti').disabled = false; $('suara-henti').hidden = false; $('suara-henti').focus()
     voiceState('connecting', 'Membuka mikrofon…'); $('suara-transkrip').replaceChildren()
     $('suara-catatan').hidden = true; $('suara-catatan').open = false; $('suara-salin').textContent = 'Salin transkrip'
-    const current = { owner, entries: [], headers: kepalaAkaun(), abort: new AbortController() }; voice = current
+    const current = { owner, entries: [], seen: new Set(), headers: kepalaAkaun(), abort: new AbortController() }; voice = current
     const alive = () => seq === voiceGeneration && owner === akaunId && voice === current
     try {
       const media = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
       if (!alive()) { media.getTracks().forEach(t => t.stop()); return }
       current.media = media
       const peer = new RTCPeerConnection(); current.peer = peer
-      const audio = $('audio-bijak'); audio.autoplay = true
-      peer.addEventListener('track', event => {
-        if (!alive()) return
-        audio.srcObject = event.streams[0] || new MediaStream([event.track])
-        audio.play().catch(() => { if (alive()) { $('suara-main').hidden = false; $('suara-status').textContent = 'Tekan Dengar audio Copilot untuk mendengar jawapan.' } })
-      })
       media.getTracks().forEach(track => peer.addTrack(track, media))
       const channel = peer.createDataChannel('oai-events'); current.channel = channel
-      channel.addEventListener('open', () => { if (alive()) voiceState('active', 'Anda boleh bercakap seperti biasa. Copilot akan menjawab dengan suara.') })
-      const seen = new Set()
+      channel.addEventListener('open', () => { if (alive()) voiceState('active', voiceReady) })
       channel.addEventListener('message', event => {
         if (!alive()) return
         let data; try { data = JSON.parse(event.data) } catch { return }
-        if (data.type === 'error') { closeVoice('Sesi suara terganggu. Cuba sambung semula.', 'error'); return }
-        const user = data.type === 'conversation.item.input_audio_transcription.completed'
-        const assistant = data.type === 'response.output_audio_transcript.done'
-        if ((!user && !assistant) || typeof data.transcript !== 'string') return
-        const key = `${data.type}:${data.item_id || data.response_id}`
-        if (seen.has(key)) return; seen.add(key)
-        const line = document.createElement('article'); line.className = 'baris-transkrip'
-        const transcript = data.transcript
-        current.entries.push({ speaker: user ? 'user' : 'assistant', text: transcript })
-        line.append(text('strong', user ? 'Anda' : 'Copilot'), text('p', transcript))
-        if (user) line.append(button('Jadikan arahan dalam sembang', () => {
-          closeVoicePanel(); tulis.value = transcript.slice(0, 600); tulis.focus()
-          status.textContent = 'Semak transkrip, kemudian tekan Hantar. Tindakan akan memerlukan pengesahan.'
-        }))
-        $('suara-transkrip').append(line)
-        $('suara-catatan').hidden = false; $('suara-bilangan').textContent = `${seen.size} mesej`
-        $('suara-salin').textContent = 'Salin transkrip'
-        if ($('suara-catatan').open) line.scrollIntoView({ block: 'nearest' })
+        if (data && typeof data === 'object') handleVoiceEvent(current, data)
       })
       channel.addEventListener('close', () => { if (alive()) closeVoice('Sambungan suara ditutup.') })
       peer.addEventListener('connectionstatechange', () => {
         if (alive() && ['failed', 'disconnected', 'closed'].includes(peer.connectionState)) closeVoice('Sambungan suara terputus. Cuba semula.', 'error')
       })
       const offer = await peer.createOffer(); await peer.setLocalDescription(offer)
+      if (!alive()) return
       voiceState('connecting', 'Menyambung kepada Copilot…')
       const response = await fetch(`${NASIHAT}/api/copilot/suara`, { method: 'POST', headers: current.headers,
-        body: JSON.stringify({ sdp: offer.sdp }), signal: current.abort.signal })
+        body: JSON.stringify({ sdp: offer.sdp, audioProvider: 'elevenlabs' }), signal: current.abort.signal })
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error(data.error || 'Suara belum dapat disambungkan.')
       current.id = data.sesi
       if (!alive()) { fetch(`${NASIHAT}/api/copilot/suara`, { method: 'POST', headers: current.headers, body: JSON.stringify({ henti: data.sesi }) }).catch(() => {}); return }
+      if (data.audioProvider !== 'elevenlabs') throw new Error('Suara ElevenLabs belum tersedia. Muat semula halaman atau cuba lagi nanti.')
       await peer.setRemoteDescription({ type: 'answer', sdp: data.sdp })
+      if (!alive()) return
       current.timer = setTimeout(() => closeVoice('Had lima minit dicapai. Anda boleh mulakan sesi baharu.'), data.had_saat * 1000)
     } catch (e) {
       if (alive()) closeVoice(e.name === 'NotAllowedError' ? 'Mikrofon belum dibenarkan. Benarkan mikrofon untuk bercakap.' : e.message || 'Suara belum dapat disambungkan.', 'error')
@@ -257,10 +335,9 @@ const BeshareBijak = (() => {
     $('suara-panel').addEventListener('click', event => { if (backdropDown && event.target === $('suara-panel')) closeVoicePanel(); backdropDown = false })
     $('suara-mula').addEventListener('click', startVoice)
     $('suara-henti').addEventListener('click', () => closeVoice())
-    $('suara-main').addEventListener('click', async () => {
+    $('suara-main').addEventListener('click', () => {
       const current = voice
-      try { await $('audio-bijak').play(); if (voice === current) $('suara-main').hidden = true }
-      catch { if (voice === current) $('suara-status').textContent = 'Audio belum dapat dimainkan. Cuba sekali lagi.' }
+      if (current?.speech?.url) void playVoiceAudio(current, current.speech)
     })
     $('suara-salin').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('suara-transkrip').innerText); $('suara-salin').textContent = 'Transkrip disalin' } catch { $('suara-status').textContent = 'Pilih transkrip untuk menyalin.' } })
     window.addEventListener('pagehide', () => closeVoice())
