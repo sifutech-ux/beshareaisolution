@@ -32,6 +32,7 @@ window.BeShareFacebookAds = function ({ state, request, connection, beginConnect
     $('disconnect').hidden = !grant?.accounts?.length
     $('manager').href = accountId ? manager + '?act=' + encodeURIComponent(accountId) : manager
     $('work').hidden = !available || !accountId
+    $('from-post').hidden = !state.capabilities.ads?.post_whatsapp_ads
     if ($('work').hidden) return
     const selected = $('plan').value, options = plans()
     $('plan').replaceChildren(new Option(options.length ? 'Pilih pelan kempen' : 'Cipta pelan di bahagian Kempen dahulu', ''))

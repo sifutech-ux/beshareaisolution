@@ -23,7 +23,7 @@ BASE_HASHES = {
 }
 RELEASE_FILES = (
     'pelanggan_copilot.py', 'pelanggan_hasil.py', 'pelanggan_marketing.py', 'pelanggan_kuota.py',
-    'marketing_social.py', 'marketing_facebook_ads.py', 'marketing_worker.py',
+    'marketing_social.py', 'marketing_facebook_ads.py', 'marketing_post_ads.py', 'marketing_worker.py',
     'akaun_pelayan.py', 'marketing_lifecycle.py',
 )
 APP_CODE_PATHS = set(BASE_HASHES) | {'/app/' + name for name in RELEASE_FILES} | {

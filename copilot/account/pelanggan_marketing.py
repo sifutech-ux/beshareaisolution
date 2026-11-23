@@ -62,7 +62,9 @@ def ensure_marketing_schema(conn, postgres):
     cur.execute('''CREATE TABLE IF NOT EXISTS marketing_telegram_search_limits (
         akaun_id TEXT PRIMARY KEY, day INTEGER NOT NULL, hits INTEGER NOT NULL)''')
     from marketing_facebook_ads import ensure_schema as ensure_ads_schema
+    from marketing_post_ads import ensure_schema as ensure_post_ads_schema
     ensure_ads_schema(conn)
+    ensure_post_ads_schema(conn)
     ensure_media_schema(conn, postgres)
     ensure_publication_schema(conn, postgres)
 

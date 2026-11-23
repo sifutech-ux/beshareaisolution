@@ -52,7 +52,9 @@
     } finally { clearTimeout(timeout); signal?.removeEventListener('abort', relay) }
   }
   const ads = window.BeShareFacebookAds?.({ state, request, connection, beginConnect, disconnect, el, live, API })
+  const postAds = window.BeSharePostAds?.({ state, request, connection, live, API })
   function resetMemory() {
+    postAds?.reset()
     ads?.reset()
     disposePostMedia(editors.post)
     resetConnectionChecks()
@@ -189,6 +191,9 @@
       if (p.status === 'planned') card.append(el('p', 'Rancangan disimpan · belum dalam giliran penerbitan', 'hint'))
       if (p.last_error) card.append(el('p', safeProviderError(p.last_error), 'post-error'))
       const actions = el('div', undefined, 'card-actions'); actions.append(button(['queued', 'publishing', 'published', 'uncertain'].includes(p.status) ? 'Lihat kandungan' : 'Sunting kandungan', () => openPost(p), 'button secondary')); card.append(actions)
+      if (p.status === 'published' && p.platform === 'facebook' && p.provider_post_id && postAds && state.capabilities.ads?.post_whatsapp_ads) {
+        actions.append(button('Jadikan iklan', () => postAds.open(p), 'button secondary'))
+      }
       if (p.status === 'published' && p.provider_post_id) { const receipt = el('div', undefined, 'publication-receipt'); renderPublication(p, receipt); card.append(receipt) }
       host.append(card)
     }); renderCalendar(rows)
