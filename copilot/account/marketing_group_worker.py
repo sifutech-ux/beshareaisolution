@@ -30,13 +30,18 @@ def _poll_claims(conn, postgres, stamp):
         if type(uid) is not int or uid <= cursor:
             continue
         msg = update.get('message') or {}
-        private = (msg.get('chat') or {}).get('type') == 'private'
+        chat = msg.get('chat') or {}
         text = msg.get('text', '')
         sender = (msg.get('from') or {}).get('id')
-        match = re.fullmatch(r'/start(?:@[A-Za-z0-9_]+)?\s+([A-Za-z0-9_-]{20,64})', text) if isinstance(text, str) else None
-        if private and type(sender) is int and match:
-            if groups.approve_private_start(conn, postgres, sender, match.group(1), me['id'], stamp):
-                verified += 1
+        match = re.fullmatch(r'/start(?:@([A-Za-z0-9_]+))?\s+([A-Za-z0-9_-]{20,64})', text) if isinstance(text, str) else None
+        if type(sender) is int and match:
+            command_bot, code = match.groups()
+            if chat.get('type') == 'private' and (not command_bot or command_bot.casefold() == str(me.get('username', '')).casefold()):
+                if groups.approve_private_start(conn, postgres, sender, code, me['id'], stamp):
+                    verified += 1
+            elif chat.get('type') in ('group', 'supergroup') and command_bot and command_bot.casefold() == str(me.get('username', '')).casefold():
+                if groups.approve_group_start(conn, postgres, sender, code, me['id'], chat, stamp):
+                    verified += 1
         def save_cursor():
             conn.cursor().execute(f'''UPDATE marketing_group_telegram_cursor SET update_id={p}
                                       WHERE singleton=1 AND update_id<{p}''', (uid, uid))
