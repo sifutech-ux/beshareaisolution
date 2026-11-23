@@ -180,7 +180,7 @@ def _create(conn, postgres, owner, payload, stamp):
         reference = _text(payload['chat_ref'], 64)
     except ValueError as exc:
         return _fail(400, str(exc))
-    if not name or (payload['platform'] == 'telegram' and not CHAT.fullmatch(reference)):
+    if not name or (payload['platform'] == 'telegram' and reference and not CHAT.fullmatch(reference)):
         return _fail(400, 'Nama atau ID Telegram tidak sah.')
     if payload['platform'] == 'whatsapp' and reference:
         return _fail(400, 'ID WhatsApp group tidak diperlukan untuk perkongsian manual.')
@@ -221,8 +221,13 @@ def _claim(conn, postgres, owner, gid, stamp, bot):
     c.execute(f'''INSERT INTO marketing_group_claims
              (code_hash,destination_id,akaun_id,expires_at,consumed_at)
              VALUES ({','.join([p]*5)})''', (digest, gid, owner, int(stamp) + CLAIM_TTL, 0))
+        mode = 'start' if row['chat_ref'] else 'startgroup'
+    # For a private Telegram group the admin selects the group directly,
+    # without discovering or pasting its numeric chat ID.
+    extra = '&admin=manage_chat' if mode == 'startgroup' else ''
     return 200, {'ok': True, 'expires_at': int(stamp) + CLAIM_TTL,
-                 'verification_url': 'https://t.me/' + bot['username'] + '?start=' + token}
+                 'verification_url': 'https://t.me/' + bot['username'] + '?' + mode + '=' + token + extra,
+                 'verification_mode': 'group_picker' if mode == 'startgroup' else 'admin_private'}
 
 
 def _schedule(conn, postgres, owner, payload, stamp):
@@ -313,6 +318,68 @@ def dispatch(method, path, conn, postgres, owner, payload, stamp):
             return _fail(503, 'Sambungan bot belum tersedia.')
         return meja._dalam(conn, postgres, lambda: _claim(conn, postgres, owner, gid, stamp, bot))
     return _fail(404, 'Endpoint tidak ditemui.')
+
+
+def approve_group_start(conn, postgres, sender_id, code, bot_id, chat, stamp):
+    """Verify a Telegram group only from a genuine /start@bot in that group.
+
+    Telegram supplies the chat ID and sender ID; never trust a frontend claim
+    about those identities. A group admin and this bot must both be admins.
+    """
+    if not CODE.fullmatch(code) or type(sender_id) is not int or type(bot_id) is not int:
+        return False
+    if not isinstance(chat, dict) or chat.get('type') not in ('group', 'supergroup'):
+        return False
+    raw_chat_id = chat.get('id')
+    if type(raw_chat_id) is not int or raw_chat_id >= 0:
+        return False
+    chat_id = str(raw_chat_id)
+    if not CHAT.fullmatch(chat_id):
+        return False
+    digest = hashlib.sha256(code.encode()).hexdigest()
+    p = _ph(postgres)
+    cur = conn.cursor()
+    cur.execute(f'''SELECT destination_id,akaun_id FROM marketing_group_claims
+                   WHERE code_hash={p} AND consumed_at=0 AND expires_at>={p}''',
+                (digest, int(stamp)))
+    record = cur.fetchone()
+    if not record:
+        return False
+    gid, owner = record
+    group = _read(conn, postgres, owner, gid)
+    if not group or group['status'] != 'pending' or group['platform'] != 'telegram' or group['chat_ref']:
+        return False
+    try:
+        admin = bot_call('getChatMember', {'chat_id': chat_id, 'user_id': sender_id})
+        bot = bot_call('getChatMember', {'chat_id': chat_id, 'user_id': bot_id})
+        if not isinstance(admin, dict) or admin.get('status') not in ('creator', 'administrator'):
+            return False
+        if not isinstance(bot, dict) or bot.get('status') not in ('creator', 'administrator'):
+            return False
+    except TelegramError:
+        return False
+    def save():
+        meja._kunci_akaun(conn, postgres, owner)
+        c = conn.cursor()
+        c.execute(f'''SELECT 1 FROM marketing_group_destinations
+            WHERE platform='telegram' AND chat_id={p} AND status='verified' AND id!={p} LIMIT 1''',
+            (chat_id, gid))
+        if c.fetchone():
+            return 409, {'ok': False}
+        c.execute(f'''UPDATE marketing_group_destinations
+            SET chat_id={p},status='verified',version=version+1,updated_at={p}
+            WHERE id={p} AND akaun_id={p} AND platform='telegram' AND status='pending' ''',
+            (chat_id, meja._iso(stamp), gid, owner))
+        if c.rowcount != 1:
+            return 409, {'ok': False}
+        c.execute(f'''UPDATE marketing_group_claims SET consumed_at={p}
+                       WHERE code_hash={p} AND consumed_at=0 AND expires_at>={p}''',
+                  (int(stamp), digest, int(stamp)))
+        if c.rowcount != 1:
+            return 409, {'ok': False}
+        return 200, {'ok': True}
+    status, _ = meja._dalam(conn, postgres, save)
+    return status == 200
 
 
 def approve_private_start(conn, postgres, sender_id, code, bot_id, stamp):
