@@ -102,7 +102,6 @@ def _search(key, profile):
         'tools': [{'type': 'web_search', 'filters': {'allowed_domains': ['t.me']},
                    'search_context_size': 'low'}],
         'tool_choice': 'required', 'reasoning': {'effort': 'low'},
-        'text': {'format': {'type': 'json_object'}},
         'max_output_tokens': 3000, 'store': False,
     }
     request = Request('https://api.openai.com/v1/responses', json.dumps(body).encode(),
