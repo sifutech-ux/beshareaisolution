@@ -1,0 +1,23 @@
+/* Additive group workspace rules; inherits BeShare Marketing design tokens. */
+.group-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:18px;margin-bottom:20px}
+.group-form,.group-job-form{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
+.group-form label,.group-job-form label{font-size:12px;color:var(--muted);font-weight:550;display:flex;flex-direction:column;gap:7px;min-width:0}
+.group-form input:not([type=checkbox]),.group-form select,.group-job-form select,.group-job-form textarea,.group-job-form input:not([type=checkbox]){width:100%;background:#0b1423;border:1px solid #39465c;color:var(--text);border-radius:9px;min-height:43px;padding:10px 12px}
+.group-form textarea,.group-job-form textarea{resize:vertical}
+.group-form .group-consent,.group-job-form .group-consent,.group-job-form .group-body{grid-column:1/-1}
+.group-consent{display:flex!important;flex-direction:row!important;align-items:flex-start;line-height:1.6;font-size:11px!important}
+.group-consent input{accent-color:var(--mint);width:17px;height:17px;margin:2px 4px 0 0;flex-shrink:0}
+.group-form button,.group-job-form button{grid-column:1/-1;justify-content:center}
+.group-note{color:var(--muted);font-size:12px;line-height:1.7;margin-top:8px;overflow-wrap:anywhere}
+.group-feedback{color:var(--mint);font-size:12px;margin-top:14px;min-height:19px;overflow-wrap:anywhere}
+.group-feedback[data-error=true],.group-error{color:var(--danger)}
+.group-list{display:grid;gap:12px;margin-top:15px}
+.group-card{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:15px;min-width:0}
+.group-card-head{display:flex;flex-direction:column;gap:3px}
+.group-card strong{font-size:13px;overflow-wrap:anywhere}
+.group-meta{font-size:11px;color:var(--faint)}
+.group-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:13px}
+.group-actions .button{font-size:11px;min-height:36px;padding:8px 12px}
+.group-history-heading{margin-top:26px}
+@media(max-width:1100px){.group-grid{grid-template-columns:1fr}}
+@media(max-width:680px){.group-form,.group-job-form{grid-template-columns:1fr}.group-form .group-consent,.group-job-form .group-consent,.group-job-form .group-body{grid-column:1}.group-grid{gap:14px}}
