@@ -12,8 +12,8 @@
   <script src="../akaun-asal.js" defer></script>
   <script src="core.js?v=20261119receipts1" defer></script>
   <script src="marketing.js?v=20261123groupnavfix1" defer></script>
-  <link rel="stylesheet" href="group-manager.css?v=20261123groupnavfix1">
-  <script src="group-manager.js?v=20261123groupnavfix1" defer></script>
+  <link rel="stylesheet" href="group-manager.css?v=20261123groupconnect2">
+  <script src="group-manager.js?v=20261123groupconnect2" defer></script>
 </head>
 <body>
   <a class="skip" href="#main">Langkau ke kandungan</a>
@@ -66,12 +66,12 @@
             <div class="group-grid">
               <div class="panel">
                 <div class="section-heading"><h2>Group Manager</h2><span class="subtle-label">Telegram &amp; WhatsApp</span></div>
-                <p class="group-note">Telegram boleh menerima penerbitan automatik selepas pentadbir group atau channel mengesahkan bot. WhatsApp group biasa menggunakan perkongsian manual melalui aplikasi.</p>
+                <p class="group-note">Telegram group boleh disambungkan terus melalui pautan bot oleh pentadbir tanpa mengetahui ID group. WhatsApp group biasa masih menggunakan perkongsian manual melalui aplikasi.</p>
                 <form id="group-add-form" class="group-form">
                   <label>Platform<select id="group-platform" required><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option></select></label>
                   <label>Pemilikan<select id="group-ownership" required><option value="owned">Group sendiri</option><option value="partner">Group orang lain (dengan izin pentadbir)</option></select></label>
                   <label>Nama kumpulan<input id="group-name" maxlength="120" placeholder="Contoh: Komuniti Produk" required></label>
-                  <label id="group-chat-wrap">ID atau @username Telegram<input id="group-chat" maxlength="64" placeholder="@komunitianda atau -100..." required></label>
+                  <label id="group-chat-wrap">ID atau @username Telegram (pilihan)<input id="group-chat" maxlength="64" placeholder="Kosongkan untuk pilih group terus dalam Telegram"><small>Kosongkan untuk Telegram group biasa; bagi channel, masukkan @username atau ID channel.</small></label>
                   <label class="group-consent"><input id="group-approved" type="checkbox" required> Saya mempunyai izin pentadbir untuk menerbitkan promosi dalam kumpulan ini.</label>
                   <button class="button primary" type="submit">Tambah kumpulan</button>
                 </form>
@@ -82,6 +82,13 @@
                 <p id="group-status" class="group-note" role="status">Muat kumpulan selepas log masuk.</p>
                 <div id="group-list" class="group-list"></div>
               </div>
+            </div>
+            <div class="panel group-share-panel">
+              <div class="section-heading"><h2>Perkongsian WhatsApp</h2><span class="subtle-label">Penghantaran manual</span></div>
+              <p class="group-note">Masukkan teks promosi di sini. Pilih group WhatsApp yang membenarkan promosi, kemudian tekan Send sendiri dalam WhatsApp. BeShare tidak menghantar mesej tanpa tindakan anda.</p>
+              <label for="group-share-body" class="group-share-label">Teks promosi WhatsApp</label>
+              <textarea id="group-share-body" rows="4" maxlength="4096" placeholder="Tulis atau tampal ayat promosi untuk WhatsApp..."></textarea>
+              <p id="group-share-feedback" class="group-feedback" role="status"></p>
             </div>
             <div class="panel group-job-panel">
               <div class="section-heading"><h2>Jadual Telegram</h2><span class="subtle-label">Kelulusan pengguna diperlukan</span></div>
