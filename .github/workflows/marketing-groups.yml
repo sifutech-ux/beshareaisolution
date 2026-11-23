@@ -1,0 +1,40 @@
+name: BeShare AI Group Distribution
+on:
+  pull_request:
+    paths:
+      - 'marketing/group-manager.js'
+      - 'marketing/group-manager.css'
+      - 'marketing/index.html'
+      - 'marketing/tests/group-navigation.test.mjs'
+      - 'copilot/account/marketing_groups.py'
+      - 'copilot/account/marketing_group_worker.py'
+      - 'copilot/tests/test_marketing_groups.py'
+      - '.github/workflows/marketing-groups.yml'
+permissions:
+  contents: read
+jobs:
+  telegram-group-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Fetch proposed source
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git init .
+          git remote add origin https://github.com/sifutech-ux/beshareaisolution.git
+          git fetch --depth=1 origin "$SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+      - name: Group permissions, privacy and delivery tests
+        env:
+          PYTHONPATH: copilot/account
+          MARKETING_GROUP_WORKER_ENABLED: '0'
+          MARKETING_GROUP_PUBLISH_ENABLED: '0'
+        run: |
+          python3 -m unittest copilot.tests.test_marketing_groups -v
+          python3 -m py_compile copilot/account/marketing_groups.py copilot/account/marketing_group_worker.py
+      - name: Group navigation and browser syntax
+        run: |
+          node --test marketing/tests/group-navigation.test.mjs
+          node --check marketing/group-manager.js
+          node --check marketing/marketing.js
