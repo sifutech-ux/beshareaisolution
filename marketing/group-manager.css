@@ -28,3 +28,10 @@
   .sidebar .nav::-webkit-scrollbar{display:none}
   .sidebar .nav a{flex:0 0 65px;min-width:65px;min-height:49px;justify-content:center}
 }
+
+/* Dedicated WhatsApp composer: do not imply Telegram scheduling equals WhatsApp delivery. */
+.group-share-panel{margin-bottom:20px}
+.group-share-label{display:block;font-size:12px;color:var(--muted);font-weight:550;margin-top:17px;margin-bottom:7px}
+#group-share-body{width:100%;background:#0b1423;border:1px solid #39465c;color:var(--text);border-radius:9px;padding:12px;resize:vertical;min-height:112px}
+#group-share-body:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+#group-job-destination:disabled,.group-job-form button:disabled{opacity:.48;cursor:not-allowed}
