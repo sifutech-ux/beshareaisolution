@@ -63,7 +63,7 @@ class GroupsTest(unittest.TestCase):
         self.assertEqual(self.create()[1]['replayed'], True)
         self.assertEqual(self.call('GET', '', owner=OTHER)[1]['groups'], [])
         self.assertEqual(self.call('DELETE', '/' + GROUP, owner=OTHER)[0], 404)
-        self.assertEqual(self.create(GROUP, owner=OTHER)[0], 201)
+        self.assertEqual(self.create('f' * 32, owner=OTHER)[0], 201)
         self.assertEqual(self.call('GET', '', owner=OWNER)[1]['groups'][0]['name'], 'Group ujian')
 
     def test_whatsapp_manual_never_can_schedule(self):
