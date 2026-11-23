@@ -17,4 +17,4 @@ COPY copilot/account/pelanggan_copilot.py copilot/account/pelanggan_hasil.py \
      copilot/account/pelanggan_marketing.py copilot/account/marketing_social.py \
      copilot/account/marketing_worker.py copilot/account/akaun_pelayan.py \
      copilot/account/marketing_lifecycle.py copilot/account/marketing_groups.py \
-     copilot/account/marketing_group_worker.py /app/
+     copilot/account/marketing_group_worker.py copilot/account/marketing_telegram_discovery.py /app/
