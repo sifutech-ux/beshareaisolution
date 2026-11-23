@@ -460,6 +460,9 @@ def dispatch_marketing(method, path, conn, postgres, owner, payload, stamp):
         connections, capabilities = _provider_status(conn, postgres, owner)
         return 200, {'ok': True, **{resource: _list(conn, postgres, owner, resource) for resource in RESOURCES},
                      'connections': connections, 'capabilities': capabilities}
+    if path == PREFIX + '/groups' or path.startswith(PREFIX + '/groups/'):
+        from marketing_groups import dispatch as dispatch_groups
+        return dispatch_groups(method, path, conn, postgres, owner, payload, stamp)
     if path.startswith(PREFIX + '/connections'):
         provider = _social()
         if provider:

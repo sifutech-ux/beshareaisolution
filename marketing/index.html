@@ -12,6 +12,8 @@
   <script src="../akaun-asal.js" defer></script>
   <script src="core.js?v=20261119receipts1" defer></script>
   <script src="marketing.js?v=20261120directauth1" defer></script>
+  <link rel="stylesheet" href="group-manager.css?v=20261123mvp1">
+  <script src="group-manager.js?v=20261123mvp1" defer></script>
 </head>
 <body>
   <a class="skip" href="#main">Langkau ke kandungan</a>
@@ -38,6 +40,7 @@
         <a href="#ringkasan" data-view="ringkasan" aria-current="page"><svg><use href="#i-grid"/></svg><span>Ringkasan</span></a>
         <a href="#kempen" data-view="kempen"><svg><use href="#i-target"/></svg><span>Kempen</span><span id="nav-campaign-count" class="nav-count" hidden></span></a>
         <a href="#kandungan" data-view="kandungan"><svg><use href="#i-calendar"/></svg><span>Kandungan</span></a>
+        <a href="#kumpulan" data-view="kumpulan"><svg><use href="#i-grid"/></svg><span>Kumpulan &amp; Saluran</span></a>
         <a href="#kajian" data-view="kajian"><svg><use href="#i-search"/></svg><span>Kajian</span></a>
         <a href="#hasil" data-view="hasil"><svg><use href="#i-chart"/></svg><span>Hasil</span></a>
         <a href="#sambungan" data-view="sambungan"><svg><use href="#i-link"/></svg><span>Sambungan</span></a>
@@ -59,6 +62,42 @@
           </section>
           <section data-panel="kempen" hidden aria-label="Kempen"><div class="toolbar"><label class="search-field"><svg><use href="#i-search"/></svg><input id="campaign-search" type="search" placeholder="Cari kempen atau tawaran" aria-label="Cari kempen"></label><label class="filter-label"><span class="sr-only">Status kempen</span><select id="campaign-status"><option value="all">Semua status</option><option value="draft">Draf</option><option value="ready">Sedia digunakan</option><option value="active">Aktif</option><option value="completed">Selesai</option><option value="archived">Arkib</option></select></label></div><div id="campaign-list" class="campaign-grid"></div></section>
           <section data-panel="kandungan" hidden aria-label="Kandungan dan kalendar"><div class="toolbar"><div class="segmented" aria-label="Paparan kandungan"><button type="button" id="show-post-list" aria-pressed="true">Senarai</button><button type="button" id="show-calendar" aria-pressed="false">Kalendar</button></div><label class="filter-label"><span class="sr-only">Kempen kandungan</span><select id="post-campaign-filter"><option value="">Semua kempen</option></select></label><button type="button" class="button secondary" id="new-post"><svg><use href="#i-plus"/></svg>Kandungan baharu</button></div><div class="inline-note"><span class="tiny-dot"></span><p>“Dirancang” ialah rancangan anda. Penerbitan automatik hanya bermula selepas kelulusan dan sambungan saluran tersedia.</p></div><div id="post-list" class="post-grid"></div><div id="calendar-panel" class="panel" hidden><div class="calendar-heading"><div><h2 id="calendar-title"></h2><p class="muted">Waktu Malaysia · UTC+8</p></div><div class="actions"><button class="icon-button" type="button" id="calendar-prev" aria-label="Bulan sebelumnya">‹</button><button class="button quiet" type="button" id="calendar-today">Hari ini</button><button class="icon-button" type="button" id="calendar-next" aria-label="Bulan seterusnya">›</button></div></div><div class="calendar-weekdays" aria-hidden="true"><span>Isn</span><span>Sel</span><span>Rab</span><span>Kha</span><span>Jum</span><span>Sab</span><span>Ahd</span></div><div id="calendar-grid" class="calendar-grid"></div><p class="hint">Kandungan tanpa masa penerbitan kekal dalam paparan Senarai.</p></div></section>
+          <section data-panel="kumpulan" hidden aria-label="Kumpulan dan Saluran">
+            <div class="group-grid">
+              <div class="panel">
+                <div class="section-heading"><h2>Group Manager</h2><span class="subtle-label">Telegram &amp; WhatsApp</span></div>
+                <p class="group-note">Telegram boleh menerima penerbitan automatik selepas pentadbir group atau channel mengesahkan bot. WhatsApp group biasa menggunakan perkongsian manual melalui aplikasi.</p>
+                <form id="group-add-form" class="group-form">
+                  <label>Platform<select id="group-platform" required><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option></select></label>
+                  <label>Pemilikan<select id="group-ownership" required><option value="owned">Group sendiri</option><option value="partner">Group orang lain (dengan izin pentadbir)</option></select></label>
+                  <label>Nama kumpulan<input id="group-name" maxlength="120" placeholder="Contoh: Komuniti Produk" required></label>
+                  <label id="group-chat-wrap">ID atau @username Telegram<input id="group-chat" maxlength="64" placeholder="@komunitianda atau -100..." required></label>
+                  <label class="group-consent"><input id="group-approved" type="checkbox" required> Saya mempunyai izin pentadbir untuk menerbitkan promosi dalam kumpulan ini.</label>
+                  <button class="button primary" type="submit">Tambah kumpulan</button>
+                </form>
+                <p id="group-feedback" class="group-feedback" role="status"></p>
+              </div>
+              <div class="panel">
+                <div class="section-heading"><h2>Destinasi tersimpan</h2><button id="group-refresh" class="button secondary" type="button">Muat semula</button></div>
+                <p id="group-status" class="group-note" role="status">Muat kumpulan selepas log masuk.</p>
+                <div id="group-list" class="group-list"></div>
+              </div>
+            </div>
+            <div class="panel group-job-panel">
+              <div class="section-heading"><h2>Jadual Telegram</h2><span class="subtle-label">Kelulusan pengguna diperlukan</span></div>
+              <p class="group-note">Draf tidak dihantar sehingga anda sendiri menjadualkan penerbitan. Hanya group Telegram yang sudah disahkan pentadbir boleh dipilih.</p>
+              <form id="group-job-form" class="group-job-form">
+                <label>Group Telegram disahkan<select id="group-job-destination" required><option value="">Pilih kumpulan</option></select></label>
+                <label>Tarikh &amp; masa (Malaysia)<input id="group-job-at" type="datetime-local" required></label>
+                <label class="group-body">Teks promosi<textarea id="group-job-body" rows="4" maxlength="4096" placeholder="Tulis atau tampal draf promosi..." required></textarea></label>
+                <label class="group-consent"><input id="group-job-approved" type="checkbox" required> Saya meluluskan kandungan dan jadual penghantaran ini.</label>
+                <button class="button primary" type="submit">Jadualkan Telegram</button>
+              </form>
+              <p id="group-job-feedback" class="group-feedback" role="status"></p>
+              <h3 class="group-history-heading">Sejarah penghantaran</h3>
+              <div id="group-jobs" class="group-list"></div>
+            </div>
+          </section>
           <section data-panel="kajian" hidden aria-label="Kajian pemasaran"><div class="research-intro panel"><div class="research-icon"><svg><use href="#i-search"/></svg></div><div><h2>Asas yang baik bermula dengan pemerhatian.</h2><p>Simpan rujukan yang anda baca. Bezakan perkara yang dilihat dengan andaian yang masih perlu diuji.</p><span class="small-label">RUJUKAN & CATATAN MANUAL</span></div><button type="button" class="button secondary" id="new-source"><svg><use href="#i-plus"/></svg>Tambah rujukan</button></div><div class="toolbar"><label class="filter-label"><span class="sr-only">Kempen kajian</span><select id="source-campaign-filter"><option value="">Semua kempen</option></select></label><p class="muted toolbar-note">Pautan disimpan sebagai rujukan; kandungan laman tidak dibaca secara automatik.</p></div><div id="source-list" class="source-grid"></div></section>
           <section data-panel="hasil" hidden aria-label="Hasil pemasaran"><div class="toolbar"><label class="filter-label"><span class="sr-only">Kempen hasil</span><select id="result-campaign-filter"><option value="">Semua kempen</option></select></label><div class="actions"><button type="button" class="button quiet" id="export-results"><svg><use href="#i-download"/></svg>Eksport CSV</button><button type="button" class="button secondary" id="new-result"><svg><use href="#i-plus"/></svg>Catat hasil</button></div></div><div class="inline-note"><span class="tiny-dot"></span><p>Angka di bawah datang daripada rekod manual anda. Ia belum membuktikan jualan berpunca daripada sesuatu kempen.</p></div><div id="result-metrics" class="metric-grid"></div><section class="panel funnel-panel"><div class="section-heading"><div><h2>Perjalanan pelanggan yang dicatat</h2><p class="muted">Jumlah daripada rekod pilihan, tanpa andaian atribusi.</p></div><span class="small-label">REKOD MANUAL</span></div><div id="result-funnel" class="result-funnel"></div></section><section class="panel table-panel"><div class="section-heading"><h2>Rekod harian</h2><span id="result-count" class="muted"></span></div><div id="result-table"></div></section></section>
           <section data-panel="sambungan" hidden aria-label="Sambungan saluran"><div class="connection-intro"><span class="small-label">AKAUN ANDA, KAWALAN ANDA</span><h2>Sambungkan tempat pelanggan anda berada.</h2><p>Benarkan BeShare menerbitkan kandungan melalui akaun yang anda pilih. Setiap saluran menunjukkan status sebenar sambungannya.</p></div><div id="connection-list" class="connection-grid"></div><section class="panel publishing-note"><svg><use href="#i-calendar"/></svg><div><h3>Rancang dahulu. Terbit selepas diluluskan.</h3><p>Draf boleh disiapkan sebelum akaun disambungkan. Penjadualan akan menyemak sambungan, kandungan dan waktu penerbitan sebelum memasukkan pos ke dalam giliran.</p></div></section></section>

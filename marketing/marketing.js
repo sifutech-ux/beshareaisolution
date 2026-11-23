@@ -15,6 +15,7 @@
     ringkasan: ['RUANG PEMASARAN ANDA', 'Idea yang bergerak.', 'Rancang dengan jelas. Terbit dengan yakin. Fahami hasilnya.'],
     kempen: ['SATU MATLAMAT, SATU ARAH', 'Kempen anda.', 'Satukan tawaran, pelanggan sasaran dan rancangan pelaksanaan.'],
     kandungan: ['KANDUNGAN DENGAN TUJUAN', 'Sedia untuk dikongsi.', 'Tulis, semak dan susun kandungan mengikut saluran.'],
+    kumpulan: ['DISTRIBUSI BERIZIN', 'Kumpulan & saluran.', 'Urus Telegram dan WhatsApp group dengan kebenaran pentadbir.'],
     kajian: ['FAHAMI SEBELUM MELANGKAH', 'Ruang untuk pemerhatian.', 'Kumpulkan rujukan dan andaian yang mahu anda uji.'],
     hasil: ['DARIPADA ANGKA KEPADA LANGKAH', 'Fahami hasil pemasaran.', 'Catat apa yang berlaku. Bina keputusan daripada rekod sebenar.'],
     sambungan: ['SALURAN PEMASARAN', 'Sambungkan perniagaan.', 'Pilih akaun yang digunakan untuk menerbitkan kandungan anda.']
