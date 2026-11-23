@@ -221,7 +221,7 @@ def _claim(conn, postgres, owner, gid, stamp, bot):
     c.execute(f'''INSERT INTO marketing_group_claims
              (code_hash,destination_id,akaun_id,expires_at,consumed_at)
              VALUES ({','.join([p]*5)})''', (digest, gid, owner, int(stamp) + CLAIM_TTL, 0))
-        mode = 'start' if row['chat_ref'] else 'startgroup'
+    mode = 'start' if row['chat_ref'] else 'startgroup'
     # For a private Telegram group the admin selects the group directly,
     # without discovering or pasting its numeric chat ID.
     extra = '&admin=manage_chat' if mode == 'startgroup' else ''
