@@ -96,7 +96,9 @@
             const url = new URL(result.verification_url)
             if (url.protocol !== 'https:' || url.hostname !== 't.me') throw Error('Pautan pengesahan tidak sah.')
             feedback('group-status', 'Buka Telegram, tekan Start sebagai pentadbir group tersebut, kemudian muat semula senarai.')
-            window.open(url.href, '_blank', 'noopener,noreferrer')
+            const link = element('a', 'Buka pautan pengesahan Telegram', 'text-link')
+            link.href = url.href; link.target = '_blank'; link.rel = 'noopener noreferrer'
+            $('group-status').append(document.createTextNode(' '), link)
           } catch (e) { feedback('group-status', e.message, true) }
         }))
       }
