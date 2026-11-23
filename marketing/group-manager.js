@@ -37,6 +37,7 @@
       })
       const result = await response.json().catch(() => ({}))
       if (token !== session()) throw Error('Sesi akaun berubah. Sila muat semula.')
+      if (response.status === 404 && !path) throw Error('Backend Kumpulan & Saluran belum diterbitkan pada pelayan BeShare. Paparan sudah tersedia, tetapi fungsi simpan belum diaktifkan.')
       if (!response.ok || result.ok === false) throw Error(result.error || 'Operasi tidak berjaya.')
       return result
     } finally { clearTimeout(timer) }
