@@ -21,6 +21,10 @@ STAMP = 1795400000
 
 class GroupsTest(unittest.TestCase):
     def setUp(self):
+        # Tests explicitly opt into sending gate; production defaults off.
+        enabled = patch.dict(os.environ, {'MARKETING_GROUP_PUBLISH_ENABLED': '1'})
+        enabled.start()
+        self.addCleanup(enabled.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.db = str(Path(self.directory.name) / 'account.sqlite')
@@ -126,6 +130,145 @@ class GroupsTest(unittest.TestCase):
             self.assertFalse(groups.approve_private_start(conn, False, 22, code, 111, STAMP))
         conn.close()
         self.assertEqual(self.call('GET')[1]['groups'][0]['status'], 'verified')
+
+    def test_publish_gate_rejects_jobs_before_worker_activation(self):
+        self.seed_verified()
+        payload = {'id': JOB, 'destination_id': GROUP, 'body': 'Promosi',
+                   'scheduled_at': STAMP + 300, 'approved': True}
+        with patch.dict(os.environ, {'MARKETING_GROUP_PUBLISH_ENABLED': '0'}):
+            status, data = self.call('POST', '/jobs', payload)
+        self.assertEqual(status, 503, data)
+        con = self.connect()
+        self.assertEqual(con.execute('SELECT COUNT(*) FROM marketing_group_jobs').fetchone()[0], 0)
+        con.close()
+
+    def test_private_group_onboarding_without_numeric_chat_id(self):
+        status, _ = self.create(chat_ref='')
+        self.assertEqual(status, 201)
+        self.assertEqual(self.call('GET')[1]['groups'][0]['status'], 'pending')
+        with patch.dict(os.environ, {'MARKETING_TELEGRAM_BOT_TOKEN': '123456:abcdefghijklmnopqrstuvwxyzABCDE1234567890'}):
+            with patch.object(groups, 'bot_call', return_value={'id': 111, 'username': 'beshare_mvp_bot'}):
+                status, result = self.call('POST', '/' + GROUP + '/verify', {})
+        self.assertEqual(status, 200, result)
+        self.assertEqual(result['verification_mode'], 'group_picker')
+        self.assertIn('?startgroup=', result['verification_url'])
+        self.assertIn('&admin=manage_chat', result['verification_url'])
+        code = result['verification_url'].split('?startgroup=')[1].split('&')[0]
+        chat = {'id': -100123456789, 'type': 'supergroup'}
+        connection = self.connect()
+        with patch.object(groups, 'bot_call', return_value={'status': 'member'}):
+            self.assertFalse(groups.approve_group_start(connection, False, 22, code, 111, chat, STAMP))
+        self.assertEqual(self.call('GET')[1]['groups'][0]['status'], 'pending')
+        with patch.object(groups, 'bot_call', return_value={'status': 'administrator'}):
+            self.assertTrue(groups.approve_group_start(connection, False, 22, code, 111, chat, STAMP))
+            self.assertFalse(groups.approve_group_start(connection, False, 22, code, 111, chat, STAMP))
+        connection.close()
+        verified = self.call('GET')[1]['groups'][0]
+        self.assertEqual(verified['chat_id'], '-100123456789')
+        self.assertEqual(verified['status'], 'verified')
+
+    def test_group_link_is_only_accepted_in_the_target_bot_group(self):
+        self.create(chat_ref='')
+        with patch.dict(os.environ, {'MARKETING_TELEGRAM_BOT_TOKEN': '123456:abcdefghijklmnopqrstuvwxyzABCDE1234567890'}):
+            with patch.object(groups, 'bot_call', return_value={'id': 111, 'username': 'beshare_mvp_bot'}):
+                result = self.call('POST', '/' + GROUP + '/verify', {})[1]
+        code = result['verification_url'].split('?startgroup=')[1].split('&')[0]
+        updates = [
+            {'update_id': 51, 'message': {'chat': {'id': -100123456789, 'type': 'supergroup'},
+                                         'from': {'id': 22}, 'text': '/start@another_bot ' + code}},
+            {'update_id': 52, 'message': {'chat': {'id': -100123456789, 'type': 'supergroup'},
+                                         'from': {'id': 22}, 'text': '/start@beshare_mvp_bot ' + code}},
+        ]
+        def provider(name, params=None):
+            if name == 'getMe':
+                return {'id': 111, 'username': 'beshare_mvp_bot'}
+            if name == 'getUpdates':
+                return updates
+            if name == 'getChatMember':
+                return {'status': 'administrator'}
+            raise AssertionError(name)
+        with patch.dict(os.environ, {'MARKETING_GROUP_WORKER_ENABLED': '1', 'MARKETING_GROUP_PUBLISH_ENABLED': '0'}):
+            with patch.object(groups, 'bot_call', side_effect=provider):
+                result = worker.run_once(self.connect, False, now=STAMP)
+        self.assertEqual(result['verified'], 1)
+        self.assertEqual(result['sent'], 0)
+        self.assertEqual(self.call('GET')[1]['groups'][0]['status'], 'verified')
+        con = self.connect()
+        self.assertEqual(con.execute('SELECT update_id FROM marketing_group_telegram_cursor').fetchone()[0], 52)
+        con.close()
+
+    def test_marketing_router_protects_authenticated_group_endpoint(self):
+        import pelanggan_marketing as marketing
+        self.create()
+        conn = self.connect()
+        try:
+            status, result = marketing.dispatch_marketing(
+                'GET', groups.ROOT, conn, False, OWNER, None, STAMP)
+            self.assertEqual(status, 200, result)
+            self.assertEqual(len(result['groups']), 1)
+            status, result = marketing.dispatch_marketing(
+                'GET', groups.ROOT, conn, False, 'missing', None, STAMP)
+            self.assertEqual(status, 401, result)
+        finally:
+            conn.close()
+
+    def test_successful_send_has_receipt_and_no_duplicate_send(self):
+        self.seed_verified()
+        payload = {'id': JOB, 'destination_id': GROUP, 'body': 'Promosi diluluskan',
+                   'scheduled_at': STAMP, 'approved': True}
+        self.assertEqual(self.call('POST', '/jobs', payload)[0], 201)
+        calls = {'sent': 0}
+        def provider(method, params=None):
+            if method == 'getMe':
+                return {'id': 111, 'username': 'beshare_mvp_bot'}
+            if method == 'getUpdates':
+                return []
+            if method == 'getChatMember':
+                return {'status': 'administrator'}
+            if method == 'sendMessage':
+                calls['sent'] += 1
+                self.assertEqual(params['chat_id'], '-100123456789')
+                self.assertEqual(params['text'], 'Promosi diluluskan')
+                return {'message_id': 44}
+            raise AssertionError(method)
+        with patch.dict(os.environ, {
+                'MARKETING_GROUP_WORKER_ENABLED': '1',
+                'MARKETING_GROUP_PUBLISH_ENABLED': '1'}):
+            with patch.object(groups, 'bot_call', side_effect=provider):
+                first = worker.run_once(self.connect, False, now=STAMP)
+                second = worker.run_once(self.connect, False, now=STAMP + 10)
+        self.assertEqual(first['sent'], 1)
+        self.assertEqual(second['sent'], 0)
+        self.assertEqual(calls['sent'], 1)
+        con = self.connect()
+        self.assertEqual(con.execute('SELECT status,provider_message_id FROM marketing_group_jobs WHERE id=?',
+                                     (JOB,)).fetchone(), ('sent', '44'))
+        con.close()
+
+    def test_revoked_bot_admin_blocks_sending(self):
+        self.seed_verified()
+        payload = {'id': JOB, 'destination_id': GROUP, 'body': 'Promosi',
+                   'scheduled_at': STAMP, 'approved': True}
+        self.assertEqual(self.call('POST', '/jobs', payload)[0], 201)
+        calls = {'sent': 0}
+        def provider(method, params=None):
+            if method == 'getMe':
+                return {'id': 111}
+            if method == 'getUpdates':
+                return []
+            if method == 'getChatMember':
+                return {'status': 'member'}
+            if method == 'sendMessage':
+                calls['sent'] += 1
+                return {'message_id': 45}
+            raise AssertionError(method)
+        with patch.dict(os.environ, {
+                'MARKETING_GROUP_WORKER_ENABLED': '1',
+                'MARKETING_GROUP_PUBLISH_ENABLED': '1'}):
+            with patch.object(groups, 'bot_call', side_effect=provider):
+                result = worker.run_once(self.connect, False, now=STAMP)
+        self.assertEqual(result['failed'], 1)
+        self.assertEqual(calls['sent'], 0)
 
     def test_worker_disabled_and_uncertain_on_lost_response(self):
         self.seed_verified()
