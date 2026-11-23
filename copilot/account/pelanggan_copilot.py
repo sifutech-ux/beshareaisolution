@@ -13,6 +13,8 @@ def ensure_copilot_schema(conn, postgres):
     ensure_hasil_schema(conn, postgres)
     ensure_marketing_schema(conn, postgres)
     ensure_social_schema(conn, postgres)
+    from marketing_groups import ensure_schema as ensure_group_schema
+    ensure_group_schema(conn, postgres)
     cur = conn.cursor()
     cur.execute('''CREATE TABLE IF NOT EXISTS copilot_memory (
         akaun_id TEXT PRIMARY KEY, data_json TEXT NOT NULL, versi INTEGER NOT NULL)''')
