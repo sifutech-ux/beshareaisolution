@@ -442,7 +442,9 @@ adminTest('Deadline, fair cron cursor and disabled archival are bounded and prov
 adminTest('Scheduled pass picks up a later read receipt and the open inbox sees its revision', function () use ($f, $pdo, $a, $b, $config, $connectionA, $wabaA, $phoneA, $now, &$calls): void {
     runtimeSettings($f, $a, $connectionA, 'A', 'all', $now);
     $ai = new AiReplyStore($pdo, $f['seal'], $config);
-    $api = new \BesharOs\AuthHttp($pdo, new \BesharOs\RateLimit(sys_get_temp_dir()), ai: $ai);
+    $rateDirectory = sys_get_temp_dir() . '/beshare-inbox-fixture-' . bin2hex(random_bytes(8));
+    $api = new \BesharOs\AuthHttp($pdo, new \BesharOs\RateLimit($rateDirectory), ai: $ai);
+    register_shutdown_function(static fn () => rmdir($rateDirectory));
     $poll = static function (array $tenant, string $revision = '') use ($api): array {
         $session = ['user_id' => $tenant['owner_id'], 'business_id' => $tenant['business_id']];
         return $api->handle('GET', 'petikini', $session, [], ['x-inbox-revision' => $revision], '127.0.0.1', 'fixture.invalid')['body'];
