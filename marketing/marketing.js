@@ -78,6 +78,7 @@
     state.epoch++; state.owner = null; state.account = null; state.token = null; state.ready = false
     for (const k of ['campaigns', 'posts', 'sources', 'results', 'connections']) state[k] = []
     state.capabilities = {}; aiController?.abort(); aiController = null; aiSignature = ''; aiKey = ''; aiTarget = null; aiDraftContext = null
+    clearAIQuestion()
     for (const key of Object.keys(editors)) delete editors[key]
     document.querySelectorAll('dialog[open]').forEach(d => d.close())
     document.querySelectorAll('dialog form').forEach(f => f.reset())
@@ -833,9 +834,13 @@
     else for (const platform of c.channels?.length ? c.channels : ['facebook', 'instagram', 'threads']) { try { const link = C.utm(c.destination_url, platform, c.id), row = el('div', undefined, 'utm-row'), lab = el('label', C.PLATFORM[platform]), field = el('input'); field.value = link; field.readOnly = true; lab.append(field); const act = el('div', undefined, 'actions'); act.append(button('Salin pautan', () => copy(link, 'links-feedback', field), 'button secondary')); row.append(lab, act); host.append(row) } catch { host.append(el('p', 'Pautan destinasi perlu disemak sebelum pautan UTM boleh dibina.', 'hint')) } }
     showDialog('links-dialog')
   }
+  function clearAIQuestion() {
+    $('ai-question-wrap').hidden = true; $('ai-question').textContent = ''; $('ai-answer').value = ''
+  }
   function openAI() {
     const p = editors.post; if (!p || p.saving) return
     aiTarget = p.item.id; campaignOptions($('ai-campaign'), { current: $('post-campaign').value }); $('ai-platform').value = $('post-platform').value
+    clearAIQuestion(); $('ai-instruction').value = ''
     aiDraftContext = null; $('ai-output-wrap').hidden = true; $('ai-output').value = ''; $('ai-use').disabled = true; feedback('ai'); showDialog('ai-dialog')
   }
   async function generateAI(event) {
@@ -843,7 +848,18 @@
     if (!live(state.epoch, state.token)) { resetMemory(); bootstrap(); return }
     const c = state.campaigns.find(x => x.id === $('ai-campaign').value), platform = $('ai-platform').value
     if (!c) { feedback('ai', 'Pilih kempen yang sudah disimpan.', 'error'); return }
-    const prompt = 'Bantu siapkan satu draf kandungan pemasaran dalam Bahasa Melayu untuk ' + C.PLATFORM[platform] + '. Gunakan hanya fakta kempen yang diberikan. Jangan reka harga, diskaun, testimoni, hasil terjamin atau stok. Jika fakta tidak cukup, nyatakan maklumat yang diperlukan. Berikan teks kandungan yang boleh disemak dan digunakan, tanpa menerbitkan apa-apa. ' + (platform === 'threads' ? 'Pastikan teks pendek, maksimum 450 aksara.' : platform === 'instagram' ? 'Kapsyen maksimum 2000 aksara.' : '') + '\n\n' + C.brief(c) + '\n\nArahan tambahan: ' + ($('ai-instruction').value.trim() || 'Nada jelas, mesra dan bersahaja. Satu ajakan tindakan.')
+    const details = { arahan_peniaga: $('ai-instruction').value.trim(), destinasi: c.destination_url }
+    if (c.id === $('post-campaign').value && $('post-body').value.trim()) details.teks_asal_peniaga = $('post-body').value.trim()
+    if (!$('ai-question-wrap').hidden) {
+      const answer = $('ai-answer').value.trim()
+      if (!answer) { feedback('ai', 'Isi jawapan ringkas dahulu.'); $('ai-answer').focus(); return }
+      details.penjelasan = { soalan: $('ai-question').textContent, jawapan: answer }
+    }
+    if (aiDraftContext?.campaignId === c.id && aiDraftContext.platform === platform) {
+      details.pembukaan_terdahulu = aiDraftContext.opening
+      details.arahan_variasi = 'Pilih sudut pembukaan yang berbeza. Draf terdahulu hanya rujukan gaya.'
+    }
+    const prompt = C.copyPrompt(platform, c, details)
     if (aiSignature !== prompt || !aiKey) { aiSignature = prompt; aiKey = C.id() }
     const controller = new AbortController(); aiController = controller; const epoch = state.epoch, token = state.token
     $('ai-generate').disabled = true; $('ai-use').disabled = true
@@ -852,9 +868,19 @@
       const data = await request('/api/marketing/draf', { ai: true, method: 'POST', body: { giliran: C.promptTurns(prompt) }, signal: controller.signal, key: aiKey })
       if (epoch !== state.epoch || aiController !== controller || controller.signal.aborted) return
       if (data.ok !== true || data.bukan_model !== false || typeof data.jawapan !== 'string' || !data.jawapan.trim() || !['openai', 'gemini', 'tersimpan'].includes(data.sumber) || (data.sumber === 'tersimpan' && data.main_semula !== true)) throw Error('Draf AI belum dapat disahkan. Anda boleh terus menulis kandungan sendiri.')
-      const output = [data.jawapan, ...(Array.isArray(data.langkah) ? data.langkah.filter(x => typeof x === 'string') : [])].join('\n\n')
-      $('ai-output').value = output.slice(0, 5000); $('ai-output-wrap').hidden = false; aiDraftContext = { campaignId: c.id, platform }
+      const output = data.jawapan.trim(), question = C.merchantQuestion(output)
       aiSignature = ''; aiKey = ''
+      if (question) {
+        if (details.penjelasan) {
+          feedback('ai', 'Maklumat masih belum mencukupi. Sunting jawapan atau arahan anda sebelum menjana semula.')
+        } else {
+          $('ai-question').textContent = question; $('ai-question-wrap').hidden = false
+          feedback('ai', 'Jawab soalan ini dan tekan Jana draf.')
+        }
+        return
+      }
+      $('ai-output').value = output.slice(0, 5000); $('ai-output-wrap').hidden = false
+      aiDraftContext = { campaignId: c.id, platform, opening: output.split('\n')[0].slice(0, 180) }
       feedback('ai', output.length > 5000 ? 'Draf diterima. Paparan dihadkan kepada 5,000 aksara; ringkaskan dan semak sebelum digunakan.' : 'Draf AI siap. Semak dan sunting sebelum menggunakannya.', 'success')
     } catch (error) {
       if (epoch !== state.epoch || aiController !== controller || controller.signal.aborted) return
@@ -908,6 +934,8 @@
   mediaDrop.addEventListener('drop', event => { event.preventDefault(); mediaDrop.classList.remove('dragging'); if (!$('post-file').disabled) return choosePostFiles([...(event.dataTransfer?.files || [])]) })
   $('copy-post').addEventListener('click', () => copy($('post-body').value, 'post-feedback', $('post-body')))
   $('post-ai').addEventListener('click', openAI); $('ai-form').addEventListener('submit', generateAI); $('ai-use').addEventListener('click', useAI)
+  $('ai-campaign').addEventListener('change', clearAIQuestion); $('ai-platform').addEventListener('change', clearAIQuestion)
+  $('ai-instruction').addEventListener('input', clearAIQuestion)
   $('export-results').addEventListener('click', () => { const rows = selectedResults(); if (rows.length) download('beshare-hasil-' + C.malaysiaDate() + '.csv', C.csv(rows, state.campaigns), 'text/csv;charset=utf-8') })
   $('refresh-workspace').addEventListener('click', bootstrap); $('gate-retry').addEventListener('click', bootstrap)
   $('marketing-logout').addEventListener('click', signOutMarketing)

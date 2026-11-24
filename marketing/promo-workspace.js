@@ -162,10 +162,10 @@ window.BeSharePromos = function ({ state, request, campaignOptions, el, API }) {
     if (generation || writing || !plan()) return
     const ticket = version, page = read(), isPage = kind === 'page'
     const out = $(isPage ? 'promo-feedback' : 'search-feedback')
-    if (!page.business || !page.area || !page.offer) { out.textContent = 'Isi nama perniagaan, kawasan dan tawaran dahulu.'; return }
-    const ask = isPage ? 'Tulis teks tawaran untuk halaman promosi, maksimum 2000 aksara. Beri teks akhir sahaja.'
-      : 'Sediakan satu kumpulan iklan Google Search. Jawab dengan objek JSON sahaja: keywords (senarai frasa carian), negatives (senarai kata kunci pengecualian yang sesuai), headlines (3 tajuk berbeza, maks 30 aksara setiap satu), descriptions (2 perihalan berbeza, maks 90 aksara setiap satu).'
-    const prompt = ask + '\nDalam Bahasa Melayu. Gunakan fakta yang diberikan sahaja. Jangan reka harga, diskaun, jaminan atau statistik.\n' + JSON.stringify({ ...page, image: undefined, product: plan().product, audience: plan().audience })
+    const prompt = C.copyPrompt(isPage ? 'page' : 'google_ads', plan(), {
+      perniagaan: page.business, kawasan: page.area, tajuk_halaman: page.title,
+      tawaran_semasa: page.offer, butang_tindakan: page.cta
+    })
     if (keys[kind]?.prompt !== prompt) keys[kind] = { prompt, id: C.id() }
     const controller = new AbortController()
     generation = controller
@@ -176,6 +176,11 @@ window.BeSharePromos = function ({ state, request, campaignOptions, el, API }) {
       if (!valid(ticket)) return
       if (result.ok !== true || result.bukan_model !== false || !['openai', 'gemini', 'tersimpan'].includes(result.sumber) || (result.sumber === 'tersimpan' && !result.main_semula) || !result.jawapan?.trim()) throw Error('Draf AI belum tersedia.')
       delete keys[kind]
+      const question = C.merchantQuestion(result.jawapan)
+      if (question) {
+        out.textContent = question + ' Tambah butiran pada halaman promosi, kemudian jana semula.'
+        return
+      }
       if (isPage) $('promo-offer').value = result.jawapan.trim().slice(0, 2000)
       else {
         const answer = result.jawapan.trim().replace(/^\x60{3}(?:json)?\s*|\s*\x60{3}$/gi, '')
