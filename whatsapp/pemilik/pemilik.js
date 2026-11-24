@@ -12,7 +12,7 @@ const h = value => String(value ?? '').replace(/[&<>"']/g, character => ({
 })[character]);
 const count = value => Number.isSafeInteger(Number(value)) && Number(value) >= 0 ? Number(value) : 0;
 const formatCount = value => new Intl.NumberFormat('ms-MY').format(count(value));
-const successStates = new Set(['succeeded', 'ready', 'registered', 'already_registered', 'refreshed', 'completed', 'updated', 'active', 'suspended', 'enabled', 'disabled']);
+const successStates = new Set(['subscribed', 'succeeded', 'ready', 'registered', 'already_registered', 'refreshed', 'completed', 'updated', 'active', 'suspended', 'enabled', 'disabled']);
 const attentionStates = new Set(['unknown', 'blocked', 'pending', 'checking', 'registering', 'in_progress']);
 const readinessLabels = {
   ready: ['Sedia digunakan', 'green'], pending: ['Menunggu pengaktifan', 'amber'],
@@ -212,6 +212,7 @@ function connectionCard(connection) {
     : connection.readiness === 'ready' ? 'Nombor sedia digunakan. Aktiviti mesej dan tetapan AI dipaparkan secara berasingan.'
       : 'Semak keadaan sambungan untuk mengetahui tindakan seterusnya.');
   const actions = [];
+  if (connection.can_subscribe === true) actions.push(`<button type="button" class="button button-primary" data-action="webhook" data-connection="${h(connection.id)}">Sambungkan webhook</button>`);
   if (connection.can_refresh === true) actions.push(`<button type="button" class="button button-quiet" data-action="refresh" data-connection="${h(connection.id)}"><span aria-hidden="true">↻</span> Kemas kini status</button>`);
   if (connection.can_activate === true && !unknown) actions.push(`<button type="button" class="button button-primary" data-action="activate" data-connection="${h(connection.id)}">Lengkapkan pengaktifan WhatsApp</button>`);
   return `<article class="connection-card"><div class="connection-top"><div><h4 class="connection-phone">${h(connection.phone || 'Nombor belum dipaparkan')}</h4><div class="connection-mode">${h(mode)}</div></div>${readiness(connection.readiness)}</div>
@@ -223,6 +224,7 @@ function connectionCard(connection) {
 const auditLabels = {
   platform_akses_suspended: 'Akses BeShare digantung', platform_akses_active: 'Akses BeShare diaktifkan',
   platform_ai_dihidupkan: 'AI Auto Reply dihidupkan', platform_ai_dihentikan: 'AI Auto Reply dimatikan',
+  webhook_disambungkan: 'Langganan webhook disahkan',
   admin_whatsapp_semakan: 'Semakan status WhatsApp dimulakan', admin_whatsapp_pendaftaran: 'Pendaftaran nombor WhatsApp dimulakan',
   admin_whatsapp_keputusan: 'Keputusan tindakan WhatsApp direkodkan',
   platform_access_suspended: 'Akses BeShare digantung', platform_access_active: 'Akses BeShare diaktifkan',
@@ -315,11 +317,12 @@ function requestAction(action, connectionId = null) {
   const customer = state.detail.customer;
   const ai = state.detail.ai || {};
   let title, message, note, label, body, phone = '';
-  if (action === 'refresh' || action === 'activate') {
+  if (['refresh', 'activate', 'webhook'].includes(action)) {
     const id = Number(connectionId);
     const connection = state.detail.connections.find(item => Number(item.id) === id);
     if (!connection || !Number.isSafeInteger(id) || id < 1) return;
     if (action === 'activate' && (connection.can_activate !== true || connection.operation_status === 'unknown')) return;
+    if (action === 'webhook' && connection.can_subscribe !== true) return;
     if (action === 'refresh' && connection.can_refresh !== true) return;
     phone = connection.phone || '';
     body = { public_id: customer.public_id, connection_id: id, expected_phone: phone, confirmed: true };
@@ -327,6 +330,12 @@ function requestAction(action, connectionId = null) {
     message = action === 'activate' ? 'Sistem akan meneruskan pengaktifan nombor WhatsApp yang telah pelanggan sambungkan.' : 'Sistem akan mendapatkan keadaan sambungan daripada Meta dan mengemas kini rekod pelanggan.';
     note = action === 'activate' ? 'Pengaktifan ini tidak menghidupkan AI Auto Reply. Keputusan akan dipaparkan selepas tindakan selesai.' : 'Tindakan ini tidak menghantar mesej atau mendaftarkan semula nombor.';
     label = action === 'activate' ? 'Lengkapkan pengaktifan' : 'Kemas kini status';
+    if (action === 'webhook') {
+      title = 'Sambungkan webhook?';
+      message = 'Benarkan BeShare menerima pemberitahuan daripada Meta untuk akaun WhatsApp perniagaan ini.';
+      note = 'Meta akan mengesahkan langganan untuk akaun WhatsApp yang memiliki nombor ini.';
+      label = 'Sambungkan webhook';
+    }
   } else if (action === 'access') {
     if (!['active', 'suspended'].includes(customer.access_status)) return;
     const suspended = customer.access_status === 'suspended';

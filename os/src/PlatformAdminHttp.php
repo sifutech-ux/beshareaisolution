@@ -10,7 +10,7 @@ require_once __DIR__ . "/CredentialSession.php";
 /** An explicit platform boundary; never derives operator power from tenant roles. */
 final class PlatformAdminHttp
 {
-    public function __construct(private PDO $pdo,private RateLimit $rates,private PlatformAdminStore $store,private ?AdminWhatsAppActivation $activation=null) {}
+    public function __construct(private PDO $pdo,private RateLimit $rates,private PlatformAdminStore $store,private ?AdminWhatsAppActivation $activation=null,private ?WhatsAppWebhookSubscription $subscription=null) {}
 
     public function handle(string $method,string $action,array &$session,array $input,array $headers,string $remote,string $host,string $scheme='https'): array
     {
@@ -29,7 +29,7 @@ final class PlatformAdminHttp
         }
         $this->origin($headers,$host,$scheme);
         Csrf::check($session,(string)($headers['x-csrf-token']??''));
-        if(!in_array($action,['refresh','activate','access','ai'],true)){throw new AuthException('Tindakan tidak dikenali.',404);}
+        if(!in_array($action,['refresh','activate','webhook','access','ai'],true)){throw new AuthException('Tindakan tidak dikenali.',404);}
         if(($input['confirmed']??false)!==true){throw new AuthException('Sahkan pelanggan dan tindakan yang dipilih.',400);}
         $publicId=$this->text($input,'public_id');
         $key='platform|'.$admin['user_id'].'|'.$action.'|'.$remote;
@@ -41,11 +41,17 @@ final class PlatformAdminHttp
             if(!is_bool($input['enabled']??null)||!is_int($input['expected_revision']??null)){throw new AuthException('Tetapan AI tidak sah.',400);}
             $result=$this->store->setAi($admin,$publicId,$input['enabled'],$input['expected_revision']);
         } else {
-            if(!$this->activation instanceof AdminWhatsAppActivation){throw new AuthException('Perkhidmatan pengaktifan WhatsApp belum tersedia.',503);}
             $id=$input['connection_id']??null;
             if(!is_int($id)||$id<1||$id>9007199254740991){throw new AuthException('Sambungan tidak sah.',400);}
-            $this->store->assertTargetPhone($publicId,$id,$this->text($input,'expected_phone'));
-            $result=$action==='activate'?$this->activation->activate($admin,$publicId,$id):$this->activation->refresh($admin,$publicId,$id);
+            $phone = $this->text($input,'expected_phone');
+            $businessId = $this->store->assertTargetPhone($publicId,$id,$phone);
+            if ($action === 'webhook') {
+                if (!$this->subscription) { throw new AuthException('Perkhidmatan webhook belum tersedia.',503); }
+                $result = $this->subscription->connect($businessId,$admin['user_id'],$id,$phone);
+            } else {
+                if (!$this->activation) { throw new AuthException('Perkhidmatan pengaktifan WhatsApp belum tersedia.',503); }
+                $result=$action==='activate'?$this->activation->activate($admin,$publicId,$id):$this->activation->refresh($admin,$publicId,$id);
+            }
         }
         return $this->respond($session,['result'=>$result]);
     }

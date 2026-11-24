@@ -139,6 +139,14 @@ f.evaluate('state.detail.ai.can_enable = false');
 f.call('requestAction', 'ai');
 check('Unavailable AI cannot be enabled through the UI', f.evaluate('state.pending') === null);
 f.evaluate('state.detail.ai.can_enable = true');
+f.evaluate("state.detail.connections[0].can_subscribe = true; renderDetail(state.detail)");
+check('Webhook action is shown on the selected number', f.node('detailContent').innerHTML.includes('data-action="webhook" data-connection="101"'));
+f.call('requestAction', 'webhook', 101);
+check('Webhook confirmation is bound to the displayed customer, connection and phone', f.evaluate("state.pending.action === 'webhook' && state.pending.body.connection_id === 101 && state.pending.body.public_id === state.selected && state.pending.body.expected_phone === state.detail.connections[0].phone"));
+f.call('cancelConfirm');
+f.evaluate('state.detail.connections[0].can_subscribe = false');
+f.call('requestAction', 'webhook', 101);
+check('Unavailable webhook action cannot be submitted', f.evaluate('state.pending') === null);
 f.call('requestAction', 'activate', 999);
 check('A connection not belonging to the selected customer cannot be submitted', f.evaluate('state.pending') === null);
 

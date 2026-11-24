@@ -11,6 +11,8 @@ use BesharOs\PrivateConfig;
 use BesharOs\RateLimit;
 use BesharOs\SessionCookie;
 use BesharOs\TokenSeal;
+use BesharOs\StreamMetaTransport;
+use BesharOs\WhatsAppWebhookSubscription;
 use BesharOs\WhatsAppGateway;
 
 if (PHP_SAPI === 'cli') {
@@ -73,10 +75,13 @@ try {
     $private = PrivateConfig::load();
     $secret = is_array($private) ? (string) ($private['app_secret'] ?? '') : '';
     $seal = TokenSeal::tryFrom(is_array($private) ? $private : null);
+    $subscription = null;
     $gateway = null;
     if ($secret !== '' && $seal instanceof TokenSeal && BESHARE_META_APP_ID !== '') {
         try {
             $gateway = new WhatsAppGateway($pdo, new MetaGraph(BESHARE_META_APP_ID, $secret, BESHARE_META_GRAPH), $seal, BESHARE_META_APP_ID);
+            $subscription = new WhatsAppWebhookSubscription($pdo,
+                new MetaGraph(BESHARE_META_APP_ID, $secret, BESHARE_META_GRAPH, new StreamMetaTransport()), $seal, BESHARE_META_APP_ID);
         } catch (AuthException) {
             $gateway = null;
         }
@@ -102,7 +107,7 @@ try {
     if (is_array($billingConfig)) {
         try { $billing = new \BesharOs\StripeBilling($pdo, $billingConfig); } catch (AuthException) { $billing = null; }
     }
-    $http = new AuthHttp($pdo, new RateLimit(RateLimit::resolveDirectory()), $gateway, $ai, $knowledge, $recovery, $preview, $billing);
+    $http = new AuthHttp($pdo, new RateLimit(RateLimit::resolveDirectory()), $gateway, $ai, $knowledge, $recovery, $preview, $billing, $subscription);
     $result = $http->handle($method, $action, $_SESSION, $body, $headers, $remote, $host, session_id());
     if ($result['regenerate']) {
         session_regenerate_id(true);

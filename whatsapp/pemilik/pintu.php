@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+use BesharOs\WhatsAppWebhookSubscription;
 use BesharOs\AdminWhatsAppActivation;
 use BesharOs\AuthException;
 use BesharOs\CloudPhoneRegistration;
@@ -45,13 +46,14 @@ try {
         if(!is_array($input)||($input!==[]&&array_is_list($input))){throw new AuthException('JSON tidak sah.',400);}
     }
     $pdo=Db::connect();
-    $private=PrivateConfig::load()??[]; $seal=TokenSeal::tryFrom($private); $activation=null;
+    $private=PrivateConfig::load()??[]; $seal=TokenSeal::tryFrom($private); $activation=null; $subscription=null;
     if($seal instanceof TokenSeal&&!empty($private['app_secret'])&&BESHARE_META_APP_ID!=='') {
         $transport=new StreamMetaTransport();
         $graph=new MetaGraph(BESHARE_META_APP_ID,$private['app_secret'],BESHARE_META_GRAPH,$transport);
+        $subscription=new WhatsAppWebhookSubscription($pdo,$graph,$seal,BESHARE_META_APP_ID);
         $activation=new AdminWhatsAppActivation($pdo,$graph,$seal,BESHARE_META_APP_ID,new CloudPhoneRegistration(BESHARE_META_GRAPH,$transport));
     }
-    $http=new PlatformAdminHttp($pdo,new RateLimit(RateLimit::resolveDirectory(),20,60),new PlatformAdminStore($pdo,$private,$activation!==null),$activation);
+    $http=new PlatformAdminHttp($pdo,new RateLimit(RateLimit::resolveDirectory(),20,60),new PlatformAdminStore($pdo,$private,$activation!==null),$activation,$subscription);
     $headers=['x-csrf-token'=>(string)($_SERVER['HTTP_X_CSRF_TOKEN']??'')];
     if(isset($_SERVER['HTTP_ORIGIN'])){$headers['origin']=(string)$_SERVER['HTTP_ORIGIN'];}
     $result=$http->handle($method,$action,$_SESSION,$input,$headers,(string)($_SERVER['REMOTE_ADDR']??'0'),(string)($_SERVER['HTTP_HOST']??''),$secure?'https':'http');
