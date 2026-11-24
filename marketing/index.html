@@ -8,12 +8,13 @@
   <meta name="robots" content="noindex,nofollow">
   <title>Marketing — BeShare AI</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="marketing.css?v=post-ads1">
+  <link rel="stylesheet" href="marketing.css?v=simulasi1">
   <script src="../akaun-asal.js" defer></script>
   <script src="core.js?v=20261119receipts1" defer></script>
-  <script src="facebook-ads.js?v=post-ads1" defer></script>
-  <script src="post-ads.js?v=2" defer></script>
-  <script src="marketing.js?v=post-ads1" defer></script>
+  <script src="ad-simulation.js?v=1" defer></script>
+  <script src="facebook-ads.js?v=simulasi1" defer></script>
+  <script src="post-ads.js?v=simulasi1" defer></script>
+  <script src="marketing.js?v=simulasi1" defer></script>
   <link rel="stylesheet" href="group-manager.css?v=20261123groupconnect2">
   <script src="group-manager.js?v=20261123groupconnect2" defer></script>
 </head>
@@ -78,7 +79,7 @@
             <div id="ads-work" hidden>
               <section id="ads-from-post" class="panel ads-panel" hidden>
                 <h2>Jadikan hantaran Facebook sebagai iklan</h2>
-                <p>Pilih hantaran Facebook yang sudah diterbitkan dan tentukan ke mana pelanggan pergi selepas mengklik iklan.</p>
+                <p>Pilih hantaran, cuba simulasi bajet dan semak sasaran sebelum meluluskan iklan.</p>
                 <a class="button secondary" href="#kandungan">Pilih hantaran</a>
               </section>
               <section class="panel ads-panel">
@@ -202,6 +203,14 @@
 
   <dialog id="links-dialog" class="editor-dialog" aria-labelledby="links-dialog-title"><div class="dialog-header"><div><p class="eyebrow">PAUTAN KEMPEN</p><h2 id="links-dialog-title">Kenal pasti sumber lawatan</h2></div><button class="icon-button" type="button" data-close="links-dialog" aria-label="Tutup pautan kempen"><svg><use href="#i-close"/></svg></button></div><div class="dialog-body"><p class="muted">Pautan UTM membezakan saluran yang membawa lawatan. Analitik destinasi perlu merekod parameter ini untuk menghasilkan laporan.</p><div id="utm-links"></div><p id="links-feedback" class="form-feedback" role="status"></p></div></dialog>
 
+  <dialog id="ads-outcome-dialog" class="editor-dialog" aria-labelledby="ads-outcome-title">
+    <div class="dialog-header"><h2 id="ads-outcome-title">Sasaran dan hasil sebenar</h2><button class="icon-button" type="button" aria-label="Tutup" data-close="ads-outcome-dialog"><svg><use href="#i-close"/></svg></button></div>
+    <div class="dialog-body"><strong id="ads-outcome-campaign"></strong><p id="ads-outcome-status" role="status"></p>
+      <section id="ads-outcome-values" class="ad-simulation" hidden><p id="ads-outcome-goal"></p><p id="ads-outcome-actual"></p><p id="ads-outcome-range"></p>
+        <form id="ads-orders-form"><label>Tempahan sebenar mengikut rekod anda <input id="ads-orders" type="number" required min="0" step="1" max="10000000"></label>
+        <button class="button secondary" type="submit">Simpan jumlah tempahan</button></form></section>
+    </div>
+  </dialog>
   <dialog id="boost-dialog" class="editor-dialog" aria-labelledby="boost-title">
     <div class="dialog-header"><h2 id="boost-title">Jadikan iklan</h2><button type="button" class="icon-button" data-close="boost-dialog" aria-label="Tutup"><svg><use href="#i-close"/></svg></button></div>
     <div class="dialog-body">
@@ -220,12 +229,30 @@
         <label>Jumlah bajet sepanjang kempen <input id="boost-budget" type="number" min="0.01" step="0.01" placeholder="Contoh 60.00" required></label>
         <div class="form-row"><label>Tempoh (hari) <input id="boost-days" type="number" min="1" max="30" value="3" required></label>
           <label>Negara audiens <select id="boost-country"><option value="MY">Malaysia</option><option value="SG">Singapura</option><option value="BN">Brunei</option><option value="ID">Indonesia</option><option value="TH">Thailand</option><option value="AU">Australia</option><option value="GB">United Kingdom</option><option value="US">Amerika Syarikat</option></select></label></div>
+        <fieldset class="ad-simulation">
+          <legend>Simulasi iklan</legend>
+          <div class="form-row"><label>Hasil yang mahu diukur <select id="boost-goal">
+            <option value="primary">Mengikut destinasi</option><option value="reach">Orang dicapai</option>
+            <option value="engagement">Interaksi hantaran</option></select></label>
+            <label>Jumlah sasaran <input type="number" id="boost-target" min="1" max="10000000" step="1" placeholder="Contoh 30"></label></div>
+          <p class="hint" id="boost-goal-hint">Masukkan sasaran untuk melihat simulasi dalam pratonton.</p>
+        </fieldset>
         <button class="button secondary" id="boost-preview" type="submit">Lihat pratonton</button>
       </form>
       <section id="boost-review" hidden aria-label="Pratonton iklan">
         <h3 id="boost-page"></h3><p id="boost-copy"></p><img id="boost-picture" alt="Media hantaran Facebook" hidden>
         <a id="boost-original" class="text-link" target="_blank" rel="noopener noreferrer">Buka hantaran asal</a>
         <p id="boost-destination"></p><p id="boost-summary"></p>
+        <section class="ad-simulation" id="boost-simulation" hidden aria-labelledby="boost-sim-title">
+          <h3 id="boost-sim-title">Simulasi iklan</h3>
+          <strong id="boost-threshold"></strong><p id="boost-estimate"></p><p class="hint" id="boost-audience" hidden></p>
+          <details><summary>Cuba kos setiap hasil sendiri</summary>
+            <label>Andaian kos setiap hasil <input id="boost-rate" type="number" min="0.01" step="0.01" placeholder="Contoh 6.00"></label>
+            <p class="hint" id="boost-whatif" aria-live="polite"></p>
+          </details><p id="boost-advice"></p>
+          <div class="actions"><button type="button" class="button secondary" id="boost-scenario">Cuba bajet lain</button>
+            <button type="button" class="button quiet" id="boost-rewrite">Sediakan draf baharu dengan AI</button></div>
+        </section>
         <form id="boost-approval">
           <label class="ads-confirm"><input type="checkbox" id="boost-ordinary" required> Saya mengesahkan iklan ini di luar kategori iklan khas Meta.</label>
           <div class="actions"><button type="button" class="button quiet" id="boost-edit">Ubah tetapan</button><button type="submit" id="boost-launch" class="button primary">Luluskan belanja dan hantar iklan</button></div>

@@ -97,6 +97,8 @@ def _report(conn, postgres, owner, payload, stamp, transport):
         rows.append({'id': social._numeric_id(row.get('id')), 'name': str(row.get('name') or '')[:250],
                      'status': str(row.get('effective_status') or '')[:48],
                      'metrics': {k: str(stats[k]) for k in metrics.split(',') if k in stats} if stats else None})
+    from marketing_ad_simulation import for_report
+    for_report(conn, postgres, owner, payload['account_id'], rows)
     current, _ = _connection(conn, postgres, owner, payload['account_id'], stamp)
     if current['token_cipher'] != grant['token_cipher']:
         raise social.SocialError('Sambungan telah berubah. Muat semula laporan.', 409, 'account_changed')
@@ -163,12 +165,12 @@ def _create(conn, postgres, owner, payload, stamp, transport):
 
 
 def dispatch(method, action, conn, postgres, owner, payload, stamp, transport=None):
-    if method != 'POST' or action not in {'report', 'campaigns', 'post-preview', 'post-launch'}:
+    if method != 'POST' or action not in {'report', 'campaigns', 'post-preview', 'post-launch', 'post-outcome', 'post-orders'}:
         return 404, {'ok': False, 'error': 'Endpoint tidak ditemui.'}
     if not isinstance(payload, dict) or not isinstance(payload.get('account_id'), str) or not social.PERSON_ID.fullmatch(payload['account_id']):
         return 400, {'ok': False, 'error': 'Akaun iklan tidak sah.'}
     try:
-        if action in {'post-preview', 'post-launch'}:
+        if action in {'post-preview', 'post-launch', 'post-outcome', 'post-orders'}:
             from marketing_post_ads import dispatch as dispatch_post
             return dispatch_post(action, conn, postgres, owner, payload, stamp, transport)
         operation = _report if action == 'report' else _create

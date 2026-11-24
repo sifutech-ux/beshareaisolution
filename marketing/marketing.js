@@ -52,7 +52,11 @@
     } finally { clearTimeout(timeout); signal?.removeEventListener('abort', relay) }
   }
   const ads = window.BeShareFacebookAds?.({ state, request, connection, beginConnect, disconnect, el, live, API })
-  const postAds = window.BeSharePostAds?.({ state, request, connection, live, API })
+  const postAds = window.BeSharePostAds?.({ state, request, connection, live, API, draftAd(plan, brief) {
+    openPost(null, { campaign_id: plan, platform: 'facebook' })
+    openAI()
+    $('ai-instruction').value = brief
+  } })
   function resetMemory() {
     postAds?.reset()
     ads?.reset()

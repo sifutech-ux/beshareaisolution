@@ -8,7 +8,11 @@ window.BeShareFacebookAds = function ({ state, request, connection, beginConnect
   let reportVersion = 0, createVersion = 0, accountId = '', after = '', creating = false
   const source = () => connection('facebook_ads')
   const plans = () => state.campaigns.filter(plan => !['completed', 'archived'].includes(plan.status))
+  let selection = null
+  $('outcome-dialog').addEventListener('close', () => { if (!$('outcome-dialog').open) selection = null })
   function reset() {
+    selection = null
+    if ($('outcome-dialog').open) $('outcome-dialog').close()
     reportVersion++; createVersion++
     accountId = ''; after = ''; creating = false
     $('rows').replaceChildren(); $('plan').replaceChildren(); $('form').reset()
@@ -65,6 +69,12 @@ window.BeShareFacebookAds = function ({ state, request, connection, beginConnect
         const values = [item.name, statusLabels[item.status] || item.status || '—',
           metric(item.metrics, 'spend'), metric(item.metrics, 'impressions'), metric(item.metrics, 'clicks')]
         for (const value of values) tr.append(el('td', value))
+        if (item.simulation_post) {
+          const button = el('button', 'Banding dengan simulasi', 'text-button')
+          button.type = 'button'
+          button.addEventListener('click', () => openOutcome(item))
+          tr.firstElementChild.append(document.createElement('br'), button)
+        }
         $('rows').append(tr)
       }
       after = data.after
@@ -77,6 +87,42 @@ window.BeShareFacebookAds = function ({ state, request, connection, beginConnect
       if (current()) { $('refresh').disabled = false; $('more').hidden = !after }
     }
   }
+  function selected(s) {
+    return s === selection && $('outcome-dialog').open && live(s.epoch, s.token) && s.body.account_id === accountId
+  }
+  async function openOutcome(item) {
+    const s = { epoch: state.epoch, token: state.token, body: { account_id: accountId, campaign_id: item.id, post_id: item.simulation_post } }
+    selection = s
+    $('outcome-campaign').textContent = item.name
+    $('outcome-status').textContent = 'Memuat hasil sepanjang kempen daripada Meta…'
+    $('outcome-values').hidden = true
+    $('orders-form').querySelector('button').disabled = false
+    $('outcome-dialog').showModal()
+    try {
+      const data = await request(API + '/facebook-ads/post-outcome', { method: 'POST', body: s.body })
+      if (!selected(s)) return
+      const sim = data.simulation, unit = window.BeShareAdSimulation.units[sim.metric]
+      $('outcome-goal').textContent = 'Sasaran asal · ' + number.format(sim.target) + ' ' + unit
+      $('outcome-actual').textContent = data.actual == null ? 'Meta belum melaporkan ukuran ini.'
+        : 'Hasil Meta · ' + number.format(data.actual) + ' ' + unit + ' (' + number.format(Math.round(data.actual * 100 / sim.target)) + '% daripada sasaran)'
+      $('outcome-range').textContent = sim.range ? 'Julat anggaran asal · ' + sim.range.join('–') + ' ' + unit : 'Julat anggaran belum tersedia semasa simulasi asal.'
+      $('orders').value = data.orders ?? ''
+      $('outcome-status').textContent = data.spend == null ? '' : 'Belanja sepanjang kempen · ' + metric({ spend: String(data.spend), account_currency: data.currency }, 'spend')
+      $('outcome-values').hidden = false
+    } catch (err) { if (selected(s)) $('outcome-status').textContent = err.message }
+  }
+  $('orders-form').addEventListener('submit', async event => {
+    event.preventDefault()
+    const s = selection, button = $('orders-form').querySelector('button')
+    if (!s || !selected(s) || button.disabled) return
+    button.disabled = true
+    try {
+      const body = { ...s.body, orders: Number($('orders').value) }
+      await request(API + '/facebook-ads/post-orders', { method: 'POST', body })
+      if (selected(s)) $('outcome-status').textContent = 'Jumlah tempahan disimpan.'
+    } catch (err) { if (selected(s)) $('outcome-status').textContent = err.message }
+    finally { if (selected(s)) button.disabled = false }
+  })
   async function create(event) {
     event.preventDefault()
     const plan = plans().find(p => p.id === $('plan').value)
