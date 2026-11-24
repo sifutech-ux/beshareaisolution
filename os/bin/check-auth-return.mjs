@@ -13,7 +13,7 @@ function check(name, condition) {
   checks += 1;
 }
 
-function fixture({ hash = '#masuk', role = 'owner', authenticated = false, storage = new Map(), deniedStorage = false } = {}) {
+function fixture({ search = '', hash = '#masuk', role = 'owner', authenticated = false, storage = new Map(), deniedStorage = false } = {}) {
   const calls = [];
   const metaLaunches = [];
   const handlers = new Map();
@@ -48,7 +48,7 @@ function fixture({ hash = '#masuk', role = 'owner', authenticated = false, stora
       })[name] || '';
     }
   }
-  const location = { origin: 'https://fixture.invalid', pathname: '/whatsapp/ruang.html', search: '' };
+  const location = { origin: 'https://fixture.invalid', pathname: '/whatsapp/ruang.html', search };
   Object.defineProperty(location, 'hash', {
     get: () => currentHash,
     set: value => {
@@ -99,6 +99,12 @@ function fixture({ hash = '#masuk', role = 'owner', authenticated = false, stora
       assert.match(url, /^akaun\/pintu\.php\?tindakan=/, 'fixture denies nonlocal URLs');
       const action = new URL(url, location.origin).searchParams.get('tindakan');
       calls.push(action);
+      if (action === 'tukar' && search) {
+        assert.equal(calls[0], 'sesi');
+        assert.equal(init.headers['X-CSRF-Token'], 'synthetic-csrf');
+        assert.equal(JSON.parse(init.body).coexistence, true);
+        return { ok: true, json: async () => ({ ...session(), attempt: { status: 'completed' } }) };
+      }
       assert.ok(['sesi', 'masuk', 'daftar', 'keluar'].includes(action), 'fixture denies Meta exchange or other actions');
       if (action === 'masuk' || action === 'daftar') {
         if (!authAccepted) return { ok: false, json: async () => ({ ok: false, error: 'Synthetic login rejection' }) };
@@ -233,6 +239,16 @@ for (const target of ['https://outside.invalid/', '//outside.invalid/', 'javascr
   await otherTab.submit();
   check('a separate tab without the pending destination retains ordinary login behavior',
     otherTab.hash() === '#papan' && waitingTab.storage.get(returnKey) === 'sambungan');
+}
+
+{
+  const state = 'e'.repeat(64);
+  const record = { state, at: Date.now(), coexistence: true, events: [], codeSent: false };
+  const f = fixture({ authenticated: true, hash: '', search: '?code=synthetic-returned-code',
+    storage: new Map([['beshare-os-signup', JSON.stringify(record)]]) });
+  await f.settle();
+  check('redirect exchanges once after authenticated session bootstrap and returns to connection',
+    f.calls.filter(a => a === 'tukar').length === 1 && f.hash() === '#sambungan' && !f.storage.has('beshare-os-signup'));
 }
 
 console.log('PASS ' + checks + ' auth-return checks; real workspace script in a synthetic VM, no network');

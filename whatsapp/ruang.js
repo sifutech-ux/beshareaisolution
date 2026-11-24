@@ -1416,13 +1416,14 @@ function team(state) {
 }
 
 function connection(state) {
+  const attempt = readSignupRecord();
   const draft = state.templateDraft || { name: '', language: 'ms', body: '', savedAt: '' };
   const saved = draft.savedAt ? `Draf disimpan dalam pelayar pada ${esc(draft.savedAt)}. Tidak dihantar ke Meta.` : 'Draf belum disimpan.';
   return `<article class="panel record-screen os-connect"><header class="os-page-heading"><span class="os-heading-icon">${osIcon('sambungan')}</span><p class="os-eyebrow">HUBUNGKAN PERNIAGAAN</p><h1>Sambungan WhatsApp</h1><p class="muted">Sambungkan nombor perniagaan dan lihat setiap langkah pengaktifannya di sini.</p></header>
     <div class="os-section-heading"><h2>Keadaan sambungan anda</h2>${state.connection.phone ? `<span class="os-phone-number">${esc(state.connection.phone)}</span>` : ''}</div>${connectionCards(state)}<p class="os-panel-note">Token tersimpan sahaja belum mengesahkan nombor boleh menghantar mesej. Pendaftaran nombor diurus melalui pengaktifan sambungan oleh pemilik sistem.</p>${state.connection.note ? `<p class="os-notice" role="status">${esc(state.connection.note)}</p>` : ''}
     ${role(state) === 'owner' && state.connection.followupConnectionId ? `<section><h3>WhatsApp susulan</h3><p>Pelanggan boleh memilih satu masa dengan membalas SUSUL DD/MM/YYYY HH:MM dalam waktu Malaysia. BATAL SUSULAN membatalkan jadual. Untuk susulan selepas 24 jam, sediakan templat pemasaran Bahasa Melayu bagi nombor ini.</p><button class="btn btn--ghost" type="button" data-act="followup-template">Sediakan atau semak templat susulan</button><p id="followup-result" role="status"></p></section>` : ''}
     ${role(state) === 'owner' && state.connection.webhookConnectionId ? `<button class="btn" type="button" data-act="connect-webhook" data-connection="${esc(state.connection.webhookConnectionId)}">Sambungkan webhook</button><p class="os-panel-note">Benarkan BeShare menerima pemberitahuan mesej daripada Meta untuk akaun WhatsApp ini.</p>` : ''}
-    <div class="os-connect-options"><section><span class="os-connect-option-icon">${osIcon('sambungan')}</span><h2>Sambung melalui Meta</h2><p class="muted">Pilih atau sediakan akaun WhatsApp Business melalui aliran rasmi Meta.</p><button class="btn" type="button" data-act="connect"><span>Buka tetingkap Meta</span> ${osIcon('arrow')}</button><p class="muted os-small" id="signup-hint">Log masuk ke Facebook untuk memberikan kebenaran kepada akaun WhatsApp perniagaan anda.</p></section>${role(state) === 'owner' ? `<section><span class="os-connect-option-icon os-tone-teal">${osIcon('peti')}</span><h2>Guna WhatsApp Business App</h2><p class="muted">Untuk nombor yang sudah digunakan dalam aplikasi WhatsApp Business.</p><button class="btn btn--ghost" type="button" data-act="connect-app">Sambung WhatsApp Business App</button><p class="muted os-small" id="signup-app-hint">Gunakan aliran ini bagi nombor sedia ada. Kelayakan sambungan ditentukan oleh Meta.</p></section>` : ''}</div>
+    <div class="os-connect-options"><section><span class="os-connect-option-icon">${osIcon('sambungan')}</span><h2>Sambung melalui Meta</h2><p class="muted">Pilih atau sediakan akaun WhatsApp Business melalui aliran rasmi Meta.</p><button class="btn" type="button" data-act="connect"><span>Buka tetingkap Meta</span> ${osIcon('arrow')}</button><p class="muted os-small" id="signup-hint">Log masuk ke Facebook untuk memberikan kebenaran kepada akaun WhatsApp perniagaan anda.</p></section>${role(state) === 'owner' ? `<section><span class="os-connect-option-icon os-tone-teal">${osIcon('peti')}</span><h2>Guna WhatsApp Business App</h2><p class="muted">Untuk nombor yang sudah digunakan dalam aplikasi WhatsApp Business.</p><button class="btn btn--ghost" type="button" data-act="connect-app">Sambung WhatsApp Business App</button><p class="muted os-small" id="signup-app-hint">Jika BeShare sudah tertera dalam WhatsApp Business, kekalkan pautan itu. Gunakan akaun Meta yang sama untuk melengkapkan kebenaran.</p>${attempt?.canVerify && attempt.coexistence && !attempt.cancelled ? '<button class="btn" type="button" data-act="verify-app">Sahkan nombor sedia ada dengan Meta</button>' : ''}${attempt?.state && (attempt.code && !attempt.codeSent || attempt.events?.length) ? '<button class="btn btn--ghost" type="button" data-act="retry-return">Sambung semula pengesahan</button>' : ''}</section>` : ''}</div>
     ${state.ai.available || state.knowledgeCentre.available ? `<a class="os-connection-next" href="#pengetahuan">${osIcon('pengetahuan')}<span><strong>Sediakan pengetahuan dan balasan AI</strong><small>Lengkapkan maklumat perniagaan sebelum mengaktifkan AI.</small></span>${osIcon('arrow')}</a>` : ''}
     <details class="os-disclosure"><summary>Draf templat mesej <span>Disimpan dalam pelayar</span></summary><div class="os-disclosure-body"><p class="muted">Sediakan nama, bahasa dan isi templat. Draf ini tidak dihantar ke Meta dan belum menjadi templat yang diluluskan.</p><form id="template-draft"><p class="error" id="form-error" hidden></p><div class="pair"><label class="field">Nama templat<input name="name" required maxlength="512" autocomplete="off" value="${esc(draft.name)}" placeholder="sambutan_kedai"></label><label class="field">Bahasa<select name="language"><option value="ms" ${draft.language === 'ms' ? 'selected' : ''}>Bahasa Melayu</option><option value="en" ${draft.language === 'en' ? 'selected' : ''}>English</option></select></label></div><label class="field">Isi templat<textarea name="body" required maxlength="1024" rows="4">${esc(draft.body)}</textarea></label><button class="btn btn--ghost" type="submit">Simpan draf dalam pelayar</button></form><p class="muted os-small">${saved}</p></div></details>
     <details class="os-disclosure"><summary>Butiran teknikal & panduan</summary><div class="os-disclosure-body"><p class="muted">Sambungan menggunakan WhatsApp Cloud API rasmi. BeShare tidak mendakwa status rakan kongsi Meta.</p><p class="muted">Kebenaran <code>whatsapp_business_management</code> dan <code>whatsapp_business_messaging</code> diurus melalui Meta. Token disimpan pada pelayan, bukan dalam pelayar.</p><p><a class="os-text-link" href="panduan-rakaman.html">Buka panduan rakaman ${osIcon('arrow')}</a></p></div></details></article>`;
@@ -1696,6 +1697,17 @@ function onClick(event) {
   }
   if (act === "connect") {
     openEmbeddedSignup();
+    return;
+  }
+  if (act === "verify-app") {
+    const record = readSignupRecord();
+    if (record?.canVerify && record.coexistence && !record.cancelled) {
+      callApi("semaknombor", { state: record.state }).then(data => handleSignupResult(record.state, data));
+    }
+    return;
+  }
+  if (act === "retry-return") {
+    flushSignup();
     return;
   }
   if (act === "connect-app") {
@@ -2097,7 +2109,9 @@ document.addEventListener("visibilitychange", () => {
 
 function facebookHost(origin) {
   try {
-    const host = new URL(origin).hostname;
+    const url = new URL(origin);
+    if (url.protocol !== "https:") return false;
+    const host = url.hostname;
     return host === "facebook.com" || host.endsWith(".facebook.com");
   } catch {
     return false;
@@ -2105,7 +2119,7 @@ function facebookHost(origin) {
 }
 
 function signupCode(value) {
-  return typeof value === "string" && /^[A-Za-z0-9_\-\.~]{8,1024}$/.test(value) ? value : "";
+  return typeof value === "string" && /^[A-Za-z0-9_\-\.~]{8,8192}$/.test(value) ? value : "";
 }
 
 function signupQueryResult(search) {
@@ -2283,6 +2297,8 @@ function openCoexistenceSignup() {
 }
 
 const SIGNUP_RECORD = "beshare-os-signup";
+const codeRequests = new Set();
+const eventRequests = new Set();
 let signupReturnTimer = 0;
 let signupLaunchTimer = 0;
 
@@ -2313,13 +2329,13 @@ function clearSignupRecord() {
   }
 }
 
-function rememberSignupCode(code) {
+function rememberSignupCode(code, defer = false) {
   const safe = signupCode(code);
   if (!safe) return;
   const record = readSignupRecord() || { state: "", events: [], at: Date.now(), codeSent: false, finish: false, reported: false };
   record.code = safe;
   writeSignupRecord(record);
-  flushSignup();
+  if (!defer) flushSignup();
 }
 
 function rememberSignupState(state) {
@@ -2334,6 +2350,10 @@ function rememberSignupState(state) {
 function rememberSignupEvent(fields) {
   const record = readSignupRecord() || { state: signupState || "", code: "", events: [], at: Date.now(), codeSent: false, finish: false, reported: false };
   if (!Array.isArray(record.events)) record.events = [];
+  if (fields.event === "CANCEL" || fields.event === "ERROR") {
+    record.cancelled = true;
+    record.canVerify = false;
+  }
   record.events.push(fields);
   if (fields.event === "FINISH" || fields.event === "FINISH_ONLY_WABA" || fields.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING") {
     record.finish = true;
@@ -2358,19 +2378,19 @@ function signupFailure(message) {
 }
 
 function flushSignup() {
+  if (!ready || !csrf || !live?.user) return;
   const record = readSignupRecord();
   if (!record || !/^[0-9a-f]{64}$/.test(record.state || "")) return;
+  if (record.businessId && record.businessId !== live.business?.public_id) return;
   signupState = record.state;
-  if (record.code && !record.codeSent) {
-    record.codeSent = true;
-    writeSignupRecord(record);
+  if (!record.codeSent && record.code && !codeRequests.has(record.state)) {
+    codeRequests.add(record.state);
     exchangeSignupCode(record.code);
   }
-  const events = Array.isArray(record.events) ? record.events : [];
-  if (!events.length) return;
-  record.events = [];
-  writeSignupRecord(record);
-  events.forEach((fields) => sendSignupEvent(fields));
+  if (record.events?.length && !eventRequests.has(record.state)) {
+    eventRequests.add(record.state);
+    sendSignupEvent(record.events[0]);
+  }
 }
 
 function reportSignupGap() {
@@ -2412,7 +2432,7 @@ function beginSignup(options) {
   const pending = { code: "", finish: false };
   signupQueue = pending;
   signupState = "";
-  writeSignupRecord({ coexistence: options.extras?.featureType === "whatsapp_business_app_onboarding", state: "", code: "", events: [], at: Date.now(), codeSent: false, finish: false, reported: false, hidden: false });
+  writeSignupRecord({ businessId: state.business?.public_id, coexistence: options.extras?.featureType === "whatsapp_business_app_onboarding", state: "", code: "", events: [], at: Date.now(), codeSent: false, finish: false, reported: false, hidden: false });
   const hint = document.getElementById("signup-hint");
   if (hint) hint.textContent = "Meminta tetingkap Meta. Jika tiada tetingkap muncul, benarkan pop-up atau buka workspace dalam pelayar biasa.";
   signupLaunchTimer = window.setTimeout(() => {
@@ -2452,7 +2472,7 @@ function beginSignup(options) {
     signupFailure("Tetingkap Meta tidak dapat dimulakan. Benarkan pop-up atau cuba pelayar biasa. Sambungan tidak disimpan.");
     return;
   }
-  if (pending.reported && !pending.code) return;
+  if (pending.reported && !pending.code && !readSignupRecord()?.coexistence) return;
   const started = callApi("sambung", {});
   started.then((data) => {
     if (signupQueue !== pending) return;
@@ -2476,7 +2496,17 @@ function exchangeSignupCode(code) {
     return;
   }
   const coexistence = readSignupRecord()?.coexistence === true;
-  callApi("tukar", { state, code, coexistence }).then((data) => handleSignupResult(state, data));
+  callApi("tukar", { state, code, coexistence }).then((data) => {
+    codeRequests.delete(state);
+    const current = readSignupRecord();
+    if (!current || current.state !== state) return;
+    if (data?.ok) {
+      current.codeSent = true;
+      current.code = "";
+      writeSignupRecord(current);
+    }
+    handleSignupResult(state, data);
+  });
 }
 
 function handleSignupResult(state, data) {
@@ -2484,6 +2514,10 @@ function handleSignupResult(state, data) {
   if (!record || record.state !== state) return;
   if (data && data.user) applyLive(data);
   inboxLoad = "";
+  if (data?.ok && data.attempt?.status === "token_held" && record.coexistence && !record.cancelled) {
+    record.canVerify = true;
+    writeSignupRecord(record);
+  }
   if (data && data.ok === true && ["completed", "incomplete", "abandoned", "rejected", "expired"].includes(data.attempt?.status)) {
     clearSignupRecord();
     signupQueue = null;
@@ -2495,7 +2529,9 @@ function handleSignupResult(state, data) {
 window.addEventListener("message", (event) => {
   const parsed = signupPayload(event.origin, event.data);
   if (!parsed || !readSignupRecord()) return;
-  rememberSignupEvent(signupEventFields(parsed));
+  const fields = signupEventFields(parsed);
+  if (!["FINISH", "FINISH_ONLY_WABA", "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING", "CANCEL", "ERROR"].includes(fields.event)) return;
+  rememberSignupEvent(fields);
   flushSignup();
 });
 
@@ -2524,7 +2560,18 @@ window.addEventListener("focus", () => {
 
 function sendSignupEvent(fields) {
   const state = signupState;
-  callApi("peristiwa", { ...fields, state }).then((data) => handleSignupResult(state, data));
+  const coexistence = readSignupRecord()?.coexistence === true;
+  callApi("peristiwa", { ...fields, state, coexistence }).then((data) => {
+    eventRequests.delete(state);
+    const record = readSignupRecord();
+    if (!record || record.state !== state) return;
+    if (data?.ok) {
+      record.events.shift();
+      writeSignupRecord(record);
+    }
+    handleSignupResult(state, data);
+    if (data?.ok && readSignupRecord()?.events?.length) flushSignup();
+  });
 }
 
 async function boot() {
@@ -2537,7 +2584,9 @@ async function boot() {
     /* Teruskan jika storan pelayar tidak tersedia. */
   }
   const returned = consumeRedirectResult();
-  if (returned.code) rememberSignupCode(returned.code);
+  const previous = readSignupRecord();
+  if (returned.code && previous?.state) rememberSignupCode(returned.code, true);
+  if ((returned.code || returned.error) && previous?.state) location.hash = "sambungan";
   const root = document.getElementById("app");
   if (root) root.innerHTML = `<main class="os-loading"><span class="os-loading-orb" aria-hidden="true"></span><h1>Menyediakan ruang kerja anda</h1><p class="muted" role="status">Memuatkan sesi…</p></main>`;
   try {
@@ -2555,8 +2604,7 @@ async function boot() {
   }
   flushSignup();
   if (returned.code) {
-    const after = readSignupRecord();
-    if (!after || !after.codeSent) {
+    if (!previous?.state) {
       signupFailure("Kod kebenaran sampai tanpa sesi sambungan yang sah. Sambungan tidak disimpan.");
     }
   }

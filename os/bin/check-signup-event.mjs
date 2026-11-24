@@ -103,6 +103,7 @@ check(
   payload && finish.event === "FINISH" && finish.waba_id === "1104940391945821" && finish.phone_number_id === "100000000000202"
 );
 check("unrelated postMessage is ignored", context.signupPayload("https://www.facebook.com", JSON.stringify({ type: "other" })) === null);
+check("long opaque Meta code survives the redirect parser", context.signupQueryResult("?code=" + "A".repeat(2048)).code.length === 2048);
 const returned = context.signupQueryResult("?code=AQABCDE123_~.-ok&error_description=secret");
 check("redirect keeps a usable code and drops the description", returned.code === "AQABCDE123_~.-ok" && returned.error === "");
 check("oauth error is a short reason", context.signupQueryResult("?error_reason=user_denied").error === "user_denied");
@@ -162,6 +163,7 @@ const storageContext = createContext({
     setItem: (key, value) => store.set(key, value),
     removeItem: (key) => store.delete(key)
   },
+  ready: true, csrf: "fixture", live: { user: {} },
   __sent: sent
 });
 const storageStart = source.indexOf("const SIGNUP_RECORD");
@@ -171,8 +173,8 @@ runInContext(`let signupState = "";
 let signupQueue = null;
 ${signupCodeSource}
 ${source.slice(storageStart, storageEnd)}
-function exchangeSignupCode(code) { __sent.codes.push(code); }
-function sendSignupEvent(fields) { __sent.events.push(fields.event); }
+function exchangeSignupCode(code) { __sent.codes.push(code); codeRequests.delete(signupState); const r = readSignupRecord(); r.codeSent = true; writeSignupRecord(r); }
+function sendSignupEvent(fields) { __sent.events.push(fields.event); eventRequests.delete(signupState); const r = readSignupRecord(); r.events.shift(); writeSignupRecord(r); }
 `, storageContext);
 const state = "a".repeat(64);
 storageContext.rememberSignupEvent({ event: "FINISH", waba_id: "123", phone_number_id: "456" });

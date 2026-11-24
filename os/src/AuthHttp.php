@@ -222,7 +222,7 @@ final class AuthHttp
             Tenants::rename($this->pdo, $actor, $this->text($body, 'name'));
             return $this->respond($session, false, $this->payload($this->actor($session)));
         }
-        if ($action === 'sambung' || $action === 'peristiwa' || $action === 'tukar' || $action === 'segera' || $action === 'selesai-kenalan') {
+        if ($action === 'sambung' || $action === 'peristiwa' || $action === 'semaknombor' || $action === 'tukar' || $action === 'segera' || $action === 'selesai-kenalan') {
             return $this->whatsapp($action, $session, $actor, $body, $remote, $sessionKey);
         }
         throw new AuthException('Tindakan tidak dikenali.', 404);
@@ -424,7 +424,12 @@ final class AuthHttp
             return $this->respond($session, false, $payload);
         }
         $state = $this->text($body, 'state');
-        if ($action === 'peristiwa') {
+        if ($action === 'semaknombor') {
+            if (!$this->rates->consume('semaknombor|'.$actor['user_id'].'|'.$remote)) {
+                throw new AuthException('Tunggu sebentar sebelum menyemak nombor semula.', 429);
+            }
+            $this->whatsapp->recoverBusinessApp($actor, $sessionKey, $state);
+        } elseif ($action === 'peristiwa') {
             $this->whatsapp->record($actor, $sessionKey, $body);
         } else {
             $key = 'tukar|' . $actor['user_id'] . '|' . $remote;
