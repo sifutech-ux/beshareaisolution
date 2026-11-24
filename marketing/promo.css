@@ -1,0 +1,36 @@
+.promo-workspace {display:grid;gap:20px}
+.promo-workspace .panel {padding:clamp(18px,3vw,32px)}
+.promo-workspace h2 {margin:0 0 16px}
+.promo-workspace fieldset {border:0;padding:0;margin:0;min-width:0}
+.promo-fields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.promo-fields .full {grid-column:1/-1}
+.promo-workspace label,.promo-share {display:grid;gap:6px}
+.promo-workspace :is(input,textarea,select) {max-width:100%;width:100%;box-sizing:border-box}
+.promo-workspace textarea {resize:vertical}
+.promo-workspace .actions {margin-top:14px;flex-wrap:wrap;gap:10px}
+.promo-workspace .notice:empty {display:none}
+.promo-workspace a {overflow-wrap:anywhere}
+.promo-workspace .lead-row {border-top:1px solid #334057;padding:14px 0;display:grid;gap:5px;overflow-wrap:anywhere}
+.lead-row p,.promo-workspace .hint {margin:4px 0}
+.promo-public {background:#f5f3ee;color:#182527;font:1rem/1.55 system-ui,sans-serif;margin:0}
+.promo-public * {box-sizing:border-box}
+.promo-public main {max-width:1140px;margin:auto;padding:clamp(24px,6vw,82px) clamp(18px,4vw,54px)}
+.promo-public #promotion {display:grid;align-items:start;grid-template-columns:minmax(0,1.25fr) minmax(290px,.8fr);gap:clamp(26px,6vw,82px)}
+.promo-public article {border-top:4px solid #24605c;overflow-wrap:anywhere}
+.promo-public header {display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:18px 0;flex-wrap:wrap}
+.promo-public .merchant {font-weight:700}.promo-public .area {color:#39665d}
+.promo-public #cover {width:100%;max-height:420px;object-fit:contain;background:white;border-radius:14px}
+.promo-public h1 {font:500 clamp(2.6rem,5vw,4.8rem)/1.05 Georgia,serif;letter-spacing:-.045em;margin:22px 0}
+.promo-public #offer {white-space:pre-wrap;font-size:1.12rem}
+.promo-public .enquiry-card {padding:clamp(22px,3vw,36px);background:#fff;border:1px solid #d8ded6;border-radius:18px}
+.promo-public h2 {margin:0 0 15px;font-size:1.5rem;line-height:1.2;overflow-wrap:anywhere}
+.promo-public form,.promo-public label {display:grid;gap:7px}
+.promo-public form {gap:16px}
+.promo-public input:not([type=checkbox]),.promo-public textarea {width:100%;padding:11px;border:1px solid #adbdb3;border-radius:7px;font:inherit;color:inherit}
+.promo-public .consent {display:flex;gap:10px;align-items:flex-start;font-size:.88rem}
+.promo-public button {padding:13px 18px;font:600 1rem system-ui;background:#1e5853;color:#fff;border:0;border-radius:8px;cursor:pointer}
+.promo-public button:disabled {opacity:.65}
+.promo-public footer {margin-top:48px;font-size:.85rem;color:#546761}
+.promo-public a {color:#245b54}
+.promo-public [hidden],.promo-workspace [hidden] {display:none!important}
+@media(max-width:760px){.promo-public #promotion,.promo-fields {grid-template-columns:1fr}}

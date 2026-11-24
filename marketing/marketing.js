@@ -15,6 +15,7 @@
     ringkasan: ['RUANG PEMASARAN ANDA', 'Idea yang bergerak.', 'Rancang dengan jelas. Terbit dengan yakin. Fahami hasilnya.'],
     kempen: ['SATU MATLAMAT, SATU ARAH', 'Kempen anda.', 'Satukan tawaran, pelanggan sasaran dan rancangan pelaksanaan.'],
     kandungan: ['KANDUNGAN DENGAN TUJUAN', 'Sedia untuk dikongsi.', 'Tulis, semak dan susun kandungan mengikut saluran.'],
+    promosi: ['KEMPEN ANDA', 'Promosi & pertanyaan', 'Terbitkan tawaran, kongsi pautan dan urus pertanyaan yang masuk.'],
     'facebook-ads': ['IKLAN BERBAYAR', 'Facebook Ads', 'Urus kempen dan lihat prestasi akaun iklan Meta anda.'],
     kumpulan: ['DISTRIBUSI BERIZIN', 'Kumpulan & saluran.', 'Urus Telegram dan WhatsApp group dengan kebenaran pentadbir.'],
     kajian: ['FAHAMI SEBELUM MELANGKAH', 'Ruang untuk pemerhatian.', 'Kumpulkan rujukan dan andaian yang mahu anda uji.'],
@@ -57,12 +58,14 @@
     } finally { clearTimeout(timeout); signal?.removeEventListener('abort', relay) }
   }
   const ads = window.BeShareFacebookAds?.({ state, request, connection, beginConnect, disconnect, el, live, API })
+  const promo = window.BeSharePromos?.({ state, request, campaignOptions, el, API })
   const postAds = window.BeSharePostAds?.({ state, request, connection, live, API, draftAd(plan, brief) {
     openPost(null, { campaign_id: plan, platform: 'facebook' })
     openAI()
     $('ai-instruction').value = brief
   } })
   function resetMemory() {
+    promo?.reset()
     postAds?.reset()
     ads?.reset()
     disposePostMedia(editors.post)
@@ -143,6 +146,7 @@
     document.querySelectorAll('[data-view]').forEach(a => { if (a.dataset.view === state.view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current') })
     document.querySelectorAll('[data-panel]').forEach(p => { p.hidden = p.dataset.panel !== state.view })
     document.title = state.view[0].toUpperCase() + state.view.slice(1) + ' · Marketing — BeShare AI'
+    if (state.view === 'promosi' && state.ready) promo?.show()
     if (state.view === 'facebook-ads' && state.ready) ads?.show()
     if (state.view === 'sambungan') refreshConnectionChecks()
   }
@@ -160,6 +164,7 @@
     for (const kind of ['post', 'source', 'result']) campaignOptions($(kind + '-campaign-filter'), { emptyLabel: 'Semua kempen' })
     const active = state.campaigns.filter(x => x.status !== 'archived').length
     $('nav-campaign-count').textContent = active; $('nav-campaign-count').hidden = active === 0
+    promo?.options()
     renderOverview(); renderCampaigns(); renderPosts(); renderSources(); renderResults(); renderConnections()
   }
   function metric(label, value, caption, mint = false) { const n = el('div', undefined, 'metric'), top = el('div', undefined, 'metric-top'); top.append(el('span', label), icon('chart')); n.append(top, el('div', value, 'metric-value' + (mint ? ' mint' : '')), el('p', caption, 'metric-caption')); return n }
@@ -380,7 +385,7 @@
       card.dataset.platform = p
       const label = health === 'checking' ? 'Menyemak akses' : reconnect ? 'Sambung semula' : connected && health === 'unknown' ? 'Belum dapat disahkan' : connected ? 'Disambungkan' : configured ? limitedThreads ? 'Akses terhad' : 'Belum disambungkan' : p === 'google_ads' ? 'Perancangan sahaja' : 'Belum tersedia'
       top.append(platformIcon(p), statusPill(health === 'checking' ? 'checking' : reconnect ? 'failed' : connected && health === 'unknown' ? 'uncertain' : connected ? 'connected' : 'draft', label)); card.append(top, el('h3', p === 'facebook' ? 'Facebook Page' : C.PLATFORM[p]))
-      const fallback = p === 'google_ads' ? 'Catat rancangan dan hasil Google Ads dalam kempen. Pengurusan iklan automatik belum tersedia di ruang ini.' : configured ? ({ facebook: 'Sambungkan Page yang anda urus untuk menerbitkan kandungan perniagaan.', instagram: 'Sambungkan akaun Instagram profesional yang anda urus.', threads: 'Sambungkan profil Threads untuk menerbitkan teks dan media.' }[p]) : 'Sambungan saluran ini belum disediakan. Anda boleh menyimpan draf dan rancangan sementara menunggu sambungan tersedia.'
+      const fallback = p === 'google_ads' ? 'Sediakan bahan Google Search dan eksport ke Google Ads Editor daripada halaman promosi.' : configured ? ({ facebook: 'Sambungkan Page yang anda urus untuk menerbitkan kandungan perniagaan.', instagram: 'Sambungkan akaun Instagram profesional yang anda urus.', threads: 'Sambungkan profil Threads untuk menerbitkan teks dan media.' }[p]) : 'Sambungan saluran ini belum disediakan. Anda boleh menyimpan draf dan rancangan sementara menunggu sambungan tersedia.'
       const healthMessage = health === 'checking' ? 'Sedang menyemak akses dengan ' + C.PLATFORM[p] + '…' : check?.health?.message
       const details = el('p', healthMessage ? safeProviderError(healthMessage) : c?.message || fallback); details.setAttribute('role', 'status'); card.append(details)
       if (configured && limitedThreads && (!connected || reconnect)) card.append(el('p', 'Sambungan Threads untuk pelanggan baharu masih menunggu kelulusan Meta. Buat masa ini, hanya akaun yang telah menerima dan mengesahkan jemputan penguji boleh menyambung.', 'connection-onboarding-note'))
@@ -391,7 +396,7 @@
       const actions = el('div', undefined, 'actions')
       if (state.capabilities.connection_health_checks && checkableConnection(c)) { const b = button(check?.pending ? 'Sedang menyemak…' : 'Semak sambungan', () => checkConnection(p, { force: true }), 'button secondary', 'refresh'); b.disabled = !!check?.pending; actions.append(b) }
       if (connected && !reconnect) actions.append(button('Putuskan sambungan', () => disconnect(p), 'button quiet'))
-      else { const b = button(connectable ? reconnect ? 'Sambung semula akaun' : 'Sambungkan akaun' : p === 'google_ads' ? 'Rancang dalam kempen' : 'Sambungan belum tersedia', () => p === 'google_ads' ? openCampaign() : beginConnect(p), p === 'google_ads' ? 'button quiet' : 'button secondary', p === 'google_ads' ? 'target' : 'link'); b.disabled = !connectable && p !== 'google_ads'; actions.append(b) }
+      else { const b = button(connectable ? reconnect ? 'Sambung semula akaun' : 'Sambungkan akaun' : p === 'google_ads' ? 'Sediakan kempen Search' : 'Sambungan belum tersedia', () => p === 'google_ads' ? location.assign('#promosi') : beginConnect(p), p === 'google_ads' ? 'button quiet' : 'button secondary', p === 'google_ads' ? 'target' : 'link'); b.disabled = !connectable && p !== 'google_ads'; actions.append(b) }
       card.append(actions); host.append(card)
     }
   }

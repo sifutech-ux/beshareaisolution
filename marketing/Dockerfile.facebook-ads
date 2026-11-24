@@ -11,6 +11,6 @@ RUN if test -e /app/marketing_facebook_ads.py; then \
       echo '859962c0ae3aae23d9146bfce342d79208ca14b1fd3b081346fe73fd9a10e752  /app/marketing_lifecycle.py' | sha256sum -c - && \
       echo '2136446dd6a110e22f5f63602173421d5474fba6eac1b91123ec7e9ca17149de  /app/pelanggan_marketing.py' | sha256sum -c -; \
     fi
-COPY copilot/account/marketing_facebook_ads.py copilot/account/marketing_post_ads.py copilot/account/marketing_ad_simulation.py copilot/account/marketing_social.py \
+COPY copilot/account/marketing_facebook_ads.py copilot/account/marketing_post_ads.py copilot/account/marketing_ad_simulation.py copilot/account/marketing_promos.py copilot/account/marketing_social.py \
      copilot/account/marketing_lifecycle.py copilot/account/pelanggan_marketing.py /app/
 RUN python -B -c 'import marketing_post_ads, marketing_facebook_ads, marketing_lifecycle, pelanggan_marketing, marketing_social'

@@ -299,6 +299,9 @@ def dispatch(method, path, origin, authorization, body, connect, postgres, secre
         return 503, {'error': 'Akaun tidak dapat dihubungi. Cuba semula.'}
     ph = _placeholder(postgres)
     try:
+        if path.startswith('/api/akaun/promosi/'):
+            from marketing_promos import public
+            return public(method, path, conn, postgres, payload, stamp, ip, secret)
         ensure_schema(conn, postgres)
         conn.commit()
         def session(token, key, when):

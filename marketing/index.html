@@ -14,7 +14,10 @@
   <script src="ad-simulation.js?v=1" defer></script>
   <script src="facebook-ads.js?v=simulasi1" defer></script>
   <script src="post-ads.js?v=simulasi1" defer></script>
-  <script src="marketing.js?v=20261124-akses" defer></script>
+  <link rel="stylesheet" href="promo.css?v=1">
+  <script src="vendor/qrcode.js" defer></script>
+  <script src="promo-workspace.js?v=1" defer></script>
+  <script src="marketing.js?v=20261124-promosi" defer></script>
   <link rel="stylesheet" href="group-manager.css?v=20261123groupconnect2">
   <script src="group-manager.js?v=20261123groupconnect2" defer></script>
 </head>
@@ -42,6 +45,7 @@
       <nav class="nav" aria-label="Navigasi Marketing">
         <a href="#ringkasan" data-view="ringkasan" aria-current="page"><svg><use href="#i-grid"/></svg><span>Ringkasan</span></a>
         <a href="#kempen" data-view="kempen"><svg><use href="#i-target"/></svg><span>Kempen</span><span id="nav-campaign-count" class="nav-count" hidden></span></a>
+        <a href="#promosi" data-view="promosi"><svg><use href="#i-link"/></svg><span>Promosi &amp; pertanyaan</span></a>
         <a href="#facebook-ads" data-view="facebook-ads"><svg><use href="#i-chart"/></svg><span>Facebook Ads</span></a>
         <a href="#kandungan" data-view="kandungan"><svg><use href="#i-calendar"/></svg><span>Kandungan</span></a>
         <a href="#kumpulan" data-view="kumpulan"><svg><use href="#i-grid"/></svg><span>Kumpulan &amp; Saluran</span></a>
@@ -66,6 +70,49 @@
           </section>
           <section data-panel="kempen" hidden aria-label="Kempen"><div class="toolbar"><label class="search-field"><svg><use href="#i-search"/></svg><input id="campaign-search" type="search" placeholder="Cari kempen atau tawaran" aria-label="Cari kempen"></label><label class="filter-label"><span class="sr-only">Status kempen</span><select id="campaign-status"><option value="all">Semua status</option><option value="draft">Draf</option><option value="ready">Sedia digunakan</option><option value="active">Aktif</option><option value="completed">Selesai</option><option value="archived">Arkib</option></select></label></div><div id="campaign-list" class="campaign-grid"></div></section>
           <section data-panel="kandungan" hidden aria-label="Kandungan dan kalendar"><div class="toolbar"><div class="segmented" aria-label="Paparan kandungan"><button type="button" id="show-post-list" aria-pressed="true">Senarai</button><button type="button" id="show-calendar" aria-pressed="false">Kalendar</button></div><label class="filter-label"><span class="sr-only">Kempen kandungan</span><select id="post-campaign-filter"><option value="">Semua kempen</option></select></label><button type="button" class="button secondary" id="new-post"><svg><use href="#i-plus"/></svg>Kandungan baharu</button></div><div class="inline-note"><span class="tiny-dot"></span><p>“Dirancang” ialah rancangan anda. Penerbitan automatik hanya bermula selepas kelulusan dan sambungan saluran tersedia.</p></div><div id="post-list" class="post-grid"></div><div id="calendar-panel" class="panel" hidden><div class="calendar-heading"><div><h2 id="calendar-title"></h2><p class="muted">Waktu Malaysia · UTC+8</p></div><div class="actions"><button class="icon-button" type="button" id="calendar-prev" aria-label="Bulan sebelumnya">‹</button><button class="button quiet" type="button" id="calendar-today">Hari ini</button><button class="icon-button" type="button" id="calendar-next" aria-label="Bulan seterusnya">›</button></div></div><div class="calendar-weekdays" aria-hidden="true"><span>Isn</span><span>Sel</span><span>Rab</span><span>Kha</span><span>Jum</span><span>Sab</span><span>Ahd</span></div><div id="calendar-grid" class="calendar-grid"></div><p class="hint">Kandungan tanpa masa penerbitan kekal dalam paparan Senarai.</p></div></section>
+          <section data-panel="promosi" class="promo-workspace" hidden aria-label="Halaman promosi dan pertanyaan">
+            <div class="panel"><label>Kempen BeShare<select id="promo-campaign"></select></label>
+              <p id="promo-status" class="hint" role="status"></p></div>
+            <div id="promo-tools" class="promo-workspace" hidden>
+              <section class="panel"><h2>Halaman promosi</h2>
+                <form id="promo-editor"><fieldset id="promo-edit-fields" class="promo-fields">
+                  <label>Nama perniagaan<input id="promo-business" maxlength="100" required></label>
+                  <label>Kawasan perkhidmatan<input id="promo-area" maxlength="120" required></label>
+                  <label class="full">Tajuk promosi<input id="promo-title" maxlength="120" required></label>
+                  <label class="full">Tawaran dan harga<textarea id="promo-offer" maxlength="2000" rows="5" required></textarea></label>
+                  <label>Ajakan tindakan<input id="promo-cta" maxlength="50" required value="Minta sebut harga"></label>
+                  <label>Pautan gambar HTTPS (pilihan)<input id="promo-image" type="url" maxlength="2048"></label>
+                </fieldset><div class="actions">
+                  <button type="button" id="promo-ai" class="button secondary">Jana teks promosi dengan AI</button>
+                  <button type="submit" value="draft" class="button secondary" id="promo-draft">Simpan draf</button>
+                  <button type="submit" value="live" class="button primary">Terbitkan halaman</button>
+                  <button type="button" class="button quiet" id="promo-hide" hidden>Hentikan paparan</button>
+                </div></form>
+                <div id="promo-share" class="promo-share" hidden>
+                  <label>Pautan mengikut sumber<select id="promo-source"><option value="">Pautan biasa</option><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option><option value="google">Google Ads</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option><option value="threads">Threads</option></select></label>
+                  <a id="promo-link" target="_blank" rel="noopener"></a>
+                  <div class="actions"><button type="button" class="button secondary" id="promo-copy">Salin pautan</button><a id="promo-qr" class="button secondary" download="kod-qr-promosi.gif">Muat turun kod QR untuk cetakan</a></div>
+                </div><p id="promo-feedback" role="status"></p>
+              </section>
+              <section class="panel"><h2>Pertanyaan pelanggan</h2>
+                <button type="button" class="button secondary" id="promo-refresh">Muat semula pertanyaan</button>
+                <p id="promo-count" role="status"></p><div id="promo-leads"></div><button id="promo-more" class="button secondary" type="button" hidden>Lihat lagi</button>
+              </section>
+              <section class="panel"><h2>Kempen Google Search</h2>
+                <p class="hint">Eksport kempen dijeda. Semak lokasi sasaran dan mata wang akaun dalam Google Ads Editor sebelum mengaktifkannya.</p>
+                <form id="search-form"><fieldset id="search-fields" class="promo-fields">
+                  <label>Bajet harian (RM)<input name="budget" type="number" step="0.01" min="0.01" max="999999" required></label>
+                  <label>Kumpulan iklan<input name="group" maxlength="100" required></label>
+                  <label>Kata kunci (satu setiap baris)<textarea name="keywords" rows="3" maxlength="1800" required></textarea></label>
+                  <label>Kata kunci negatif (pilihan)<textarea name="negatives" rows="3" maxlength="1800"></textarea></label>
+                  <label class="full">Tiga tajuk (satu setiap baris, maks. 30 aksara)<textarea name="headlines" rows="3" required></textarea></label>
+                  <label class="full">Dua perihalan (satu setiap baris, maks. 90 aksara)<textarea name="descriptions" rows="2" required></textarea></label>
+                </fieldset><div class="actions"><button type="button" id="search-ai" class="button secondary">Jana cadangan dengan AI</button>
+                  <button type="submit" class="button primary">Eksport CSV Google Ads Editor</button></div></form>
+                <p id="search-feedback" role="status"></p>
+              </section>
+            </div>
+          </section>
           <section data-panel="facebook-ads" hidden aria-label="Facebook Ads">
             <section class="panel ads-panel">
               <h2>Akaun iklan Meta</h2>
