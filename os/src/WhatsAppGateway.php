@@ -14,6 +14,19 @@ final class WhatsAppGateway
     {
     }
 
+    public function prepareFollowUpTemplate(array $actor, int $connectionId): string
+    {
+        $this->assertOwner($actor);
+        $statement = $this->pdo->prepare("SELECT * FROM whatsapp_connections WHERE id=? AND business_id=?
+            AND token_state='verified' AND webhook_state='subscribed' AND disconnected_at IS NULL
+            AND (token_expires_at IS NULL OR token_expires_at>UTC_TIMESTAMP())");
+        $statement->execute([$connectionId, $actor['business_id']]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        if (!$row) { throw new AuthException('Sambungan WhatsApp aktif diperlukan.',409); }
+        $token = $this->seal->open($row['token_ciphertext'],$row['token_nonce'],$row['token_tag'],(int)$row['token_key_version']);
+        return $this->graph->followUpTemplate($token, $row['waba_id'], true);
+    }
+
     /**
      * @param array{user_id:int,business_id:int,role:string,owner_user_id:int,status:string} $actor
      * @return array{state:string}
@@ -238,6 +251,9 @@ final class WhatsAppGateway
             $card = $this->labels($row, $owner);
             if ($owner && $actor['status'] === 'active' && $row['token_state'] === 'verified' && $row['webhook_state'] !== 'subscribed') {
                 $card['webhook_connection_id'] = (int)$row['id'];
+            }
+            if ($owner && $row['token_state'] === 'verified' && $row['webhook_state'] === 'subscribed') {
+                $card['followup_connection_id'] = (int)$row['id'];
             }
             return $card;
         }

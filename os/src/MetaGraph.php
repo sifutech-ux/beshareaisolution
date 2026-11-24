@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace BesharOs;
 
+require_once __DIR__ . '/WhatsAppFollowUp.php';
+
 interface MetaTransport
 {
     /**
@@ -295,6 +297,28 @@ final class MetaGraph
         return ($json['success'] ?? false) === true;
     }
 
+    public function followUpTemplate(string $token, string $waba, bool $create = false): string
+    {
+        $this->assertId($waba);
+        $path = $waba . '/message_templates';
+        $list = $this->request('GET', $path, $this->bearer($token), '', [
+            'name'=>WhatsAppFollowUp::TEMPLATE, 'fields'=>'name,language,status,category,components', 'limit'=>'100',
+        ]);
+        if (!is_array($list['data'] ?? null)) { throw new MetaCallException('template_read', 502); }
+        foreach ($list['data'] as $item) {
+            if (($item['name'] ?? '') !== WhatsAppFollowUp::TEMPLATE || ($item['language'] ?? '') !== WhatsAppFollowUp::LANGUAGE) { continue; }
+            if (($item['category'] ?? '') !== 'MARKETING' || count($item['components'] ?? []) !== 1
+                || ($item['components'][0]['type'] ?? '') !== 'BODY'
+                || ($item['components'][0]['text'] ?? '') !== WhatsAppFollowUp::MESSAGE) { return 'MISMATCH'; }
+            return (string)($item['status'] ?? 'UNKNOWN');
+        }
+        if (!$create) { return 'ABSENT'; }
+        $new = $this->request('POST', $path, $this->bearer($token) + ['content-type'=>'application/json'],
+            json_encode(['name'=>WhatsAppFollowUp::TEMPLATE, 'category'=>'MARKETING', 'language'=>WhatsAppFollowUp::LANGUAGE,
+                'components'=>[['type'=>'BODY', 'text'=>WhatsAppFollowUp::MESSAGE]]], JSON_THROW_ON_ERROR));
+        return isset($new['id']) ? (string)($new['status'] ?? 'PENDING') : 'UNKNOWN';
+    }
+
     /** @return array<string,mixed> */
     public function smbAppData(string $token, string $phoneId, string $syncType): array
     {
@@ -317,7 +341,7 @@ final class MetaGraph
     /** @param array<string,string> $headers @param array<string,string> $query @return array<string,mixed> */
     private function request(string $method, string $path, array $headers, string $body, array $query = []): array
     {
-        if (preg_match('#\A(?:oauth/access_token|debug_token|\d{5,32}(?:/phone_numbers|/subscribed_apps|/smb_app_data|/owned_whatsapp_business_accounts)?)\z#', $path) !== 1) {
+        if (preg_match('#\A(?:oauth/access_token|debug_token|\d{5,32}(?:/phone_numbers|/subscribed_apps|/smb_app_data|/owned_whatsapp_business_accounts|/message_templates)?)\z#', $path) !== 1) {
             throw new MetaCallException('path', 502);
         }
         $url = 'https://graph.facebook.com/' . $this->version . '/' . $path;

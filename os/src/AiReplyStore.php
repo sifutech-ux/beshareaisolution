@@ -6,6 +6,7 @@ namespace BesharOs;
 use PDO;
 
 require_once __DIR__ . '/PlatformAccess.php';
+require_once __DIR__ . '/WhatsAppFollowUp.php';
 require_once __DIR__ . '/AiReplyPolicy.php';
 require_once __DIR__ . '/AiProductionSchema.php';
 require_once __DIR__ . '/WhatsAppDeliveryError.php';
@@ -206,6 +207,10 @@ final class AiReplyStore
             if ($mode === 'ai') { PlatformAccess::assertBusinessActive($this->pdo, (int) $actor['business_id']); }
             $update = $this->pdo->prepare('UPDATE ai_conversations SET mode=?,updated_at=UTC_TIMESTAMP() WHERE id=? AND business_id=?');
             $update->execute([$mode, $conversation['id'], $actor['business_id']]);
+            if ($mode === 'human' && WhatsAppFollowUp::installed($this->pdo)) {
+                $cancel = $this->pdo->prepare("UPDATE ai_followups SET status='cancelled' WHERE business_id=? AND conversation_id=? AND status='scheduled'");
+                $cancel->execute([$actor['business_id'],$conversation['id']]);
+            }
             Accounts::audit($this->pdo, $actor['business_id'], $actor['user_id'], $mode === 'ai' ? 'ai_disambung' : 'ai_ambil_alih', 'ai_conversation', (int) $conversation['id']);
             $this->pdo->commit();
         } catch (\Throwable $error) {

@@ -5,6 +5,7 @@ namespace BesharOs;
 
 require_once __DIR__ . '/AiReplyPolicy.php';
 require_once __DIR__ . '/KnowledgeReply.php';
+require_once __DIR__ . '/WhatsAppFollowUp.php';
 
 /** Owner-only simulation. No sender, webhook, job queue or activation dependency exists here. */
 final class AiReplyPreview
@@ -34,6 +35,16 @@ final class AiReplyPreview
         }
         if ($bytes > 12000) { throw new AuthException('Sejarah ujian terlalu panjang. Mulakan ujian baharu.', 400); }
         if (!$this->rates->consume('ai-preview|'.$actor['user_id'])) { throw new AuthException('Had 12 ujian dalam 15 minit dicapai. Cuba lagi kemudian.', 429); }
+        $command = WhatsAppFollowUp::command($message,time());
+        if ($command !== null) {
+            $example = match($command['action']) {
+                'schedule' => 'Simulasi satu susulan pada '.WhatsAppFollowUp::localTime($command['due']).'. Tiada jadual sebenar dicipta.',
+                'offer' => 'Boleh kami hantar satu WhatsApp susulan pada '.WhatsAppFollowUp::localTime($command['due']).'? (Simulasi)',
+                'cancel' => 'Simulasi pembatalan susulan. Jadual sebenar tidak diubah.',
+                default => WhatsAppFollowUp::GUIDE,
+            };
+            return ['revision'=>$context['revision'],'handoff'=>false,'reply'=>$example,'attachment'=>false,'sent'=>false];
+        }
         $answer = ($this->generate)($context['knowledge'], $message, $clean, KnowledgeReply::catalog($context['document']));
         // Recheck ownership and the publication after the provider finishes.
         $current = $this->centre->previewContext($actor);

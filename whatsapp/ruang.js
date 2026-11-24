@@ -179,6 +179,7 @@ function serverConnection() {
     registration: typeof source.registration === "string" && source.registration ? source.registration : "Belum",
     messaging: source.linked === true && source.messaging === "Belum" ? "Belum ada bukti mesej" : (typeof source.messaging === "string" && source.messaging ? source.messaging : "Belum"),
     note: typeof source.note === "string" ? source.note : "",
+    followupConnectionId: Number.isSafeInteger(source.followup_connection_id) ? source.followup_connection_id : null,
     webhookConnectionId: Number.isSafeInteger(source.webhook_connection_id) ? source.webhook_connection_id : null,
     phone: typeof source.phone === "string" ? source.phone : ""
   };
@@ -1418,6 +1419,7 @@ function connection(state) {
   const saved = draft.savedAt ? `Draf disimpan dalam pelayar pada ${esc(draft.savedAt)}. Tidak dihantar ke Meta.` : 'Draf belum disimpan.';
   return `<article class="panel record-screen os-connect"><header class="os-page-heading"><span class="os-heading-icon">${osIcon('sambungan')}</span><p class="os-eyebrow">HUBUNGKAN PERNIAGAAN</p><h1>Sambungan WhatsApp</h1><p class="muted">Sambungkan nombor perniagaan dan lihat setiap langkah pengaktifannya di sini.</p></header>
     <div class="os-section-heading"><h2>Keadaan sambungan anda</h2>${state.connection.phone ? `<span class="os-phone-number">${esc(state.connection.phone)}</span>` : ''}</div>${connectionCards(state)}<p class="os-panel-note">Token tersimpan sahaja belum mengesahkan nombor boleh menghantar mesej. Pendaftaran nombor diurus melalui pengaktifan sambungan oleh pemilik sistem.</p>${state.connection.note ? `<p class="os-notice" role="status">${esc(state.connection.note)}</p>` : ''}
+    ${role(state) === 'owner' && state.connection.followupConnectionId ? `<section><h3>WhatsApp susulan</h3><p>Pelanggan boleh memilih satu masa dengan membalas SUSUL DD/MM/YYYY HH:MM dalam waktu Malaysia. BATAL SUSULAN membatalkan jadual. Untuk susulan selepas 24 jam, sediakan templat pemasaran Bahasa Melayu bagi nombor ini.</p><button class="btn btn--ghost" type="button" data-act="followup-template">Sediakan atau semak templat susulan</button><p id="followup-result" role="status"></p></section>` : ''}
     ${role(state) === 'owner' && state.connection.webhookConnectionId ? `<button class="btn" type="button" data-act="connect-webhook" data-connection="${esc(state.connection.webhookConnectionId)}">Sambungkan webhook</button><p class="os-panel-note">Benarkan BeShare menerima pemberitahuan mesej daripada Meta untuk akaun WhatsApp ini.</p>` : ''}
     <div class="os-connect-options"><section><span class="os-connect-option-icon">${osIcon('sambungan')}</span><h2>Sambung melalui Meta</h2><p class="muted">Pilih atau sediakan akaun WhatsApp Business melalui aliran rasmi Meta.</p><button class="btn" type="button" data-act="connect"><span>Buka tetingkap Meta</span> ${osIcon('arrow')}</button><p class="muted os-small" id="signup-hint">Log masuk ke Facebook untuk memberikan kebenaran kepada akaun WhatsApp perniagaan anda.</p></section>${role(state) === 'owner' ? `<section><span class="os-connect-option-icon os-tone-teal">${osIcon('peti')}</span><h2>Guna WhatsApp Business App</h2><p class="muted">Untuk nombor yang sudah digunakan dalam aplikasi WhatsApp Business.</p><button class="btn btn--ghost" type="button" data-act="connect-app">Sambung WhatsApp Business App</button><p class="muted os-small" id="signup-app-hint">Gunakan aliran ini bagi nombor sedia ada. Kelayakan sambungan ditentukan oleh Meta.</p></section>` : ''}</div>
     ${state.ai.available || state.knowledgeCentre.available ? `<a class="os-connection-next" href="#pengetahuan">${osIcon('pengetahuan')}<span><strong>Sediakan pengetahuan dan balasan AI</strong><small>Lengkapkan maklumat perniagaan sebelum mengaktifkan AI.</small></span>${osIcon('arrow')}</a>` : ''}
@@ -1660,6 +1662,20 @@ function onClick(event) {
       }
       applyLive(data);
       route();
+    });
+    return;
+  }
+  if (act === "followup-template") {
+    if (role(state) !== "owner" || !state.connection.followupConnectionId || button.disabled) return;
+    button.disabled = true;
+    const result = document.getElementById("followup-result");
+    result.textContent = "Menyemak dengan Meta…";
+    callApi("templatsusulan", {expected_business_public_id:state.business.public_id,connection_id:state.connection.followupConnectionId}).then(data => {
+      if (!result.isConnected) return;
+      const labels = {APPROVED:"Diluluskan oleh Meta",PENDING:"Menunggu semakan Meta",REJECTED:"Ditolak oleh Meta",MISMATCH:"Kandungan templat tidak sepadan"};
+      result.textContent = data.ok ? (labels[data.template_status] || "Status templat: " + data.template_status)
+        + (data.scheduler_ready ? ". Penjadual aktif." : ". Penjadual belum tersedia.") : data.error;
+      button.disabled = false;
     });
     return;
   }
