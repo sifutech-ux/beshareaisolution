@@ -8,6 +8,8 @@ use PDOException;
 
 final class WhatsAppGateway
 {
+    private const APP_FINISH = 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING';
+    private const APP_RECOVERY = 'VERIFIED_BUSINESS_APP_GRANT';
     private const TOKEN_MAX = 1800;
 
     public function __construct(private PDO $pdo, private MetaGraph $graph, private TokenSeal $seal, private string $appId)
@@ -76,6 +78,20 @@ final class WhatsAppGateway
                 $this->pdo->commit();
                 return;
             }
+            // A code-less asset picker close can precede the business app's own finish.
+            // Leave this attempt unbound and require positive confirmation before expiry.
+            $appFlow = ($body['coexistence'] ?? false) === true;
+            if ($appFlow && $event === 'CANCEL' && $step === 'ASSET_SELECTION' && $errorCode === null) {
+                $update = $this->pdo->prepare("UPDATE onboarding_sessions SET finish_event='CANCEL',
+                    current_step=? WHERE id=? AND business_id=?");
+                $update->execute([$step, $row['id'], $actor['business_id']]);
+                $this->audit($actor, 'sambungan_pemilihan_ditutup', (int) $row['id'], $this->cancelMeta($step, null, $sessionId));
+                $this->pdo->commit();
+                return;
+            }
+            if ($appFlow && $waba !== null && $event === 'FINISH') {
+                $event = self::APP_FINISH;
+            }
             if ($event === 'CANCEL') {
                 $this->finishRow((int) $row['id'], $actor['business_id'], 'abandoned', $event, $step, $errorCode, $waba, $phone);
                 $this->audit($actor, 'sambungan_dibatalkan', (int) $row['id'], $this->cancelMeta($step, $errorCode, $sessionId));
@@ -123,12 +139,17 @@ final class WhatsAppGateway
     public function exchangeCode(array $actor, string $sessionKey, string $state, string $code, bool $coexistence = false): void
     {
         $this->assertOwner($actor);
-        if (preg_match('/\A[A-Za-z0-9_\-\.~]{8,1024}\z/', $code) !== 1) {
+        if (preg_match('/\A[A-Za-z0-9_\-\.~]{8,8192}\z/', $code) !== 1) {
             throw new AuthException('Kod kebenaran tidak sah.', 400);
         }
         $this->pdo->beginTransaction();
         try {
             $row = $this->lock($actor, $state, $sessionKey);
+            if ($coexistence && in_array($row['status'], ['token_held','completed'], true)) {
+                // The same authenticated attempt may retry after losing its HTTP response.
+                $this->pdo->commit();
+                return;
+            }
             if ($row['status'] === 'exchanging') {
                 $this->pdo->commit();
                 throw new AuthException('Pertukaran sedang diproses.', 409);
@@ -194,7 +215,7 @@ final class WhatsAppGateway
     public function attemptResult(array $actor, string $state, string $sessionKey): array
     {
         $query = $this->pdo->prepare(
-            'SELECT status, meta_error_code FROM onboarding_sessions
+            'SELECT status, finish_event, meta_error_code FROM onboarding_sessions
              WHERE correlation_hash = ? AND session_hash = ? AND business_id = ? AND user_id = ?'
         );
         $query->execute([hash('sha256', $state), hash('sha256', $sessionKey), $actor['business_id'], $actor['user_id']]);
@@ -209,6 +230,9 @@ final class WhatsAppGateway
             'token_held' => 'Kod diterima. Menunggu pengesahan nombor daripada Meta.',
             default => $this->noteFor((string) ($row['meta_error_code'] ?? ''), $status),
         };
+        if (($row['finish_event'] ?? '') === 'CANCEL' && in_array($status, ['pending','exchanging','token_held'], true)) {
+            $note = 'Meta melaporkan tetingkap pemilihan ditutup. BeShare masih menunggu pengesahan akhir untuk nombor ini.';
+        }
         return ['status' => $status, 'note' => $note];
     }
 
@@ -258,13 +282,15 @@ final class WhatsAppGateway
             return $card;
         }
         $open = $this->pdo->prepare(
-            'SELECT status, meta_error_code FROM onboarding_sessions WHERE business_id = ? ORDER BY id DESC LIMIT 1'
+            'SELECT status, finish_event, meta_error_code FROM onboarding_sessions WHERE business_id = ? ORDER BY id DESC LIMIT 1'
         );
         $open->execute([$actor['business_id']]);
         $session = $open->fetch();
         $note = '';
         $token = 'Belum';
-        if (is_array($session) && $session['status'] === 'token_held') {
+        if (is_array($session) && $session['finish_event'] === 'CANCEL' && in_array($session['status'], ['pending','exchanging','token_held'], true)) {
+            $note = 'Sambungan belum lengkap di BeShare. Jika BeShare sudah tertera dalam WhatsApp Business, kekalkan pautan itu semasa melengkapkan kebenaran Meta.';
+        } elseif (is_array($session) && $session['status'] === 'token_held') {
             $token = 'Tersimpan';
             $note = 'Kod ditukar. Menunggu pengesahan nombor daripada Meta.';
         } elseif (is_array($session) && in_array($session['status'], ['rejected', 'incomplete', 'expired', 'abandoned'], true)) {
@@ -399,7 +425,7 @@ final class WhatsAppGateway
      */
     private function bindIfHeld(array $actor, string $state, string $sessionKey, bool $allowAssetFallback = true): void
     {
-        $opened = $this->openForBind($actor, $state, $sessionKey, $allowAssetFallback);
+        $opened = $this->openForBind($actor, $state, $sessionKey, $allowAssetFallback, false);
         if ($opened === null) {
             return;
         }
@@ -410,11 +436,21 @@ final class WhatsAppGateway
         $this->bind($actor, $opened['row'], $opened['token']);
     }
 
+    public function recoverBusinessApp(array $actor, string $sessionKey, string $state): void
+    {
+        $this->assertOwner($actor);
+        $opened = $this->openForBind($actor, $state, $sessionKey, true, true);
+        if ($opened === null || !$opened['coexistence']) {
+            throw new AuthException('Meta belum mengesahkan satu nombor untuk sesi ini. Kekalkan pautan dalam WhatsApp Business dan lengkapkan kebenaran Meta.', 409);
+        }
+        $this->bindCoexistence($actor, $opened['row'], $opened['token']);
+    }
+
     /**
      * @param array{user_id:int,business_id:int,role:string,owner_user_id:int,status:string} $actor
      * @return array{row:array<string,mixed>,token:string,coexistence:bool}|null
      */
-    private function openForBind(array $actor, string $state, string $sessionKey, bool $allowAssetFallback): ?array
+    private function openForBind(array $actor, string $state, string $sessionKey, bool $allowAssetFallback, bool $recoverApp): ?array
     {
         $this->pdo->beginTransaction();
         try {
@@ -456,7 +492,7 @@ final class WhatsAppGateway
             }
             $saved = $this->pdo->prepare(
                 'UPDATE onboarding_sessions
-                 SET reported_waba_id = ?, reported_phone_number_id = ?
+                 SET reported_waba_id = ?, reported_phone_number_id = ?, finish_event = ?
                  WHERE id = ? AND business_id = ? AND status = \'token_held\'
                    AND finish_event IS NULL
                    AND reported_waba_id IS NULL
@@ -465,6 +501,7 @@ final class WhatsAppGateway
             $saved->execute([
                 $resolved['waba_id'],
                 $resolved['phone_number_id'],
+                $recoverApp ? self::APP_RECOVERY : null,
                 $row['id'],
                 $actor['business_id'],
             ]);
@@ -475,7 +512,8 @@ final class WhatsAppGateway
             $row['reported_waba_id'] = $resolved['waba_id'];
             $row['reported_phone_number_id'] = $resolved['phone_number_id'];
             $this->pdo->commit();
-            return ['row' => $row, 'token' => $token, 'coexistence' => false];
+            $row['finish_event'] = $recoverApp ? self::APP_RECOVERY : null;
+            return ['row' => $row, 'token' => $token, 'coexistence' => $recoverApp];
         } catch (\Throwable $error) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
@@ -487,13 +525,14 @@ final class WhatsAppGateway
     /** @param array<string,mixed> $row */
     private function isCoexistence(array $row): bool
     {
-        return (string) ($row['finish_event'] ?? '') === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING';
+        return in_array($row['finish_event'] ?? null, [self::APP_FINISH, self::APP_RECOVERY], true);
     }
 
     /** @param array<string,mixed> $row */
     private function bindReady(array $row, bool $coexistence): bool
     {
         return $row['status'] === 'token_held'
+            && ($row['finish_event'] ?? '') !== 'CANCEL'
             && is_string($row['reported_waba_id'])
             && is_string($row['token_ciphertext'])
             && $row['token_ciphertext'] !== ''
@@ -718,7 +757,12 @@ final class WhatsAppGateway
             if ((string) ($waba['id'] ?? '') !== $wabaId) {
                 throw new MetaCallException('waba', 409);
             }
-            $eligible = $this->eligibleCoexistencePhones($this->graph->coexistencePhones($token, $wabaId));
+            $listed = $this->graph->coexistencePhones($token, $wabaId);
+            if (isset($listed['paging']['next'])) {
+                $this->stopIncomplete((int) $row['id'], $actor['business_id'], 'coexistence_ambiguous');
+                return;
+            }
+            $eligible = $this->eligibleCoexistencePhones($listed);
         } catch (MetaCallException $error) {
             if ($error->metaCode === '190') {
                 $this->rejectId((int) $row['id'], $actor['business_id'], $error->metaCode);
@@ -749,6 +793,16 @@ final class WhatsAppGateway
         $sealed = $this->seal->seal($token, self::TOKEN_MAX);
         $this->pdo->beginTransaction();
         try {
+            $current = $this->pdo->prepare("SELECT status, finish_event, reported_waba_id, reported_phone_number_id,
+                    expires_at > UTC_TIMESTAMP() AS valid FROM onboarding_sessions WHERE id=? AND business_id=? FOR UPDATE");
+            $current->execute([$row['id'], $actor['business_id']]);
+            $attempt = $current->fetch(PDO::FETCH_ASSOC);
+            if (!$attempt || $attempt['status'] !== 'token_held' || !(int) $attempt['valid']
+                || !$this->isCoexistence($attempt) || $attempt['reported_waba_id'] !== $wabaId
+                || ($attempt['reported_phone_number_id'] !== null && $attempt['reported_phone_number_id'] !== $phoneId)) {
+                $this->pdo->commit();
+                return;
+            }
             $insert = $this->pdo->prepare(
                 'INSERT INTO whatsapp_connections (
                     business_id, waba_id, phone_number_id, display_phone, token_state, webhook_state,
@@ -882,6 +936,10 @@ final class WhatsAppGateway
 
     private function expireDue(int $businessId): void
     {
+        $expire = $this->pdo->prepare("UPDATE onboarding_sessions SET status='expired', consumed_at=UTC_TIMESTAMP(),
+            token_ciphertext=NULL, token_nonce=NULL, token_tag=NULL, token_key_version=NULL
+            WHERE business_id=? AND status IN ('pending','exchanging','token_held') AND expires_at<=UTC_TIMESTAMP()");
+        $expire->execute([$businessId]);
         $statement = $this->pdo->prepare(
             'UPDATE whatsapp_connections
              SET token_state = \'expired\', messaging_state = \'unverified\', last_error_code = \'expired\',
@@ -996,7 +1054,7 @@ final class WhatsAppGateway
             'timeout', 'interrupted' => 'Penyegerakan menunggu semakan. Tiada permintaan baharu.',
             'PARTNER_REMOVED', 'ACCOUNT_OFFBOARDED', 'ACCOUNT_DISCONNECTED', 'BUSINESS_DOWNGRADE', 'CHANGE_NUMBER', 'COMPANION_INACTIVITY', 'PRIMARY_INACTIVITY', 'USER_RE_REGISTERED' => 'Sambungan platform perniagaan diputuskan.',
             default => match ($status) {
-                'abandoned' => $code === '' ? 'Aliran Meta dibatalkan.' : 'Aliran Meta dibatalkan. Kod ralat ' . $code . '.',
+                'abandoned' => $code === '' ? 'BeShare menerima laporan tetingkap Meta ditutup. Jika BeShare sudah tertera dalam WhatsApp Business, kekalkan pautan itu dan lengkapkan kebenaran dengan akaun Meta yang sama.' : 'Aliran Meta dibatalkan. Kod ralat ' . $code . '.',
                 'incomplete' => 'Meta tidak memulangkan nombor telefon.',
                 'expired' => 'Sesi sambungan telah tamat.',
                 'rejected' => 'Sambungan Meta ditolak.',
@@ -1048,7 +1106,7 @@ final class WhatsAppGateway
                  reported_phone_number_id = COALESCE(?, reported_phone_number_id),
                  consumed_at = UTC_TIMESTAMP(), token_ciphertext = NULL, token_nonce = NULL,
                  token_tag = NULL, token_key_version = NULL
-             WHERE id = ? AND business_id = ?'
+             WHERE id = ? AND business_id = ? AND status IN (\'pending\',\'exchanging\',\'token_held\')'
         );
         $statement->execute([$status, $event, $step, $error, $waba, $phone, $id, $businessId]);
     }

@@ -16,7 +16,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require dirname(__DIR__) . '/src/bootstrap.php';
-require dirname(__DIR__) . '/src/SqlScript.php';
+require_once dirname(__DIR__) . '/src/SqlScript.php';
 require dirname(__DIR__, 2) . '/whatsapp/sambungan/ids.php';
 
 $failures = 0;
@@ -184,6 +184,10 @@ $created = $http->handle('POST', 'daftar', $owner, [
     'business' => 'Kedai Fallback',
 ], ['x-csrf-token' => $issued['body']['csrf']], $remote, $host, 'owner-session');
 $businessId = (string) $pdo->query('SELECT id FROM businesses WHERE name = \'Kedai Fallback\'')->fetchColumn();
+
+// These synthetic owners exercise an already-approved AI OS workspace.
+$pdo->exec("INSERT INTO audit_logs (business_id,actor_user_id,actor_kind,action,entity_type,entity_id,meta_json,created_at)
+    SELECT id,owner_user_id,'user','os_product_access','platform_admin',id,JSON_OBJECT('state','free','until',0),UTC_TIMESTAMP() FROM businesses");
 
 $begin = static function () use ($http, &$owner, $remote, $host): string {
     $started = $http->handle('POST', 'sambung', $owner, [], ['x-csrf-token' => (string) $owner['csrf']], $remote, $host, 'owner-session');

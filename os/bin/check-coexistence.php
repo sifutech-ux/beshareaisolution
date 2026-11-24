@@ -21,7 +21,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require dirname(__DIR__) . '/src/bootstrap.php';
-require dirname(__DIR__) . '/src/SqlScript.php';
+require_once dirname(__DIR__) . '/src/SqlScript.php';
 require dirname(__DIR__, 2) . '/whatsapp/sambungan/ids.php';
 
 $failures = 0;
@@ -336,6 +336,10 @@ $retryOwner = registerOwner($http, 'Pemilik Cuba', 'cuba.coex@kedai.test', 'Keda
 $failOwner = registerOwner($http, 'Pemilik Gagal', 'gagal.coex@kedai.test', 'Kedai Gagal', $remote, $host, 'fail-owner');
 $dropOwner = registerOwner($http, 'Pemilik Putus', 'putus.coex@kedai.test', 'Kedai Putus', $remote, $host, 'drop-owner');
 $otherOwner = registerOwner($http, 'Pemilik Lain', 'lain.coex@kedai.test', 'Kedai Lain', $remote, $host, 'other-owner');
+// These synthetic owners exercise an already-approved AI OS workspace.
+$pdo->exec("INSERT INTO audit_logs (business_id,actor_user_id,actor_kind,action,entity_type,entity_id,meta_json,created_at)
+    SELECT id,owner_user_id,'user','os_product_access','platform_admin',id,JSON_OBJECT('state','free','until',0),UTC_TIMESTAMP() FROM businesses");
+
 $staffSession = [];
 $staffIssued = $http->handle('GET', 'sesi', $staffSession, [], [], $remote, $host, 'staff-session');
 $staffSession['csrf'] = $staffIssued['body']['csrf'];
@@ -358,7 +362,14 @@ $script->calls = [];
 $script->script = [oauthResponse($token)];
 $started = post($http, $app, 'sambung', [], $remote, $host, 'app-owner');
 $state = (string) ($started['body']['state'] ?? '');
-post($http, $app, 'tukar', ['state' => $state, 'code' => 'coex-code-abcdefgh'], $remote, $host, 'app-owner');
+$close = post($http, $app, 'peristiwa', ['state'=>$state, 'coexistence'=>true,
+    'event'=>'CANCEL', 'current_step'=>'ASSET_SELECTION'], $remote, $host, 'app-owner');
+$check('asset picker close alone never links a number', $close['body']['attempt']['status'] === 'pending'
+    && !$close['body']['connection']['linked']);
+post($http, $app, 'tukar', ['state'=>$state, 'code'=>str_repeat('A',2048), 'coexistence'=>true], $remote, $host, 'app-owner');
+$check('manual recovery cannot use a cancelled picker without a positive finish', catchStatus(function () use ($http, &$app, $state, $remote, $host) {
+    post($http, $app, 'semaknombor', ['state'=>$state], $remote, $host, 'app-owner');
+}) === 409 && count($script->calls) === 1);
 $script->calls = [];
 $script->script = [
     debugResponse($appId, $appWaba),
@@ -1078,7 +1089,7 @@ $check(
 );
 
 $cli = [];
-exec('php ' . escapeshellarg(dirname(__DIR__) . '/bin/sync-coexistence.php') . ' 2>&1', $cli, $cliCode);
+exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(dirname(__DIR__) . '/bin/sync-coexistence.php') . ' 2>&1', $cli, $cliCode);
 $cliText = implode("\n", $cli);
 $check(
     'the sync command makes no live call',
@@ -1091,6 +1102,29 @@ $check(
     'production migrator does not apply the coexistence migration',
     !str_contains($migrator, '0002_coexistence') && !str_contains($worker, 'graph.facebook.com') && !str_contains($worker, 'smbAppData')
 );
+
+
+
+$recoveryWaba = '100000000000771';
+$recoveryPhone = '100000000000772';
+$proof = [debugResponse($appId, $recoveryWaba), ['status'=>200, 'json'=>['id'=>$recoveryWaba]],
+    ['status'=>200, 'json'=>['data'=>[['id'=>$recoveryPhone, 'display_phone_number'=>'+60120000772',
+        'is_on_biz_app'=>true, 'platform_type'=>'CLOUD_API', 'status'=>'CONNECTED']]]]];
+$started = post($http, $otherOwner, 'sambung', [], $remote, $host, 'other-owner');
+$recoveryState = $started['body']['state'];
+$script->calls = [];
+$script->script = [oauthResponse($token . '-recovery')];
+$held = post($http, $otherOwner, 'tukar', ['state'=>$recoveryState,'code'=>'fixture-recovery-code','coexistence'=>true], $remote, $host, 'other-owner');
+$check('code alone remains unbound until owner confirms', $held['body']['attempt']['status'] === 'token_held' && count($script->calls) === 1);
+$script->script = [debugResponse($appId,$recoveryWaba), ['status'=>200,'json'=>['id'=>$recoveryWaba]],
+    ['status'=>200,'json'=>['data'=>[['id'=>$recoveryPhone],['id'=>'100000000000773']]]]];
+$check('ambiguous grant stays unbound', catchStatus(function () use ($http, &$otherOwner, $remote, $host, $recoveryState) {
+    post($http,$otherOwner,'semaknombor',['state'=>$recoveryState],$remote,$host,'other-owner');
+}) === 409 && !connectionRow($pdo,$recoveryPhone));
+$script->script = array_merge($proof, $proof);
+$recovered = post($http,$otherOwner,'semaknombor',['state'=>$recoveryState],$remote,$host,'other-owner');
+$check('explicit verified recovery binds once using read-only Graph calls', $recovered['body']['attempt']['status'] === 'completed'
+    && $recovered['body']['connection']['phone'] === '+60120000772' && !in_array('POST',array_column($script->calls,'method'),true));
 
 fwrite(STDOUT, $failures === 0 ? "PASS\n" : "FAIL {$failures}\n");
 exit($failures === 0 ? 0 : 1);
