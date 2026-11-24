@@ -518,7 +518,7 @@ class PostgresMejaTests(MejaCases, unittest.TestCase):
         for name in (
             'pelanggan_import', 'pelanggan_angka', 'pelanggan_tugas', 'pelanggan_pelan',
             'copilot_service_nonce', 'copilot_usage_reservation', 'copilot_usage_counter',
-            'copilot_quota_policy', 'pelanggan_akaun',
+            'copilot_quota_policy', 'pelanggan_akses', 'pelanggan_pulih', 'pelanggan_akses_audit', 'pelanggan_akaun',
         ):
             cur.execute(f'DROP TABLE IF EXISTS {name}')
         conn.commit()

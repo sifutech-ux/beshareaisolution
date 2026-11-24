@@ -24,7 +24,16 @@
         for (const product of source === 'os' ? ['os'] : ['copilot','marketing']) {
           const grant = user.grants[product] || {state:'pending', revision:0, until:0}
           const row = el('users').insertRow()
-          row.insertCell().textContent = [user.name, user.email].filter(Boolean).join(' · ')
+          const customer = row.insertCell()
+          customer.textContent = [user.name, user.email].filter(Boolean).join(' · ')
+          if (user.members?.length) {
+            const detail = document.createElement('details'), title = document.createElement('summary')
+            title.textContent = 'Ahli ruang (' + user.members.length + ')'; detail.append(title)
+            for (const m of user.members) {
+              const line = document.createElement('div'); line.textContent = m.email + ' · ' + m.role; detail.append(line)
+            }
+            customer.append(detail)
+          }
           row.insertCell().textContent = products[product]
           const expiry = grant.until ? new Date((grant.until-1)*1000).toLocaleString('ms-MY',{timeZone:'Asia/Kuala_Lumpur'}) : ''
           row.insertCell().textContent = (expiry && grant.until <= Date.now()/1000 ? 'Tamat' : labels[grant.state]) + (expiry ? ' · '+expiry : '')

@@ -21,7 +21,7 @@ function sessionSeed(business = 'synthetic-business') {
   return {
     ok: true, csrf: 'synthetic-csrf',
     user: { name: 'Synthetic owner', email: 'owner@example.invalid', role: 'owner' },
-    business: { name: 'Synthetic business', public_id: business, status: 'active' },
+    business: { name: 'Synthetic business', public_id: business, status: 'active', access_status: 'active' },
     members: [], memberships: [], audit: [], contacts: [], conversations: [], inbox_ready: true, connection: {},
     ai: {
       available: true, can_manage: true, enabled: true, deployment_ready: true, knowledge: 'Pengetahuan aktif asal.',

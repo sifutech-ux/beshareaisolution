@@ -25,15 +25,17 @@ final class ProductAccess
     {
         $offset = (max(1,min(100000,$page))-1)*25;
         $sql = "SELECT b.id,b.public_id,b.name,u.email,b.created_at FROM businesses b JOIN users u ON u.id=b.owner_user_id
-                WHERE (LOWER(u.email) LIKE ? OR LOWER(b.name) LIKE ?) ORDER BY b.id DESC LIMIT 26 OFFSET ".$offset;
+                WHERE (LOWER(u.email) LIKE ? OR LOWER(b.name) LIKE ? OR EXISTS (SELECT 1 FROM business_users m JOIN users mu ON mu.id=m.user_id WHERE m.business_id=b.id AND LOWER(mu.email) LIKE ?)) ORDER BY b.id DESC LIMIT 26 OFFSET ".$offset;
         $stmt = $db->prepare($sql);
         $term = '%'.strtolower(substr($q,0,120)).'%';
-        $stmt->execute([$term,$term]);
+        $stmt->execute([$term,$term,$term]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $users = [];
+        $members=$db->prepare('SELECT u.email,m.role FROM business_users m JOIN users u ON u.id=m.user_id WHERE m.business_id=? ORDER BY u.email');
         foreach (array_slice($rows,0,25) as $row) {
+            $members->execute([$row['id']]);
             $users[] = ['id'=>$row['public_id'],'email'=>$row['email'],'name'=>$row['name'],'date'=>$row['created_at'],
-                'grants'=>['os'=>self::grant($db,(int)$row['id'])]];
+                'members'=>$members->fetchAll(PDO::FETCH_ASSOC),'grants'=>['os'=>self::grant($db,(int)$row['id'])]];
         }
         return ['users'=>$users,'next'=>count($rows)>25];
     }
