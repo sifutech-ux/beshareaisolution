@@ -30,7 +30,7 @@ final class AiReplyDispatcher
      * The callback receives business ID, event limit, and a wall-time
      * deadline. A worker finishes its current provider operation before stopping.
      */
-    public function run(callable $process, int $businessLimit = 20, int $eventLimit = 10, float $budgetSeconds = 50.0): array
+    public function run(callable $process, int $businessLimit = 20, int $eventLimit = 10, float $budgetSeconds = 50.0, bool $watch = false): array
     {
         $this->bounds($businessLimit, $eventLimit);
         if ($budgetSeconds < 1 || $budgetSeconds > 300 || $this->pdo->inTransaction()) {
@@ -40,34 +40,47 @@ final class AiReplyDispatcher
             'failed_businesses' => 0, 'archived' => 0, 'generated' => 0, 'sent' => 0,
             'handoff' => 0, 'unknown' => 0, 'skipped' => 0, 'failed' => 0,
             'statuses' => 0, 'recovered' => 0];
-        $lock = $this->pdo->prepare('SELECT GET_LOCK(?, 0)');
-        $lock->execute([self::LOCK]);
+        $deadline = microtime(true) + $budgetSeconds;
+        // A provider call may finish just after the next cron starts. Share that
+        // slot's budget with the lock wait instead of losing the entire slot.
+        $lock = $this->pdo->prepare('SELECT GET_LOCK(?, ?)');
+        $lock->execute([self::LOCK, $watch ? (int) $budgetSeconds : 0]);
         if ((int) $lock->fetchColumn() !== 1) {
             $result['mode'] = 'busy';
             return $result;
         }
         try {
-            $deadline = microtime(true) + $budgetSeconds;
-            $ids = $this->candidates($this->cursor(), $businessLimit);
-            foreach ($ids as $businessId) {
-                if (microtime(true) >= $deadline) { break; }
-                try {
-                    $counts = $process($businessId, $eventLimit, $deadline);
-                    if (!is_array($counts)) { throw new \RuntimeException('invalid_worker_result'); }
-                    $result['businesses']++;
-                    if (($counts['mode'] ?? '') === 'busy') { $result['busy_businesses']++; }
-                    foreach (['archived', 'generated', 'sent', 'handoff', 'unknown', 'skipped', 'failed', 'statuses', 'recovered'] as $key) {
-                        if (is_int($counts[$key] ?? null) && $counts[$key] >= 0) { $result[$key] += $counts[$key]; }
+            $cursor = $this->cursor();
+            $remaining = $businessLimit;
+            do {
+                $ids = $this->candidates($cursor, $remaining);
+                foreach ($ids as $businessId) {
+                    if (microtime(true) >= $deadline) { break; }
+                    try {
+                        $counts = $process($businessId, $eventLimit, $deadline);
+                        if (!is_array($counts)) { throw new \RuntimeException('invalid_worker_result'); }
+                        $result['businesses']++;
+                        if (($counts['mode'] ?? '') === 'busy') { $result['busy_businesses']++; }
+                        foreach (['archived', 'generated', 'sent', 'handoff', 'unknown', 'skipped', 'failed', 'statuses', 'recovered'] as $key) {
+                            if (is_int($counts[$key] ?? null) && $counts[$key] >= 0) { $result[$key] += $counts[$key]; }
+                        }
+                    } catch (Throwable) {
+                        // A broken tenant must not prevent other customers receiving
+                        // their own scheduled work. The worker retains uncertain sends.
+                        $result['failed_businesses']++;
                     }
-                } catch (Throwable) {
-                    // A broken tenant must not prevent other customers receiving
-                    // their own scheduled work. The worker retains uncertain sends.
-                    $result['failed_businesses']++;
+                    if ($this->pdo->inTransaction()) { $this->pdo->rollBack(); }
+                    $saveCursor = $this->pdo->prepare("UPDATE ai_reply_dispatch_state SET last_business_id=?,updated_at=UTC_TIMESTAMP() WHERE name='all'");
+                    $saveCursor->execute([$businessId]);
+                    $cursor = $businessId;
+                    $remaining--;
                 }
-                if ($this->pdo->inTransaction()) { $this->pdo->rollBack(); }
-                $cursor = $this->pdo->prepare("UPDATE ai_reply_dispatch_state SET last_business_id=?,updated_at=UTC_TIMESTAMP() WHERE name='all'");
-                $cursor->execute([$businessId]);
-            }
+                // Poll inside this cron slot. Keep the same deadline and visit cap
+                // across all passes, including busy and failed tenants.
+                $left = $deadline - microtime(true);
+                if (!$watch || $remaining === 0 || $left <= 0 || $result['failed_businesses'] > 0) { break; }
+                usleep((int) (min(2.0, $left) * 1000000));
+            } while (microtime(true) < $deadline);
         } finally {
             if ($this->pdo->inTransaction()) { $this->pdo->rollBack(); }
             $release = $this->pdo->prepare('SELECT RELEASE_LOCK(?)');

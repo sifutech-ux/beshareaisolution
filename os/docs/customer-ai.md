@@ -62,8 +62,11 @@ Tukar **hanya** jadual pemproses AI yang menggunakan `--business=ID` kepada:
 php /ABSOLUTE/WEBROOT/os/bin/process-ai-replies.php --all --limit=10 --business-limit=20
 ```
 
-Kekalkan pelaksana PHP, sela jadual dan redirection log persendirian yang sudah
-digunakan. Elakkan jadual pilot dan `--all` berjalan serentak. Kunci perniagaan
+Jalankan cron produksi setiap minit. Dalam satu panggilan, `--all` menyemak
+giliran setiap dua saat selama maksimum 58 saat untuk memulakan kerja. Operasi
+penyedia yang sudah bermula boleh selesai selepas had masa. Had lawatan perniagaan
+terpakai untuk keseluruhan panggilan. Kekalkan pelaksana PHP dan redirection log
+persendirian yang sudah digunakan. Elakkan jadual pilot dan `--all` berjalan serentak. Kunci perniagaan
 mencegah dua pekerja memproses perniagaan sama; kunci dispatcher mencegah pertindihan
 jadual semua pelanggan. Giliran disimpan selepas setiap perniagaan dilawati supaya
 akaun kemudian tidak kelaparan ketika had masa atau bilangan dicapai. Setiap

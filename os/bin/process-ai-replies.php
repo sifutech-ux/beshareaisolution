@@ -92,7 +92,7 @@ try {
     $worker = new AiReplyWorker($pdo, $seal, [$generator, 'reply'], [$sender, 'send'], null,
         new KnowledgeCentre($pdo, $seal), $rollout);
     $result = $all
-        ? (new AiReplyDispatcher($pdo))->run([$worker, 'run'], $businessLimit, $limit)
+        ? (new AiReplyDispatcher($pdo))->run([$worker, 'run'], $businessLimit, $limit, 58.0, true)
         : $worker->run($businessId, $limit);
     // Aggregate counters only. Tokens, prompts and message bodies never leave the host.
     fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n");

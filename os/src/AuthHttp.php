@@ -45,6 +45,28 @@ final class AuthHttp
             PlatformAccess::assertBusinessAccess($this->pdo, $actor['business_id']);
             return $this->respond($session, false, $this->payload($actor));
         }
+        if ($method === 'GET' && $action === 'petikini') {
+            $actor = $this->actor($session);
+            PlatformAccess::assertBusinessAccess($this->pdo, $actor['business_id']);
+            // Recent queue transitions cover both new messages and their receipts.
+            // The client occasionally requests a full snapshot for older backlog and mode changes.
+            $assets = $this->pdo->prepare('SELECT id FROM whatsapp_connections WHERE business_id=? ORDER BY id');
+            $assets->execute([$actor['business_id']]);
+            // The tenant/connection foreign-key index also orders each asset's events by primary key.
+            $query = $this->pdo->prepare('SELECT id,status FROM webhook_events WHERE business_id=? AND connection_id=? ORDER BY id DESC LIMIT 32');
+            $recent = [];
+            foreach ($assets->fetchAll(PDO::FETCH_COLUMN) as $connection) {
+                $query->execute([$actor['business_id'], $connection]);
+                $recent[$connection] = $query->fetchAll(PDO::FETCH_NUM);
+            }
+            $revision = hash('sha256', json_encode([$actor['user_id'], $actor['business_id'], $actor['role'], $recent], JSON_THROW_ON_ERROR));
+            $body = ['ok' => true, 'public_id' => $actor['public_id'], 'email' => $actor['email'],
+                'role' => $actor['role'], 'revision' => $revision];
+            if (!hash_equals($revision, $headers['x-inbox-revision'] ?? '')) {
+                $body += $this->inboxData($actor);
+            }
+            return $this->respond($session, false, $body);
+        }
         if ($method === 'GET' && $action === 'peti') {
             $actor = $this->actor($session);
             PlatformAccess::assertBusinessAccess($this->pdo, $actor['business_id']);
@@ -414,16 +436,18 @@ final class AuthHttp
      */
     private function withInbox(array $actor): array
     {
-        $payload = $this->payload($actor);
+        return $this->payload($actor) + $this->inboxData($actor);
+    }
+
+    private function inboxData(array $actor): array
+    {
         $inbox = $this->whatsapp instanceof WhatsAppGateway
             ? $this->whatsapp->inbox($actor)
             : ['conversations' => [], 'contacts' => []];
         if ($this->ai instanceof AiReplyStore) {
             $inbox = $this->ai->inbox($actor, $inbox);
         }
-        $payload['conversations'] = $inbox['conversations'];
-        $payload['contacts'] = $inbox['contacts'];
-        return $payload;
+        return $inbox;
     }
 
     /**

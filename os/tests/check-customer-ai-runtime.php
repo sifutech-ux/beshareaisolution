@@ -439,4 +439,48 @@ adminTest('Deadline, fair cron cursor and disabled archival are bounded and prov
     }
 });
 
+adminTest('Scheduled pass picks up a later read receipt and the open inbox sees its revision', function () use ($f, $pdo, $a, $b, $config, $connectionA, $wabaA, $phoneA, $now, &$calls): void {
+    runtimeSettings($f, $a, $connectionA, 'A', 'all', $now);
+    $ai = new AiReplyStore($pdo, $f['seal'], $config);
+    $api = new \BesharOs\AuthHttp($pdo, new \BesharOs\RateLimit(sys_get_temp_dir()), ai: $ai);
+    $poll = static function (array $tenant, string $revision = '') use ($api): array {
+        $session = ['user_id' => $tenant['owner_id'], 'business_id' => $tenant['business_id']];
+        return $api->handle('GET', 'petikini', $session, [], ['x-inbox-revision' => $revision], '127.0.0.1', 'fixture.invalid')['body'];
+    };
+    $initial = $poll($a);
+    adminAssert(isset($initial['conversations']) && !isset($initial['audit']) && !isset($initial['ai']), 'First poll returns scoped inbox data');
+    adminAssert(!isset($poll($a, $initial['revision'])['conversations']), 'Idle poll omits message history');
+    adminAssert($poll($b, $initial['revision'])['revision'] !== $initial['revision'], 'Another tenant cannot reuse this revision');
+    $before = runtimeCalls($calls);
+    $entry = runtimeEntry($wabaA, $phoneA, 'wamid.runtime.watch.in', '601199999883');
+    runtimeBridge($f, $config, [$entry]);
+    runtimeBridge($f, $config, [$entry]);
+    $queued = $poll($a, $initial['revision']);
+    adminAssert($queued['revision'] !== $initial['revision'], 'Incoming webhook invalidates an idle poll');
+    $worker = runtimeWorker($f, $now, $calls);
+    $outId = 'wamid.runtime.out.' . ($before[1] + 1);
+    $afterSend = '';
+    $process = function (int $business, int $limit, float $deadline) use ($worker, $f, $a, $config, $wabaA, $phoneA, $now, $outId, $poll, &$afterSend): array {
+        $counts = $worker->run($business, $limit, $deadline);
+        if ($counts['sent'] === 1) {
+            $afterSend = $poll($a)['revision'];
+            // This webhook arrives after the worker has finished its original batch.
+            $receipt = ['id' => $wabaA, 'changes' => [['field' => 'messages', 'value' => [
+                'metadata' => ['phone_number_id' => $phoneA], 'statuses' => [['id' => $outId, 'status' => 'read',
+                    'timestamp' => (string) $now, 'recipient_id' => '601199999883']],
+            ]]]];
+            runtimeBridge($f, $config, [$receipt]);
+            runtimeBridge($f, $config, [$receipt]);
+        }
+        return $counts;
+    };
+    $result = (new AiReplyDispatcher($pdo))->run($process, 2, 10, 10, true);
+    adminAssert($result['sent'] === 1 && $result['statuses'] === 1 && runtimeCalls($calls) === [$before[0]+1,$before[1]+1],
+        'One cron slot processes the later receipt with just one generation and send');
+    $fresh = $poll($a, $afterSend);
+    $messages = array_merge(...array_column($fresh['conversations'], 'messages'));
+    adminAssert(in_array('read', array_column(array_filter($messages, fn ($m) => $m['wamid'] === $outId), 'status'), true),
+        'Real receipt updates the tracked outbound message in the next snapshot');
+});
+
 fwrite(STDOUT, 'PASS ' . $adminChecks . " customer AI runtime checks; synthetic DB and injected transports only.\n");

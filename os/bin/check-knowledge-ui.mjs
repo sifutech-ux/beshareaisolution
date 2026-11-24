@@ -58,6 +58,7 @@ async function fixture(initial = sessionSeed()) {
       if (selector === "select[data-act='pilih']" && this.tagName === 'SELECT' && this.getAttribute('data-act') === 'pilih') return this;
       return null;
     }
+    contains() { return false; }
     addEventListener() {}
     querySelector() { return new Node(); }
     scrollIntoView() {}
@@ -125,7 +126,7 @@ async function fixture(initial = sessionSeed()) {
       assert.match(url, /^akaun\/pintu\.php\?tindakan=/, 'fixture forbids external network and Meta calls');
       const action = new URL(url, location.origin).searchParams.get('tindakan');
       const body = init.body ? JSON.parse(init.body) : null;
-      requests.push({ action, body });
+      requests.push({ action, body, revision: init.headers["X-Inbox-Revision"] });
       if (['knowsave', 'knowpublish', 'knowimport', 'knowtest'].includes(action)) {
         assert.equal(typeof body.expected_business_public_id, 'string', 'knowledge action carries the captured business');
         if (body.expected_business_public_id !== server.business.public_id) return response({ ok: false, error: 'Perniagaan sesi telah berubah.' });
@@ -441,5 +442,51 @@ check('tenant switch discards in-flight preview',!preview.html().includes('STALE
 const revised=await fixture();await revised.submit('knowledge-preview',{preview_message:'Old publication test'});
 const newerPreview=sessionSeed();newerPreview.knowledge_centre.published_revision=4;newerPreview.knowledge_centre.revision=4;await revised.refresh(newerPreview);
 check('publication change clears earlier preview context',revised.editor().preview.revision===4&&revised.editor().preview.messages.length===0);
+
+async function checkInboxRefresh() {
+  const inbox = await fixture();
+  const runInbox = code => new Script(code).runInContext(inbox.context);
+  const who = sessionSeed().user;
+  const scope = sessionSeed().business.public_id;
+  const message = { from: 'ai', text: 'Synthetic reply', status: 'sent', at: '2026-01-01 01:02:03', wamid: 'fixture.out' };
+  const thread = { id: 'ai-1', name: 'Fixture', mode: 'ai_active', window: 'open', messages: [message] };
+  const feed = { ok: true, public_id: scope, email: who.email, role: who.role, revision: 'a', conversations: [thread], contacts: [] };
+  inbox.context.location.hash = '#peti';
+  await inbox.settle();
+  const pane = inbox.node('talk');
+  const history = inbox.node('messages');
+  pane.querySelector = selector => selector === '.msgs' ? history : null;
+  inbox.context.document.querySelector = selector => selector === '.pane-talk' ? pane : null;
+  const poll = () => runInbox('refreshVisibleInbox(inboxWatch)');
+  const first = inbox.defer('petikini');
+  void poll(); await first(feed);
+  await inbox.click('open', 'ai-1');
+  const second = inbox.defer('petikini');
+  const countBefore = inbox.requests.length;
+  void poll(); void poll();
+  check('visible poll is sequential and sends its last revision', inbox.requests.length === countBefore+1
+    && inbox.requests.at(-1).revision === 'a');
+  message.status = 'read';
+  await second({ ...feed, revision: 'b' });
+  check('open thread updates the matching bubble without navigation', history.innerHTML.includes('Sudah dibaca')
+    && !history.innerHTML.includes('Menunggu pengesahan sampai') && history.innerHTML.includes(':02:03'));
+  inbox.context.document.hidden = true;
+  const previousCount = inbox.requests.length;
+  await poll();
+  check('hidden inbox does not poll', inbox.requests.length === previousCount);
+  inbox.context.document.hidden = false;
+  const stale = inbox.defer('petikini');
+  void poll();
+  inbox.context.location.hash = '#analitik';
+  await inbox.settle();
+  await stale({ ...feed, revision: 'old', conversations: [] });
+  check('leaving the inbox discards a delayed response', runInbox('live.conversations.length') === 1);
+  const cards = Array.from({length: 6}, () => ({textContent: ''}));
+  inbox.context.document.querySelectorAll = selector => selector.includes('.os-stat') ? cards : [];
+  const summary = inbox.defer('petikini');
+  void poll(); await summary(feed);
+  check('analytics refreshes with confirmed replies', cards[1].textContent === '1' && cards[3].textContent === '0');
+}
+await checkInboxRefresh();
 
 console.log(`PASS — knowledge-centre UI: ${checks} focused checks; synthetic APIs only.`);

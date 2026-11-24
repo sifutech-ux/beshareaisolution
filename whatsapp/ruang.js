@@ -196,8 +196,8 @@ function applyLive(data) {
   live = data;
 }
 
-async function callApi(action, body) {
-  const headers = { Accept: "application/json" };
+async function callApi(action, body, extraHeaders = {}) {
+  const headers = { Accept: "application/json", ...extraHeaders };
   const init = { method: body ? "POST" : "GET", credentials: "same-origin", headers, cache: "no-store" };
   if (body) {
     headers["Content-Type"] = "application/json";
@@ -209,12 +209,12 @@ async function callApi(action, body) {
     const response = await fetch("akaun/pintu.php?tindakan=" + encodeURIComponent(action), init);
     const parsed = await response.json();
     data = parsed && typeof parsed === "object" ? parsed : data;
-    if (!response.ok && data.ok !== false) data.ok = false;
+    if (!response.ok) { data.ok = false; data.httpStatus = response.status; }
     if (!response.ok && !data.error) data.error = "Permintaan gagal.";
   } catch {
     data = { ok: false, error: "Pelayan tidak menjawab." };
   }
-  if (typeof data.csrf === "string") csrf = data.csrf;
+  if (action !== "petikini" && typeof data.csrf === "string") csrf = data.csrf;
   return data;
 }
 
@@ -321,6 +321,7 @@ function route() {
   applyTheme(state);
   captureRecoveryToken();
   const hash = location.hash.replace("#", "") || (state ? "papan" : "masuk");
+  syncInboxWatch(hash);
   const changedPage = Boolean(paintedHash && paintedHash !== hash);
   if (state && paintedHash && paintedHash !== hash && state.notice) {
     state.notice = "";
@@ -356,14 +357,16 @@ function route() {
     document.getElementById("os-main")?.focus?.({ preventScroll: true });
   }
   if (hash === "sambungan" && state && state.business.accessStatus !== "suspended") prepareSignup();
-  if (state && state.business.accessStatus !== "suspended" && (hash === "peti" || hash === "kenalan" || hash === "papan" || hash === "sambungan" || hash === "pengetahuan") && inboxLoad !== hash) {
+  if (state && state.business.accessStatus !== "suspended" && (hash === "kenalan" || hash === "papan" || hash === "sambungan" || hash === "pengetahuan") && inboxLoad !== hash) {
     const requested = hash;
     inboxLoad = hash;
-    const action = hash === "peti" || hash === "kenalan" ? "peti" : "sesi";
+    const previous = live;
+    const action = hash === "kenalan" ? "peti" : "sesi";
     callApi(action).then((data) => {
-      if (data && data.user) applyLive(data);
       const current = location.hash.replace("#", "") || "papan";
-      if (current === requested || (requested === "papan" && current === "mula")) route();
+      if (previous !== live || current !== requested) return;
+      if (data && data.user) applyLive(data);
+      route();
     });
   }
 }
@@ -511,7 +514,7 @@ function messageTime(item) {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return "";
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return "";
-  const label = date.toLocaleString("ms-MY", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kuala_Lumpur" });
+  const label = date.toLocaleString("ms-MY", { dateStyle: "medium", timeStyle: "medium", timeZone: "Asia/Kuala_Lumpur" });
   return `<small class="msg-time">${item.from === "ai" ? "Dijana" : "Masa mesej"}: <time datetime="${esc(date.toISOString())}">${esc(label)} MYT</time></small>`;
 }
 
@@ -1548,13 +1551,20 @@ function onClick(event) {
   }
   if (!state) return;
   if (act.startsWith("kc-")) return knowledgeClick(act, value);
-  if (act === "ai-stop" || act === "refresh-inbox") {
+  if (act === "refresh-inbox") {
+    if (inboxWatch) {
+      inboxWatch.manual = true;
+      scheduleInboxWatch(inboxWatch, 0);
+    }
+    return;
+  }
+  if (act === "ai-stop") {
     button.disabled = true;
-    callApi(act === "ai-stop" ? "aistop" : "peti", act === "ai-stop" ? {} : undefined).then((result) => {
-      state.notice = result.ok ? (act === "ai-stop" ? "AI dihentikan." : "") : result.error || "Permintaan gagal.";
+    callApi("aistop", {}).then((result) => {
+      state.notice = result.ok ? "AI dihentikan." : result.error || "Permintaan gagal.";
       save(state);
       if (result.ok) {
-        if (act === "ai-stop" && knowledgeEditor) knowledgeEditor.controls = null;
+        if (knowledgeEditor) knowledgeEditor.controls = null;
         applyLive(result);
       }
       route();
@@ -1950,6 +1960,123 @@ let signupReady = { appId: "", configId: "", version: "v26.0" };
 let signupState = "";
 let signupQueue = null;
 let inboxLoad = "";
+
+// A visible inbox or analytics screen shares one sequential, tenant-scoped poll.
+let inboxWatch = null;
+function syncInboxWatch(hash) {
+  const active = live?.business && live.business.access_status !== "suspended"
+    && (hash === "peti" || hash === "analitik");
+  if (active && inboxWatch?.page === hash && inboxWatch.session === live) return;
+  if (inboxWatch) window.clearTimeout(inboxWatch.timer);
+  inboxWatch = null;
+  if (!active) return;
+  inboxWatch = { page: hash, session: live, scope: live.business.public_id, revision: "", lastFull: 0,
+    timer: null, busy: false, manual: false, delay: 3000 };
+  scheduleInboxWatch(inboxWatch, 0);
+}
+
+function scheduleInboxWatch(watch, delay) {
+  window.clearTimeout(watch.timer);
+  if (watch !== inboxWatch || watch.busy || document.hidden) return;
+  watch.timer = window.setTimeout(() => refreshVisibleInbox(watch), delay);
+}
+
+async function refreshVisibleInbox(watch) {
+  if (watch !== inboxWatch || watch.busy || document.hidden) return;
+  watch.busy = true;
+  const manual = watch.manual;
+  watch.manual = false;
+  const session = live;
+  const revision = manual || Date.now() - watch.lastFull > 60000 ? "" : watch.revision;
+  try {
+    const data = await callApi("petikini", undefined, { "X-Inbox-Revision": revision });
+    if (watch !== inboxWatch || session !== live || document.hidden || location.hash !== "#" + watch.page) return;
+    if (data.httpStatus === 401 || data.httpStatus === 403 || (data.ok && (data.public_id !== watch.scope
+        || data.email !== session.user.email || data.role !== session.user.role))) {
+      location.reload();
+      return;
+    }
+    if (!data.ok || !data.revision) {
+      watch.delay = Math.min(watch.delay * 2, 30000);
+      if (manual) {
+        const state = load();
+        state.notice = data.error || "Peti masuk belum dapat dikemas kini.";
+        save(state);
+        route();
+      }
+      return;
+    }
+    watch.delay = 3000;
+    if (Array.isArray(data.conversations) && Array.isArray(data.contacts)) {
+      const before = load();
+      live.conversations = data.conversations;
+      live.contacts = data.contacts;
+      const after = load();
+      // A signed inbound event may move from a temporary thread to its archived conversation.
+      const selected = currentConversation(before);
+      if (selected && !currentConversation(after)) {
+        const anchor = selected.messages.find(message => message.wamid)?.wamid;
+        const match = anchor && after.conversations.find(thread => thread.messages.some(message => message.wamid === anchor));
+        if (match) { after.active = match.id; save(after); }
+      }
+      updateInboxDisplay(before, after, watch.page);
+      watch.lastFull = Date.now();
+    }
+    watch.revision = data.revision;
+  } finally {
+    watch.busy = false;
+    scheduleInboxWatch(watch, watch.manual ? 0 : watch.delay);
+  }
+}
+
+function updateInboxDisplay(before, after, page) {
+  const counts = metrics(after);
+  for (const link of document.querySelectorAll('a[href="#peti"]')) {
+    if (!link.closest("nav")) continue;
+    let badge = link.querySelector(".os-nav-count");
+    if (!counts.unanswered) { badge?.remove(); continue; }
+    if (!badge) { badge = document.createElement("span"); badge.className = "os-nav-count"; link.append(badge); }
+    badge.textContent = String(counts.unanswered);
+  }
+  if (page === "analitik") {
+    const values = [counts.incoming, counts.aiReplied, counts.human, counts.unanswered, counts.sent, counts.failed];
+    document.querySelectorAll(".os-dashboard-kpis .os-stat strong").forEach((node, index) => {
+      node.textContent = String(values[index]);
+    });
+    return;
+  }
+  const count = document.querySelector(".inbox-screen .os-total");
+  if (count) count.textContent = String(after.conversations.length);
+  const list = visibleConversations(after);
+  const prev = visibleConversations(before).find(item => item.id === before.active) || null;
+  const next = list.find(item => item.id === after.active) || null;
+  const threads = inboxThreads(after, list);
+  const thread = document.getElementById("thread");
+  if (thread && threads !== inboxThreads(before)) {
+    const focusId = thread.contains(document.activeElement) ? document.activeElement.dataset.value : null;
+    thread.innerHTML = threads;
+    if (focusId) Array.from(thread.querySelectorAll("[data-value]")).find(el => el.dataset.value === focusId)?.focus({ preventScroll: true });
+  }
+  const talkPane = document.querySelector(".pane-talk");
+  const messages = talkPane?.querySelector(".msgs");
+  if (next && prev && messages && prev.id === next.id && prev.mode === next.mode && prev.window === next.window
+      && prev.can_control === next.can_control && prev.name === next.name) {
+    if (JSON.stringify(prev.messages) !== JSON.stringify(next.messages)) {
+      const atEnd = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 24;
+      const top = messages.scrollTop;
+      messages.innerHTML = next.messages.map(messageBubble).join("");
+      messages.scrollTop = atEnd ? messages.scrollHeight : top;
+    }
+  } else if (talkPane && talk(before, prev) !== talk(after, next)) {
+    talkPane.innerHTML = talk(after, next);
+  }
+  const details = document.querySelector(".pane-profile");
+  if (details && profile(before, prev) !== profile(after, next)) details.innerHTML = profile(after, next);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (inboxWatch) scheduleInboxWatch(inboxWatch, 0);
+});
 
 function facebookHost(origin) {
   try {
