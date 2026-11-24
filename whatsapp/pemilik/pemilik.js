@@ -148,13 +148,13 @@ function renderSummary(summary) {
 }
 
 function customerRow(customer) {
-  const access = customer.access_status === 'suspended' ? badge('Digantung', 'red') : customer.access_status === 'active' ? badge('Aktif', 'green') : badge('Belum disahkan');
+  const access = customer.access_status === 'suspended' ? badge('Digantung', 'red') : customer.access_status === 'active' ? badge('Tiada sekatan', 'green') : badge('Belum disahkan');
   const ai = customer.ai_enabled === true || customer.ai_enabled === 1 ? badge('Dihidupkan', 'violet') : badge('Dimatikan');
   const registered = customer.created_at ? 'Daftar ' + dateText(customer.created_at, false) : 'Tarikh belum direkodkan';
   return `<tr>
     <td><div class="customer-name"><span class="customer-avatar" aria-hidden="true">${h(initials(customer.name))}</span><span><strong>${h(customer.name)}</strong><small>${h(customer.owner_name || customer.owner_email || 'Pemilik belum direkodkan')}</small></span></div></td>
     <td data-label="WhatsApp"><span class="phone">${h(customer.phone || 'Tiada nombor')}</span>${readiness(customer.readiness)}</td>
-    <td data-label="Akses BeShare">${access}</td>
+    <td data-label="Sekatan operasi">${access}</td>
     <td data-label="AI Auto Reply">${ai}</td>
     <td><span class="activity-date">${h(dateText(customer.last_activity))}</span><span class="activity-time">${h(registered)}</span></td>
     <td><button class="manage-button" type="button" data-open="${h(customer.public_id)}" aria-label="Urus ${h(customer.name)}"><span class="manage-label">Urus</span><span aria-hidden="true">↗</span></button></td>
@@ -242,11 +242,11 @@ function renderDetail(data) {
   const knowledge = data.knowledge || {};
   const suspended = customer.access_status === 'suspended';
   const knownAccess = ['active', 'suspended'].includes(customer.access_status);
-  const accessLabel = suspended ? badge('Digantung', 'red') : knownAccess ? badge('Aktif', 'green') : badge('Belum disahkan');
+  const accessLabel = suspended ? badge('Digantung', 'red') : knownAccess ? badge('Tiada sekatan', 'green') : badge('Belum disahkan');
   const businessStatus = customer.business_status === 'suspended' ? 'Ruang perniagaan turut digantung oleh pemilik pelanggan.'
     : customer.business_status === 'provisioning' ? 'Ruang perniagaan sedang melalui proses pemilikan.' : '';
   const accessMessage = suspended ? 'Akses ruang perniagaan ini digantung oleh pentadbir sistem.'
-    : knownAccess ? 'Akses platform dibenarkan untuk perniagaan ini.' : 'Status akses belum dapat dipastikan.';
+    : knownAccess ? 'Tiada sekatan operasi. Semak kelulusan bayaran atau akses percuma di bahagian Akses produk.' : 'Status akses belum dapat dipastikan.';
   const enabled = ai.enabled === true;
   const canEnable = ai.available === true && ai.can_enable === true;
   const audience = ai.audience_mode === 'all' ? 'Semua pelanggan yang menghubungi nombor perniagaan'
@@ -263,7 +263,7 @@ function renderDetail(data) {
   byId('detailTitle').textContent = customer.name;
   byId('detailSubtitle').textContent = owner || 'Pemilik belum direkodkan';
   byId('detailContent').innerHTML = `<div class="detail-grid">
-    <section class="detail-card"><h3><span aria-hidden="true">▤</span> Akses BeShare</h3>${accessLabel}<p>${h(accessMessage)}</p>${businessStatus ? '<p class="access-caveat">' + h(businessStatus) + '</p>' : ''}${knownAccess ? '<button type="button" class="button ' + (suspended ? 'button-quiet' : 'button-danger') + '" data-action="access">' + (suspended ? 'Aktifkan akses BeShare' : 'Gantung akses BeShare') + '</button>' : ''}</section>
+    <section class="detail-card"><h3><span aria-hidden="true">▤</span> Sekatan operasi</h3>${accessLabel}<p>${h(accessMessage)}</p>${businessStatus ? '<p class="access-caveat">' + h(businessStatus) + '</p>' : ''}${knownAccess ? '<button type="button" class="button ' + (suspended ? 'button-quiet' : 'button-danger') + '" data-action="access">' + (suspended ? 'Tarik sekatan operasi' : 'Gantung operasi') + '</button>' : ''}</section>
     <section class="detail-card"><h3><span aria-hidden="true">✧</span> AI Auto Reply</h3>${enabled ? canEnable ? badge('Dihidupkan', 'violet') : badge('Dijeda', 'amber') : badge('Dimatikan')}<p id="aiReadinessReason">${h(aiReason)}</p>${needsPreparation ? '<p id="aiPreparationHelp" class="muted">Pemilik perniagaan pelanggan perlu membuka Pengetahuan dalam akaun mereka, melengkapkan maklumat, memilih “Semak &amp; terbitkan”, kemudian menyimpan tetapan AI dengan pengesahan pemilik. AI boleh kekal dimatikan semasa tetapan disimpan. Selepas itu, muat semula butiran ini untuk menghidupkan AI melalui panel pemilik.</p>' : ''}${audience ? '<p class="muted">Penerima: ' + h(audience) + '.</p>' : ''}${aiButton}<p><button type="button" class="button button-quiet" data-action="reload-detail">Muat semula butiran</button></p></section>
   </div>
   <h3 class="section-title">Sambungan WhatsApp <span>${formatCount(connections.length)} nombor</span></h3>
@@ -340,7 +340,7 @@ function requestAction(action, connectionId = null) {
     if (!['active', 'suspended'].includes(customer.access_status)) return;
     const suspended = customer.access_status === 'suspended';
     body = { public_id: customer.public_id, status: suspended ? 'active' : 'suspended', expected_status: customer.access_status, confirmed: true };
-    title = suspended ? 'Aktifkan akses BeShare?' : 'Gantung akses BeShare?';
+    title = suspended ? 'Tarik sekatan operasi?' : 'Gantung operasi?';
     message = suspended ? 'Pelanggan akan mendapat semula akses ruang perniagaan ini.' : 'Pelanggan akan kehilangan akses operasi ruang perniagaan ini sehingga diaktifkan semula.';
     note = 'Perubahan ini direkodkan atas akaun admin anda.';
     label = suspended ? 'Aktifkan akses' : 'Gantung akses';
