@@ -51,6 +51,8 @@ class ConnectionHealthTests(unittest.TestCase):
         conn.cursor().execute('CREATE TABLE pelanggan_akaun (id TEXT PRIMARY KEY,email TEXT NOT NULL)')
         conn.cursor().executemany(f'INSERT INTO pelanggan_akaun VALUES ({ph},{ph})',
                                  [(OWNER, 'owner@example.com'), (OTHER, 'other@example.com')])
+        from access_fixture import grant_existing
+        grant_existing(conn, postgres=self.postgres)
         marketing.ensure_marketing_schema(conn, self.postgres)
         social.ensure_social_schema(conn, self.postgres)
         conn.commit()

@@ -75,7 +75,7 @@ async function workspace({ posts = [], mediaGet, uploadEnabled = true } = {}) {
     setTimeout(fn, ms) { const id = ++timerId; timers.set(id, { fn, ms }); return id }, clearTimeout(id) { timers.delete(id) },
     fetch: async (url, options) => {
       const path = new URL(url).pathname; requests.push({ url, path, options })
-      if (options.method === 'GET' && path === '/api/akaun/saya') return response({ akaun_id: stored === sessionB ? 'owner-b' : 'owner-a', nama: 'Ujian media' })
+      if (options.method === 'GET' && path === '/api/akaun/identiti') return response({ akaun_id: stored === sessionB ? 'owner-b' : 'owner-a', nama: 'Ujian media' })
       if (options.method === 'GET' && path.endsWith('/workspace')) return response({ ok: true, campaigns: [campaign], posts: stored === sessionB ? [] : posts, sources: [], results: [], connections: [{ platform: 'facebook', status: 'connected', publishable: true, configured: true }], capabilities: { worker_enabled: true, auto_publish: true, media_upload: { ...capability, enabled: uploadEnabled } } })
       if (path.includes('/media/')) {
         if (options.method === 'DELETE') return response({ ok: true })

@@ -1,4 +1,5 @@
 """Akaun pelanggan BeShare. Jadual dan laluan ini tidak membaca desk dagangan."""
+import pelanggan_akses as akses
 import hashlib
 import hmac
 import json
@@ -108,6 +109,7 @@ def ensure_schema(conn, postgres):
         )
         '''
     )
+    akses.schema(conn)
     from pelanggan_bil import schema as billing_schema
     billing_schema(conn)
     ensure_kuota_schema(conn, postgres)
@@ -299,21 +301,48 @@ def dispatch(method, path, origin, authorization, body, connect, postgres, secre
     try:
         ensure_schema(conn, postgres)
         conn.commit()
+        def session(token, key, when):
+            return akses.current(conn, ph, read_session(token, key, when), SESSION_SECONDS)
+        if method == 'POST' and path == '/api/akaun/operasi':
+            return akses.operator(conn, ph, payload, body, authorization, stamp)
+        if method == 'POST' and path == '/api/akaun/pulih':
+            return akses.reset(conn, ph, payload, stamp, _clean_password, _hash_password)
         if path.startswith('/api/akaun/copilot/kuota/'):
             from pelanggan_kuota import handle_kuota
             return handle_kuota(
-                method, path, authorization, body, conn, postgres, secret, stamp, kuta_headers, read_session,
+                method, path, authorization, body, conn, postgres, secret, stamp, kuta_headers, session,
             )
         if method == 'POST' and path == '/api/akaun/daftar':
             return _daftar(conn, ph, payload, secret, stamp)
         if method == 'POST' and path == '/api/akaun/masuk':
             return _masuk(conn, ph, payload, secret, stamp)
-        user_id = read_token(_bearer(authorization), secret, stamp)
+        claims = session(_bearer(authorization), secret, stamp)
+        user_id = claims and claims["akaun_id"]
         if not user_id:
             return 401, {'error': 'Sila masuk akaun dahulu.'}
         if path == '/api/akaun/bil' or path.startswith('/api/akaun/bil/'):
             from pelanggan_bil import dispatch_billing
             return dispatch_billing(method, path, conn, postgres, user_id, stamp)
+        if method == 'GET' and path == '/api/akaun/identiti':
+            cur = conn.cursor()
+            cur.execute(f'SELECT email FROM pelanggan_akaun WHERE id={ph}', (user_id,))
+            row = cur.fetchone()
+            return (200, {'ok': True, 'akaun_id': user_id, 'email': row[0]}) if row else (401, {'error':'Sila masuk semula.'})
+        if method == 'GET' and path in ('/api/akaun/izin/copilot', '/api/akaun/izin/marketing'):
+            return (200, {'ok': True}) if akses.allowed(conn, ph, user_id, path.rsplit('/',1)[1], stamp) else akses.DENIED
+        if method == 'GET' and path in ('/api/akaun/copilot/sesi', '/api/akaun/copilot/konteks') and not akses.allowed(conn, ph, user_id, 'copilot', stamp):
+            if not akses.allowed(conn, ph, user_id, 'marketing', stamp):
+                return akses.DENIED
+            if path.endswith('/konteks'):
+                from pelanggan_meja import hari_ini
+                from datetime import timedelta
+                today = hari_ini(stamp)
+                return 200, {'ok': True, 'hari': today.isoformat(), 'minggu_mula': (today-timedelta(days=today.weekday())).isoformat(),
+                             'pelan': None, 'matlamat': None, 'angka': {}, 'ingatan': {'versi': 0, 'ingatan': {}}, 'semakan_mingguan': []}
+            return 200, {'ok': True, **claims, 'penasihat': {'nama': 'BeShare Marketing', 'jualan': 'Kandungan pemasaran', 'peringkat': 'jual'}}
+        product = 'marketing' if path.startswith('/api/akaun/copilot/marketing/') else 'copilot'
+        if not akses.allowed(conn, ph, user_id, product, stamp):
+            return akses.denial(conn, ph, user_id, product)
         if method == 'GET' and path == '/api/akaun/saya':
             return _saya(conn, ph, user_id)
         if method == 'GET' and path == '/api/akaun/copilot/sesi':
@@ -348,6 +377,7 @@ def _daftar(conn, ph, payload, secret, now):
                 VALUES ({ph}, {ph}, {ph}, '', '', '', '[]', {ph})''',
             (user_id, email, _hash_password(password), time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(now))),
         )
+        akses.pending(conn.cursor(), ph, user_id)
         conn.commit()
     except Exception as error:
         conn.rollback()
@@ -368,7 +398,10 @@ def _masuk(conn, ph, payload, secret, now):
     stored = row[1] if row else _dummy_hash()
     if not email or not password or not row or not _verify_password(password, stored):
         return 401, {'error': 'E-mel atau kata laluan tidak tepat.'}
-    return 200, {'ok': True, 'token': issue_token(row[0], secret, now), 'email': email}
+    cur.execute(f'SELECT revoked FROM pelanggan_pulih WHERE owner={ph}', (row[0],))
+    recovery = cur.fetchone()
+    issued = max(int(now), recovery[0]) if recovery else int(now)
+    return 200, {'ok': True, 'token': issue_token(row[0], secret, issued), 'email': email}
 
 
 def _copilot_sesi(conn, ph, claims):

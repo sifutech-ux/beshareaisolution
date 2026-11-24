@@ -21,7 +21,15 @@ class AkaunTests(unittest.TestCase):
     def call(self, method, path, body=None, token='', origin='https://beshareaisolution.com', ip='1.1.1.1'):
         raw = b'' if body is None else json.dumps(body).encode()
         header = f'Bearer {token}' if token else ''
-        return akaun.dispatch(method, path, origin, header, raw, self.connect, False, self.secret, ip, now=1_700_000_000)
+        status, result = akaun.dispatch(method, path, origin, header, raw, self.connect, False, self.secret, ip, now=1_700_000_000)
+        if path == '/api/akaun/daftar' and status == 200:
+            from access_fixture import grant_existing
+            conn = self.connect()
+            try:
+                grant_existing(conn, 'copilot', result['email'], False)
+            finally:
+                conn.close()
+        return status, result
 
     def test_daftar_masuk_dan_simpan_penasihat(self):
         status, body = self.call('POST', '/api/akaun/daftar', {'email': 'Siti@Kedai.my', 'password': 'kata-rahsia'})

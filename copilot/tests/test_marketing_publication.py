@@ -58,6 +58,8 @@ class PublicationTests(unittest.TestCase):
         ph = meja._ph(self.postgres)
         cur.executemany(f'INSERT INTO pelanggan_akaun VALUES ({ph},{ph})',
                         [(OWNER, 'a@example.test'), (OTHER, 'b@example.test')])
+        from access_fixture import grant_existing
+        grant_existing(conn, postgres=self.postgres)
         marketing.ensure_marketing_schema(conn, self.postgres)
         social.ensure_social_schema(conn, self.postgres)
         marketing.ensure_marketing_schema(conn, self.postgres)

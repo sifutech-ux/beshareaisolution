@@ -338,6 +338,7 @@ function route() {
   }
   if (hash === "daftar" || hash === "masuk" || hash === "lupa" || hash === "pulih") root.innerHTML = authView(hash, state);
   else if (hash === "sahkan") root.innerHTML = `<main class="page"><section class="panel" style="max-width:560px;margin:2rem auto;"><h1>Pengesahan e-mel</h1><p class="muted">Pengesahan e-mel tidak digunakan. Tiada e-mel dihantar.</p><p><a href="#masuk">Masuk</a></p></section></main>`;
+  else if (state && state.business.accessStatus === "pending") root.innerHTML = shell(state, "papan", '<article class="panel"><h1>Aktifkan BeShare AI OS</h1><p>Hubungi pasukan BeShare untuk ujian WhatsApp berpandu. Bayaran bermula selepas ujian berjaya. Jika sudah membayar, kami akan semak invois dan aktifkan ruang ini.</p><a class="btn" href="https://wa.me/60175457957">Hubungi BeShare</a></article>');
   else if (state && state.business.accessStatus === "suspended") root.innerHTML = shell(state, "papan", '<article class="panel"><h1>Akses perniagaan digantung</h1><p>Hubungi pemilik sistem BeShare untuk bantuan. Anda masih boleh memilih ruang perniagaan lain atau keluar daripada akaun.</p></article>');
   else if (hash === "mula") root.innerHTML = shell(state, "papan", board(state));
   else if (!NAV.some(([id]) => id === hash)) root.innerHTML = shell(state, "papan", board(state));
@@ -357,8 +358,8 @@ function route() {
     window.scrollTo?.({ top: 0, behavior: "instant" });
     document.getElementById("os-main")?.focus?.({ preventScroll: true });
   }
-  if (hash === "sambungan" && state && state.business.accessStatus !== "suspended") prepareSignup();
-  if (state && state.business.accessStatus !== "suspended" && (hash === "kenalan" || hash === "papan" || hash === "sambungan" || hash === "pengetahuan") && inboxLoad !== hash) {
+  if (hash === "sambungan" && state && state.business.accessStatus === "active") prepareSignup();
+  if (state && state.business.accessStatus === "active" && (hash === "kenalan" || hash === "papan" || hash === "sambungan" || hash === "pengetahuan") && inboxLoad !== hash) {
     const requested = hash;
     inboxLoad = hash;
     const previous = live;
@@ -1980,7 +1981,7 @@ let inboxLoad = "";
 // A visible inbox or analytics screen shares one sequential, tenant-scoped poll.
 let inboxWatch = null;
 function syncInboxWatch(hash) {
-  const active = live?.business && live.business.access_status !== "suspended"
+  const active = live?.business && live.business.access_status === "active"
     && (hash === "peti" || hash === "analitik");
   if (active && inboxWatch?.page === hash && inboxWatch.session === live) return;
   if (inboxWatch) window.clearTimeout(inboxWatch.timer);

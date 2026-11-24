@@ -58,10 +58,19 @@ class KuotaCases:
 
     def dispatch_raw(self, method, path, raw, token='', stamp=STAMP, kuta=None, origin=None):
         header = f'Bearer {token}' if token else ''
-        return akaun.dispatch(
+        status, result = akaun.dispatch(
             method, path, origin, header, raw, self.connect, self.postgres, AKAUN_SECRET, '1.1.1.1',
             now=stamp, kuta_headers=kuta,
         )
+        if path == '/api/akaun/daftar' and status == 200:
+            from access_fixture import grant_existing
+            conn = self.connect()
+            try:
+                grant_existing(conn, 'copilot', result['email'], self.postgres)
+                grant_existing(conn, 'marketing', result['email'], self.postgres)
+            finally:
+                conn.close()
+        return status, result
 
     def kuota(self, path, body, token='', stamp=STAMP, nonce=None, secret=KUTA, method='POST', sign_path=None, sign_body=None, masa=None):
         raw = json.dumps(body, separators=(',', ':')).encode() if sign_body is None else sign_body

@@ -5,6 +5,7 @@ namespace BesharOs;
 
 use PDO;
 use PDOException;
+require_once __DIR__.'/ProductAccess.php';
 
 /** Platform grants are independent of tenant membership and legacy admin cookies. */
 final class PlatformAccess
@@ -47,16 +48,21 @@ final class PlatformAccess
             $statement = $pdo->prepare('SELECT status FROM platform_business_access WHERE business_id=?');
             $statement->execute([$businessId]);
             $status = $statement->fetchColumn();
-            return $status === false ? 'active' : ($status === 'active' ? 'active' : 'suspended');
+            if ($status !== false && $status !== 'active') { return 'suspended'; }
+            $grant = ProductAccess::grant($pdo,$businessId);
+            if (ProductAccess::usable($grant)) { return 'active'; }
+            return $grant['state'] === 'suspended' ? 'suspended' : 'pending';
         } catch (PDOException $error) {
-            if (self::missingTable($error) && !self::installed($pdo)) { return 'active'; }
+            if (self::missingTable($error) && !self::installed($pdo)) { return ProductAccess::usable(ProductAccess::grant($pdo,$businessId)) ? 'active' : 'pending'; }
             throw $error;
         }
     }
 
     public static function assertBusinessAccess(PDO $pdo, int $businessId): void
     {
-        if ($businessId < 1 || self::businessStatus($pdo, $businessId) !== 'active') {
+        $status = $businessId > 0 ? self::businessStatus($pdo, $businessId) : 'suspended';
+        if ($status === 'pending') { throw new AuthException('Akses AI OS belum aktif. Hubungi BeShare untuk pemasangan atau semakan bayaran.',402); }
+        if ($status !== 'active') {
             throw new AuthException('Akses perniagaan ini digantung oleh pentadbir BeShare. Hubungi pemilik sistem.', 403);
         }
     }

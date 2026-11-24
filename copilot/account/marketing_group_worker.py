@@ -9,6 +9,7 @@ import os
 import re
 import time
 
+import pelanggan_akses as access
 import pelanggan_meja as meja
 import marketing_groups as groups
 
@@ -52,13 +53,15 @@ def _poll_claims(conn, postgres, stamp):
 
 
 def _claim_one(conn, postgres, stamp):
+    def permitted(alias):
+        return access.worker_condition(alias, stamp)
     p = meja._ph(postgres)
     def claim():
         c = conn.cursor()
         c.execute(f'''SELECT j.id,j.akaun_id,j.destination_id,j.body,d.chat_id
             FROM marketing_group_jobs j
             JOIN marketing_group_destinations d ON d.id=j.destination_id AND d.akaun_id=j.akaun_id
-            WHERE j.status='queued' AND j.scheduled_at<={p} AND d.platform='telegram'
+            WHERE {permitted('j')} AND j.status='queued' AND j.scheduled_at<={p} AND d.platform='telegram'
             ORDER BY j.scheduled_at,j.id LIMIT 20''', (stamp,))
         for jid, owner, gid, body, chat_id in c.fetchall():
             c.execute(f'''UPDATE marketing_group_jobs SET status='sending',updated_at={p}
@@ -106,6 +109,9 @@ def _send(conn, postgres, job, bot_id, stamp):
         bot = groups.bot_call('getChatMember', {'chat_id': job['chat_id'], 'user_id': bot_id})
         if not isinstance(bot, dict) or bot.get('status') not in ('creator', 'administrator'):
             _finish(conn, postgres, job, stamp, 'failed', 'Bot bukan pentadbir kumpulan lagi.')
+            return 'failed'
+        if not access.allowed(conn, p, job['owner'], 'marketing', stamp):
+            _finish(conn, postgres, job, stamp, 'failed', 'Akses Marketing telah ditarik balik.')
             return 'failed'
         result = groups.bot_call('sendMessage', {'chat_id': job['chat_id'], 'text': job['body'],
                                                 'disable_notification': False})

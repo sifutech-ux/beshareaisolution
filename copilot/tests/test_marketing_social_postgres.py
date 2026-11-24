@@ -51,6 +51,8 @@ class PostgresMarketingSocialTests(unittest.TestCase):
             cur.execute('CREATE TABLE pelanggan_akaun (id TEXT PRIMARY KEY,email TEXT NOT NULL)')
             cur.executemany('INSERT INTO pelanggan_akaun VALUES (%s,%s)',
                             [(OWNER, 'a@example.test'), (OTHER, 'b@example.test')])
+            from access_fixture import grant_existing
+            grant_existing(conn, postgres=True)
             marketing.ensure_marketing_schema(conn, True)
             social.ensure_social_schema(conn, True)
             cur.execute('INSERT INTO marketing_campaigns VALUES (%s,%s,%s,%s,%s,%s,%s)',

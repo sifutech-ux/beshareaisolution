@@ -39,10 +39,18 @@ class MejaCases:
     def call(self, method, path, body=None, token='', query=None, kunci=None, origin='https://beshareaisolution.com'):
         raw = b'' if body is None else json.dumps(body).encode()
         header = f'Bearer {token}' if token else ''
-        return akaun.dispatch(
+        status, result = akaun.dispatch(
             method, path, origin, header, raw, self.connect, self.postgres, self.secret, '1.1.1.1',
             now=STAMP, query=query, idempotency_key=kunci,
         )
+        if path == '/api/akaun/daftar' and status == 200:
+            from access_fixture import grant_existing
+            conn = self.connect()
+            try:
+                grant_existing(conn, 'copilot', result['email'], self.postgres)
+            finally:
+                conn.close()
+        return status, result
 
     def daftar(self, email='siti@kedai.my'):
         status, body = self.call('POST', '/api/akaun/daftar', {'email': email, 'password': 'kata-rahsia'})

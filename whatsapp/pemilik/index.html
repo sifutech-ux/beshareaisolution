@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="pemilik.css?v=20261026-r1">
   <link rel="stylesheet" href="aurora.css?v=20261113-r1">
   <script src="pemilik.js?v=20261124-webhook-r1" defer></script>
+  <script src="produk.js?v=20261124-1" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Langkau ke kandungan</a>
@@ -21,6 +22,7 @@
       <div class="sidebar-section">RUANG KAWALAN</div>
       <nav class="side-nav" aria-label="Bahagian utama">
         <a class="nav-item is-active" href="#main" aria-current="page"><span aria-hidden="true">◈</span> Gambaran keseluruhan</a>
+        <a class="nav-item" href="#produk">Akses produk</a>
         <a class="nav-item" href="#customers"><span aria-hidden="true">▤</span> Pelanggan</a>
         <button class="nav-item" id="attentionShortcut" type="button"><span aria-hidden="true">◎</span> Perlu perhatian <span class="nav-count" id="attentionCount">—</span></button>
       </nav>
@@ -54,6 +56,19 @@
           <article class="metric"><span class="metric-icon red" aria-hidden="true">Ⅱ</span><span class="metric-label">Akses digantung</span><strong data-metric="suspended_customers">—</strong><small>Akses BeShare pelanggan</small></article>
         </section>
 
+        <section class="panel customer-panel" id="produk">
+          <h2>Akses produk pelanggan</h2>
+          <form id="product-search" class="list-toolbar"><label>Direktori <select id="product-source"><option value="shared">Business Copilot dan AI Marketing</option><option value="os">BeShare AI OS</option></select></label>
+          <label>E-mel atau perniagaan <input type="search" id="product-query" maxlength="120"></label>
+          <button class="button button-primary">Cari pengguna</button></form>
+          <p id="product-status" role="status"></p><div class="table-wrap"><table class="customer-table"><thead><tr><th>Pelanggan</th><th>Produk</th><th>Akses</th><th></th></tr></thead><tbody id="product-users"></tbody></table></div>
+          <div class="pagination"><button class="button" id="product-prev" type="button">Sebelum</button><button class="button" id="product-next" type="button">Seterusnya</button></div>
+          <dialog id="product-edit" class="confirm-dialog"><form id="product-form"><h2>Ubah akses pelanggan</h2><p id="product-target"></p>
+          <label>Akses <select id="product-state"><option value="pending">Menunggu bayaran</option><option value="paid">Berbayar</option><option value="free">Percuma</option><option value="suspended">Digantung</option><option value="setup">Ujian berpandu selama 1 jam</option></select></label>
+          <div id="product-billing"><p>Semak invois berstatus Paid dalam Stripe dan sahkan identiti pemilik akaun. Untuk pakej gabungan, aktifkan setiap produk yang dibeli.</p>
+          <label>ID invois Stripe <input id="product-invoice" placeholder="in_…"></label><label>Hari terakhir yang dibayar (Malaysia) <input id="product-until" type="date"></label></div>
+          <p id="product-message" role="status"></p><div class="confirm-actions"><button type="button" class="button" id="product-cancel">Batal</button><button id="product-save" class="button button-primary">Sahkan perubahan</button></div></form></dialog>
+        </section>
         <section id="customers" class="panel customer-panel" aria-labelledby="customersTitle">
           <div class="section-heading"><div><p class="eyebrow">DIREKTORI PELANGGAN</p><h2 id="customersTitle">Semua perniagaan, tersusun.</h2></div><span class="count-label" id="customerCount">Memuatkan pelanggan…</span></div>
           <div class="list-toolbar">

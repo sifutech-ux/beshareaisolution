@@ -65,7 +65,7 @@ async function workspace({ health = () => response(checked()), connections = [co
       const path = new URL(url).pathname; requests.push({ url, path, options })
       if (path.endsWith('/publication')) { const call = { url, path, options }; publications.push(call); return publication(call, publications.length) }
       if (path.endsWith('/check')) { const call = { url, path, options }; checks.push(call); return health(call, checks.length) }
-      if (options.method === 'GET' && path === '/api/akaun/saya') return response({ akaun_id: stored === sessionB ? 'owner-b' : 'owner-a', nama: 'Ujian pautan penerbitan' })
+      if (options.method === 'GET' && path === '/api/akaun/identiti') return response({ akaun_id: stored === sessionB ? 'owner-b' : 'owner-a', nama: 'Ujian pautan penerbitan' })
       if (options.method === 'GET' && path.endsWith('/workspace')) return response({ ok: true, campaigns: [campaign], posts: stored === sessionB ? [] : structuredClone(posts), sources: [], results: [], connections: stored === sessionB ? [] : structuredClone(connections), capabilities: { publication_receipts: receiptsEnabled, connection_health_checks: enabled, worker_enabled: true, auto_publish: true } })
       if (options.method === 'PUT' && path.includes('/posts/')) { const payload = JSON.parse(options.body), record = { ...payload, id: path.split('/').pop(), version: payload.version + 1 }; saved.push(record); return response({ ok: true, post: record }) }
       throw Error('Unexpected request: ' + options.method + ' ' + url)

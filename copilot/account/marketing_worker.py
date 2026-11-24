@@ -9,6 +9,7 @@ import json
 import secrets
 import time
 
+import pelanggan_akses as access
 import pelanggan_meja as meja
 import marketing_social as social
 
@@ -37,15 +38,17 @@ def _post(conn, postgres, owner, key):
 
 
 def _claim(conn, postgres, worker, stamp):
+    def permitted(alias):
+        return access.worker_condition(alias, stamp)
     ph = meja._ph(postgres)
     cur = conn.cursor()
-    cur.execute(f'''SELECT id,akaun_id FROM marketing_posts
-                    WHERE status='queued' AND scheduled_at<={ph}
+    cur.execute(f'''SELECT id,akaun_id FROM marketing_posts p
+                    WHERE {permitted('p')} AND status='queued' AND scheduled_at<={ph}
                     ORDER BY scheduled_at,id LIMIT 50''', (meja._iso(stamp),))
     queued = cur.fetchall()
     cur.execute(f'''SELECT p.id,p.akaun_id FROM marketing_posts p
                     JOIN marketing_publish_attempts a ON a.id=p.attempt_id AND a.akaun_id=p.akaun_id
-                    WHERE p.status='publishing' AND a.available_at<={ph} AND a.lease_until<={ph}
+                    WHERE {permitted('p')} AND p.status='publishing' AND a.available_at<={ph} AND a.lease_until<={ph}
                     ORDER BY a.available_at,p.id LIMIT 50''', (int(stamp), int(stamp)))
     resumable = cur.fetchall()
     for key, owner in resumable + queued:
@@ -191,6 +194,9 @@ def _mark_reconnect(conn, postgres, job, worker, connection, stamp):
 
 def _publish_step(conn, postgres, job, worker, stamp, transport=None):
     item, attempt = job['post'], job['attempt']
+    if not access.allowed(conn, meja._ph(postgres), item['akaun_id'], 'marketing', stamp):
+        _finish(conn, postgres, job, worker, stamp, 'cancelled', 'Akses Marketing telah ditarik balik.')
+        return 'cancelled'
     connection, data = social.load_bound_connection(conn, postgres, item['akaun_id'], item, stamp)
     platform = data['platform']
     form = data['format']
