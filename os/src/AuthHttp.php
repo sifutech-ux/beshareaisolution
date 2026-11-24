@@ -59,11 +59,29 @@ final class AuthHttp
                 $query->execute([$actor['business_id'], $connection]);
                 $recent[$connection] = $query->fetchAll(PDO::FETCH_NUM);
             }
-            $revision = hash('sha256', json_encode([$actor['user_id'], $actor['business_id'], $actor['role'], $recent], JSON_THROW_ON_ERROR));
+            // Quota use, a settings change or the UTC day rollover can change the
+            // inbox status without a new webhook. The idle path reads one tenant row.
+            $aiStamp = null;
+            if ($this->ai instanceof AiReplyStore) {
+                try {
+                    $usage = $this->pdo->prepare('SELECT knowledge_revision,enabled,daily_limit,
+                        CASE WHEN quota_date=UTC_DATE() THEN quota_used ELSE 0 END
+                        FROM ai_reply_settings WHERE business_id=?');
+                    $usage->execute([$actor['business_id']]);
+                    $aiStamp = $usage->fetch(PDO::FETCH_NUM);
+                } catch (\PDOException $error) {
+                    // Inbox-only installations may predate the AI schema.
+                    if ($error->getCode() !== '42S02') { throw $error; }
+                }
+            }
+            $revision = hash('sha256', json_encode([$actor['user_id'], $actor['business_id'], $actor['role'], $recent, $aiStamp], JSON_THROW_ON_ERROR));
             $body = ['ok' => true, 'public_id' => $actor['public_id'], 'email' => $actor['email'],
                 'role' => $actor['role'], 'revision' => $revision];
             if (!hash_equals($revision, $headers['x-inbox-revision'] ?? '')) {
                 $body += $this->inboxData($actor);
+                if ($this->ai instanceof AiReplyStore) {
+                    $body['inbox_ai'] = $this->ai->view($actor, inboxOnly: true);
+                }
             }
             return $this->respond($session, false, $body);
         }

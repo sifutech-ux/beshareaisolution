@@ -21,15 +21,11 @@ final class AiReplyStore
     {
     }
 
-    public function view(array $actor): array
+    public function view(array $actor, bool $inboxOnly = false): array
     {
         $actor = $this->member($actor);
         $available = $this->available($actor);
         $row = $this->baseInstalled() ? $this->settings((int) $actor['business_id']) : null;
-        $canManage = $available && $actor['role'] === 'owner' && $actor['user_id'] === $actor['owner_user_id']
-            && $actor['status'] === 'active';
-        $connections = $this->pdo->prepare('SELECT id,display_phone,token_state,webhook_state,registration_state FROM whatsapp_connections WHERE business_id = ? AND disconnected_at IS NULL ORDER BY id');
-        $connections->execute([$actor['business_id']]);
         $productionAvailable = $this->productionAvailable();
         $audience = $row === null ? ($productionAvailable ? 'all' : 'test') : AiReplyPolicy::audienceMode($row);
         $allowlist = $row === null ? [] : json_decode((string) $row['allowlist_json'], true, 8);
@@ -43,17 +39,24 @@ final class AiReplyStore
                 && AiReplyPolicy::recipientAllowed($row, $allowlist[0], (int) $actor['owner_user_id'], false)));
         $view = [
             'available' => $available,
-            'can_manage' => $canManage,
             'enabled' => $available && $row !== null && (int) $row['enabled'] === 1,
             'deployment_ready' => $available && $this->deploymentReady(),
             'production_available' => $productionAvailable,
             'audience_mode' => $audience,
             'audience_approved' => $audienceApproved,
             'controls_configured' => $controlsConfigured,
-            'revision' => $row === null ? 0 : (int) $row['knowledge_revision'],
-            'connection_id' => $row === null ? 0 : (int) $row['connection_id'],
             'daily_limit' => $row === null ? 20 : (int) $row['daily_limit'],
             'quota_used' => $row !== null && $row['quota_date'] === gmdate('Y-m-d') ? (int) $row['quota_used'] : 0,
+        ];
+        if ($inboxOnly) { return $view; }
+        $canManage = $available && $actor['role'] === 'owner' && $actor['user_id'] === $actor['owner_user_id']
+            && $actor['status'] === 'active';
+        $connections = $this->pdo->prepare('SELECT id,display_phone,token_state,webhook_state,registration_state FROM whatsapp_connections WHERE business_id = ? AND disconnected_at IS NULL ORDER BY id');
+        $connections->execute([$actor['business_id']]);
+        $view += [
+            'can_manage' => $canManage,
+            'revision' => $row === null ? 0 : (int) $row['knowledge_revision'],
+            'connection_id' => $row === null ? 0 : (int) $row['connection_id'],
             'approved_at' => $row['approved_at'] ?? null,
             'connections' => $connections->fetchAll(),
         ];

@@ -453,6 +453,21 @@ adminTest('Scheduled pass picks up a later read receipt and the open inbox sees 
     adminAssert(isset($initial['conversations']) && !isset($initial['audit']) && !isset($initial['ai']), 'First poll returns scoped inbox data');
     adminAssert(!isset($poll($a, $initial['revision'])['conversations']), 'Idle poll omits message history');
     adminAssert($poll($b, $initial['revision'])['revision'] !== $initial['revision'], 'Another tenant cannot reuse this revision');
+    $status = $initial['inbox_ai'];
+    adminAssert($status['audience_mode'] === 'all' && $status['enabled'] && $status['daily_limit'] > 0
+        && !array_key_exists('knowledge', $status) && !array_key_exists('allowlist', $status) && !array_key_exists('connections', $status),
+        'Inbox carries only the public reply status');
+    $usage = adminSql($pdo,'SELECT quota_date,quota_used FROM ai_reply_settings WHERE business_id=?',[$a['business_id']])->fetch();
+    adminSql($pdo,'UPDATE ai_reply_settings SET quota_date=UTC_DATE(),quota_used=daily_limit WHERE business_id=?',[$a['business_id']]);
+    $capped = $poll($a,$initial['revision']);
+    adminAssert($capped['revision'] !== $initial['revision'] && $capped['inbox_ai']['quota_used'] === $status['daily_limit'],
+        'Reaching the quota invalidates the inbox revision without new messages');
+    adminSql($pdo,'UPDATE ai_reply_settings SET quota_date=UTC_DATE()-INTERVAL 1 DAY WHERE business_id=?',[$a['business_id']]);
+    $renewed = $poll($a,$capped['revision']);
+    adminAssert($renewed['revision'] !== $capped['revision'] && $renewed['inbox_ai']['quota_used'] === 0,
+        'A previous quota day clears the inbox counter without new messages');
+    adminSql($pdo,'UPDATE ai_reply_settings SET quota_date=?,quota_used=? WHERE business_id=?',
+        [$usage['quota_date'],$usage['quota_used'],$a['business_id']]);
     $before = runtimeCalls($calls);
     $entry = runtimeEntry($wabaA, $phoneA, 'wamid.runtime.watch.in', '601199999883');
     runtimeBridge($f, $config, [$entry]);

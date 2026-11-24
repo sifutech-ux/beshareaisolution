@@ -267,6 +267,8 @@ html[data-theme="cerah"] .os-tone-amber { color: #89611c; }
 .os-disclosure > summary span { color: var(--os-muted); font-size: 10px; font-weight: 400; margin-left: 8px; }
 .os-disclosure-body { padding-bottom: 20px; }
 .os-app .record-screen h2 { margin-top: 0; }
+.os-inbox-status { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin: 0 0 16px; color: var(--os-muted); font-size: 12px; }
+.os-inbox-status .msg-status { font-size: 12px; padding: 4px 10px; }
 .os-inbox-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
 .os-inbox-heading h1 { margin: 0; }
 .os-total { display: inline-block; border: 1px solid var(--os-line); border-radius: 8px; background: var(--os-raised); padding: 3px 8px; font-size: 12px; color: var(--os-muted); margin-left: 13px; vertical-align: middle; }

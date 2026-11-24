@@ -139,6 +139,7 @@ function load() {
     ai: live.ai && typeof live.ai === "object" ? live.ai : { available: false, enabled: false },
     knowledgeCentre: live.knowledge_centre && typeof live.knowledge_centre === "object" ? live.knowledge_centre : { available: false, can_manage: false },
     inboxReady: live.inbox_ready === true,
+    inboxStatus: inboxAiStatus(live.inbox_ai || live.ai),
     rules: [],
     invoices: [],
     plan: "",
@@ -484,8 +485,36 @@ function board(state) {
     <section class="panel os-activity-panel"><div class="os-section-heading"><div><p class="os-eyebrow">REKOD RUANG KERJA</p><h2>Aktiviti terkini</h2></div>${allow(state, 'audit') ? '<a class="os-text-link" href="#audit">Lihat semua <span aria-hidden="true">↗</span></a>' : ''}</div><ul class="os-activity-list">${state.audit.slice(0, 5).map((item) => `<li><span class="os-activity-dot"></span><div><strong>${esc(item.action)}</strong><small>${esc(item.actor)}</small></div><time>${esc(item.at)}</time></li>`).join('') || '<li class="os-empty-inline">Aktiviti perniagaan anda akan dipaparkan di sini.</li>'}</ul></section>`;
 }
 
+function inboxAiStatus(ai) {
+  if (!ai?.available) return { label: 'AI belum tersedia', paused: true };
+  if (!ai.enabled) return { label: 'AI dimatikan', paused: true };
+  const liveMode = ai.audience_mode === 'all' && ai.production_available && ai.audience_approved;
+  if (!ai.deployment_ready || !ai.controls_configured || (!liveMode && ai.audience_mode !== 'test')) {
+    return { label: 'AI dijeda', paused: true };
+  }
+  const mode = liveMode ? 'Live' : 'Mod ujian';
+  const used = ai.quota_used;
+  const limit = ai.daily_limit;
+  if (!Number.isInteger(used) || used < 0 || !Number.isInteger(limit) || limit < 1) return { label: mode };
+  if (used >= limit) return { label: mode + ' · Had harian dicapai (' + used + '/' + limit + ')', full: true };
+  return { label: mode + ' · ' + used + '/' + limit + ' cubaan hari ini' };
+}
+
+function inboxStatusContent(state) {
+  const status = state.inboxStatus;
+  const tone = status.full ? 'pending' : status.paused ? 'neutral' : 'success';
+  return `<strong class="msg-status msg-status--${tone}">${esc(status.label)}</strong>${status.full
+    ? '<span>Kuota balasan diperbaharui setiap hari pada 8:00 pagi waktu Malaysia.</span>' : ''}`;
+}
+
+function inboxModeLabel(mode, status) {
+  if (mode === 'ai_active' && status.full) return 'AI dijeda · Had harian dicapai';
+  if (mode === 'ai_active' && status.paused) return status.label;
+  return label(mode);
+}
+
 function inboxThreads(state, list = visibleConversations(state)) {
-  return list.map((item) => `<button class="thread-item ${item.id === state.active ? 'is-on' : ''}" type="button" data-act="open" data-value="${esc(item.id)}"><span class="os-avatar">${osInitial(item.name)}</span><span class="os-thread-copy"><strong>${esc(item.name)}</strong><small>${esc(label(item.mode))}${item.unread ? ' · belum dibaca' : ''}</small></span>${item.unread ? '<span class="os-unread" aria-hidden="true"></span>' : ''}</button>`).join('') || `<div class="os-empty">${osIcon('peti')}<h2>${state.conversations.length ? 'Tiada hasil carian' : 'Belum ada perbualan'}</h2><p>${state.conversations.length ? 'Cuba nama atau penapis yang lain.' : state.inboxReady ? 'Mesej pelanggan yang diterima akan muncul di sini.' : 'Lengkapkan sambungan WhatsApp untuk menerima mesej pelanggan.'}</p>${!state.inboxReady && allow(state, 'connection') ? '<a href="#sambungan">Urus sambungan</a>' : ''}</div>`;
+  return list.map((item) => `<button class="thread-item ${item.id === state.active ? 'is-on' : ''}" type="button" data-act="open" data-value="${esc(item.id)}"><span class="os-avatar">${osInitial(item.name)}</span><span class="os-thread-copy"><strong>${esc(item.name)}</strong><small>${esc(inboxModeLabel(item.mode, state.inboxStatus))}${item.unread ? ' · belum dibaca' : ''}</small></span>${item.unread ? '<span class="os-unread" aria-hidden="true"></span>' : ''}</button>`).join('') || `<div class="os-empty">${osIcon('peti')}<h2>${state.conversations.length ? 'Tiada hasil carian' : 'Belum ada perbualan'}</h2><p>${state.conversations.length ? 'Cuba nama atau penapis yang lain.' : state.inboxReady ? 'Mesej pelanggan yang diterima akan muncul di sini.' : 'Lengkapkan sambungan WhatsApp untuk menerima mesej pelanggan.'}</p>${!state.inboxReady && allow(state, 'connection') ? '<a href="#sambungan">Urus sambungan</a>' : ''}</div>`;
 }
 
 function inbox(state) {
@@ -493,7 +522,7 @@ function inbox(state) {
   const current = list.find((item) => item.id === state.active) || null;
   const buttons = inboxThreads(state, list);
   const filters = [['semua', 'Semua'], ['belum', 'Belum dibaca'], ['saya', 'Tugasan saya'], ['ai', 'AI'], ['manusia', 'Manusia'], ['selesai', 'Selesai']];
-  return `<article class="panel inbox-screen" data-screen="${esc(state.inboxPane || 'list')}"><header class="os-inbox-heading"><div><p class="os-eyebrow">PERBUALAN PELANGGAN</p><h1>Peti masuk<span class="os-total">${state.conversations.length}</span></h1></div><button class="btn btn--ghost" type="button" data-act="refresh-inbox">${osIcon('refresh')}<span>Muat semula mesej</span></button></header><div class="inbox-find"><label class="field"><span class="os-sr-only">Cari perbualan</span><input name="q" value="${esc(state.inboxQuery || '')}" placeholder="Cari nama atau tag…"></label><div class="chips">${filters.map(([id, name]) => `<button class="btn btn--ghost ${state.inboxFilter === id ? 'is-on' : ''}" type="button" data-act="filter" data-value="${id}" aria-pressed="${state.inboxFilter === id}">${name}</button>`).join('')}</div></div><div class="inbox" data-pane="${esc(state.inboxPane || 'list')}"><div class="pane-list thread" id="thread">${buttons}</div><div class="pane-talk">${talk(state, current)}</div><aside class="pane-profile">${profile(state, current)}</aside></div></article>`;
+  return `<article class="panel inbox-screen" data-screen="${esc(state.inboxPane || 'list')}"><header class="os-inbox-heading"><div><p class="os-eyebrow">PERBUALAN PELANGGAN</p><h1>Peti masuk<span class="os-total">${state.conversations.length}</span></h1></div><button class="btn btn--ghost" type="button" data-act="refresh-inbox">${osIcon('refresh')}<span>Muat semula mesej</span></button></header><div class="os-inbox-status" id="inbox-ai-status" role="status">${inboxStatusContent(state)}</div><div class="inbox-find"><label class="field"><span class="os-sr-only">Cari perbualan</span><input name="q" value="${esc(state.inboxQuery || '')}" placeholder="Cari nama atau tag…"></label><div class="chips">${filters.map(([id, name]) => `<button class="btn btn--ghost ${state.inboxFilter === id ? 'is-on' : ''}" type="button" data-act="filter" data-value="${id}" aria-pressed="${state.inboxFilter === id}">${name}</button>`).join('')}</div></div><div class="inbox" data-pane="${esc(state.inboxPane || 'list')}"><div class="pane-list thread" id="thread">${buttons}</div><div class="pane-talk">${talk(state, current)}</div><aside class="pane-profile">${profile(state, current)}</aside></div></article>`;
 }
 
 function messageDelivery(status) {
@@ -547,15 +576,18 @@ function talk(state, current) {
       <p class="actions"><button class="btn" type="button" data-act="reopen" data-value="ai_active">Buka semula sebagai AI</button>
       <button class="btn btn--ghost" type="button" data-act="reopen" data-value="human_takeover">Buka semula sebagai manusia</button></p>`;
   }
+  const activeHint = state.inboxStatus.full ? "AI telah mencapai had harian akaun ini."
+    : state.inboxStatus.paused ? "Semak tetapan balasan dalam Pengetahuan."
+    : "AI aktif untuk mesej baharu mengikut tetapan perniagaan. Ambil alih untuk menjeda balasan dalam perbualan ini.";
   const composer = current.window === "closed"
     ? `<p class="error">Tetingkap perkhidmatan pelanggan telah tamat. Mesej biasa tidak dihantar. Templat yang diluluskan diperlukan.</p>`
     : current.mode === "human_takeover"
       ? current.can_control ? `<p class="muted">AI dijeda untuk perbualan ini. Penghantaran manual oleh staf belum tersedia dalam peti masuk.</p>` : `<form id="reply"><label class="field">Balasan staf<input name="text" required></label><button class="btn" type="submit">Hantar</button></form>`
-      : `<p class="muted">${current.mode === "ai_active" ? "AI aktif untuk mesej baharu mengikut tetapan perniagaan. Ambil alih untuk menjeda balasan dalam perbualan ini." : "AI dijeda. Semak tetapan balasan dalam Pengetahuan."}</p>`;
+      : `<p class="muted">${current.mode === "ai_active" ? activeHint : "AI dijeda. Semak tetapan balasan dalam Pengetahuan."}</p>`;
   const actions = current.mode === "human_takeover"
     ? `<button class="btn btn--ghost" type="button" data-act="release">Pulangkan kepada AI</button>${current.can_control ? "" : ' <button class="btn btn--ghost" type="button" data-act="resolve">Selesai</button>'}`
     : `<button class="btn" type="button" data-act="take">Ambil alih</button>`;
-  return `${back}<p>Mod: <strong>${esc(label(current.mode))}</strong></p><div class="msgs">${messages}</div>${composer}<p class="actions">${actions}</p>`;
+  return `${back}<p>Mod: <strong>${esc(inboxModeLabel(current.mode, state.inboxStatus))}</strong></p><div class="msgs">${messages}</div>${composer}<p class="actions">${actions}</p>`;
 }
 
 function profile(state, current) {
@@ -2040,6 +2072,7 @@ async function refreshVisibleInbox(watch) {
       const before = load();
       live.conversations = data.conversations;
       live.contacts = data.contacts;
+      if (data.inbox_ai) live.inbox_ai = data.inbox_ai;
       const after = load();
       // A signed inbound event may move from a temporary thread to its archived conversation.
       const selected = currentConversation(before);
@@ -2074,6 +2107,8 @@ function updateInboxDisplay(before, after, page) {
     });
     return;
   }
+  const status = document.getElementById("inbox-ai-status");
+  if (status && before.inboxStatus.label !== after.inboxStatus.label) status.innerHTML = inboxStatusContent(after);
   const count = document.querySelector(".inbox-screen .os-total");
   if (count) count.textContent = String(after.conversations.length);
   const list = visibleConversations(after);
@@ -2089,7 +2124,8 @@ function updateInboxDisplay(before, after, page) {
   const talkPane = document.querySelector(".pane-talk");
   const messages = talkPane?.querySelector(".msgs");
   if (next && prev && messages && prev.id === next.id && prev.mode === next.mode && prev.window === next.window
-      && prev.can_control === next.can_control && prev.name === next.name) {
+      && prev.can_control === next.can_control && prev.name === next.name
+      && inboxModeLabel(prev.mode, before.inboxStatus) === inboxModeLabel(next.mode, after.inboxStatus)) {
     if (JSON.stringify(prev.messages) !== JSON.stringify(next.messages)) {
       const atEnd = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 24;
       const top = messages.scrollTop;

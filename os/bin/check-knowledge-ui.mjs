@@ -470,6 +470,27 @@ async function checkInboxRefresh() {
   await second({ ...feed, revision: 'b' });
   check('open thread updates the matching bubble without navigation', history.innerHTML.includes('Sudah dibaca')
     && !history.innerHTML.includes('Menunggu pengesahan sampai') && history.innerHTML.includes(':02:03'));
+  const ai = { available: true, enabled: true, deployment_ready: true, controls_configured: true,
+    production_available: true, audience_mode: 'all', audience_approved: true, daily_limit: 20, quota_used: 20 };
+  check('test audience is labelled in the inbox before a live configuration arrives',
+    runInbox('inbox(load())').includes('Mod ujian · 0/20 cubaan hari ini'));
+  const full = inbox.defer('petikini');
+  void poll(); await full({ ...feed, revision: 'quota-full', inbox_ai: ai });
+  check('live quota exhaustion updates the banner, open thread and composer during a poll',
+    inbox.node('inbox-ai-status').innerHTML.includes('Live · Had harian dicapai (20/20)')
+    && pane.innerHTML.includes('AI dijeda · Had harian dicapai') && !pane.innerHTML.includes('AI aktif untuk mesej baharu'));
+  const human = { ...thread, mode: 'human_takeover' };
+  const takeover = inbox.defer('petikini');
+  void poll(); await takeover({ ...feed, revision: 'human', inbox_ai: ai, conversations: [human] });
+  check('human takeover stays visible alongside the account quota', pane.innerHTML.includes('Manusia mengambil alih')
+    && inbox.node('inbox-ai-status').innerHTML.includes('Had harian dicapai'));
+  const reset = inbox.defer('petikini');
+  void poll(); await reset({ ...feed, revision: 'quota-reset', inbox_ai: { ...ai, quota_used: 0 } });
+  check('the next quota day clears the warning without navigation',
+    inbox.node('inbox-ai-status').innerHTML.includes('Live · 0/20') && pane.innerHTML.includes('AI aktif untuk mesej baharu'));
+  check('paused or unapproved AI cannot appear live',
+    runInbox("inboxAiStatus({...live.inbox_ai, enabled:false}).label") === 'AI dimatikan'
+    && runInbox("inboxAiStatus({...live.inbox_ai, audience_approved:false}).label") === 'AI dijeda');
   inbox.context.document.hidden = true;
   const previousCount = inbox.requests.length;
   await poll();
