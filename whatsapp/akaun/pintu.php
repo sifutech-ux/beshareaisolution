@@ -66,6 +66,7 @@ try {
         }
     }
     $headers = ['x-csrf-token' => (string) ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')];
+    if ($action === 'petikini') { $headers['x-inbox-revision'] = (string) ($_SERVER['HTTP_X_INBOX_REVISION'] ?? ''); }
     if (isset($_SERVER['HTTP_ORIGIN']) && is_string($_SERVER['HTTP_ORIGIN'])) {
         $headers['origin'] = $_SERVER['HTTP_ORIGIN'];
     }
