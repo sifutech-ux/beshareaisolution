@@ -151,10 +151,13 @@ def record(conn, postgres, key):
 
 
 def preview(conn, postgres, owner, body, stamp, transport):
-    if set(body) - {'destination', 'destination_url'} != {'account_id', 'post_id', 'budget', 'days', 'country'}:
+    if set(body) - {'destination', 'destination_url', 'goal_metric', 'goal_count'} != {'account_id', 'post_id', 'budget', 'days', 'country'}:
         fail('Semak maklumat pratonton.')
     ctx = context(conn, postgres, owner, body, stamp, transport)
     spec = settings(body, ctx)
+    if 'goal_metric' in body or 'goal_count' in body:
+        from marketing_ad_simulation import simulate
+        spec['simulation'] = simulate(conn, postgres, owner, body, spec, ctx, stamp, transport)
     data = json.dumps(spec, sort_keys=True)
     key = (owner, body['account_id'], body['post_id'])
     ph = meja._ph(postgres)
@@ -167,7 +170,9 @@ def preview(conn, postgres, owner, body, stamp, transport):
         if old and old['phase'] == 'sending':
             fail(CHECK, 'check_meta', 409)
         nonce = secrets.token_hex(20)
-        resume = old and ({'destination': 'whatsapp'} | json.loads(old['settings'])) == spec
+        previous = {'destination': 'whatsapp'} | json.loads(old['settings']) if old else {}
+        previous.pop('simulation', None)
+        resume = old and previous == {k: v for k, v in spec.items() if k != 'simulation'}
         ids = [old[k] if resume else '' for k in ('campaign_id', 'adset_id', 'creative_id', 'ad_id')]
         if old:
             conn.cursor().execute('DELETE FROM marketing_post_ads WHERE ' + WHERE.format(ph, ph, ph), key)
@@ -209,6 +214,7 @@ def launch(conn, postgres, owner, body, stamp, transport):
         return status, reserved
     row, base, token = reserved
     spec = {'destination': 'whatsapp'} | json.loads(row['settings'])
+    simulation = spec.pop('simulation', None)
     def save(field, value):
         cur = conn.cursor()
         cur.execute(f"UPDATE marketing_post_ads SET {field}={ph} WHERE nonce={ph} AND akaun_id={ph} AND phase='sending'",
@@ -282,7 +288,15 @@ def launch(conn, postgres, owner, body, stamp, transport):
         reply = social.provider_call('POST', api + '/' + row['campaign_id'], {'status': 'ACTIVE'}, token, transport)
         if reply.get('success') is not True:
             raise social.SocialError(CHECK, 409, 'check_meta', ambiguous=True)
-        save('phase', 'active')
+        confirmed = {**spec, 'submitted_at': stamp}
+        if simulation:
+            confirmed['simulation'] = simulation
+        cur = conn.cursor()
+        cur.execute(f"UPDATE marketing_post_ads SET phase='active',settings={ph} WHERE nonce={ph} AND akaun_id={ph} AND phase='sending'",
+                    (json.dumps(confirmed, sort_keys=True), row['nonce'], owner))
+        conn.commit()
+        if cur.rowcount != 1:
+            raise social.SocialError(CHECK, 409, 'check_meta', ambiguous=True)
         return 200, {'ok': True, 'campaign_id': row['campaign_id']}
     except social.SocialError as error:
         if error.ambiguous:
@@ -294,6 +308,9 @@ def launch(conn, postgres, owner, body, stamp, transport):
 def dispatch(action, conn, postgres, owner, body, stamp, transport):
     if not isinstance(body.get('post_id'), str) or not social.ID.fullmatch(body['post_id']):
         fail('Hantaran tidak sah.')
+    if action in ('post-outcome', 'post-orders'):
+        from marketing_ad_simulation import outcome
+        return outcome(conn, postgres, owner, body, stamp, transport, action == 'post-orders')
     if action == 'post-preview':
         return preview(conn, postgres, owner, body, stamp, transport)
     return launch(conn, postgres, owner, body, stamp, transport)

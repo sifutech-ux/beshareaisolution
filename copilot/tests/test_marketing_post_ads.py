@@ -22,6 +22,7 @@ class PostAdsTests(unittest.TestCase):
         self.body = {'account_id': '123', 'post_id': fixtures.POST, 'days': 3, 'budget': '60.09', 'country': 'MY'}
         self.page_phone = '+60 12-3456789'
         self.writes = []
+        self.insights = []
         self.page_fields = []
         self.creative_target = None
         self.actual = {}
@@ -31,6 +32,11 @@ class PostAdsTests(unittest.TestCase):
     def meta(self, method, url, params, token):
         endpoint = url.rsplit('/', 1)[-1]
         if method == 'GET':
+            if endpoint == 'insights':
+                assert params['level'] == 'adset'
+                return {'data': self.insights}
+            if endpoint == 'delivery_estimate':
+                return {'data': [{'estimate_ready': True, 'estimate_mau_lower_bound': 15000, 'estimate_mau_upper_bound': 20000}]}
             if endpoint == 'act_123':
                 return {'account_id': '123', 'name': 'Akaun', 'currency': 'MYR', 'account_status': 1}
             if endpoint == '1001':
@@ -191,3 +197,55 @@ class PostAdsTests(unittest.TestCase):
             marketing_lifecycle.apply_callback(conn, False, 'meta', '12345', '5001', 'media-approval', fixtures.NOW)
             self.assertEqual(conn.execute('SELECT count(*) FROM marketing_post_ads').fetchone()[0], 0)
         self.assertEqual(self.writes, [])
+
+    def test_simulation_cold_start_original_goal_actual_and_orders(self):
+        self.body.update(destination='link', destination_url='https://kedai.my', goal_metric='clicks', goal_count=30)
+        status, preview = self.ads('post-preview', self.body, self.meta)
+        self.assertEqual(status, 200, preview)
+        sim = preview['preview']['simulation']
+        self.assertEqual((sim['target'], sim['metric'], sim['range'], sim['audience']), (30, 'clicks', None, [15000, 20000]))
+        self.assertEqual(self.writes, [])
+        self.assertEqual(self.ads('post-launch', self.review(), self.meta)[0], 200)
+        lookup = {'account_id': '123', 'post_id': fixtures.POST, 'campaign_id': '911'}
+        self.insights = [{'adset_id': '912', 'account_currency': 'MYR', 'spend': '45.30', 'clicks': '100', 'inline_link_clicks': '24'}]
+        status, outcome = self.ads('post-outcome', lookup, self.meta)
+        self.assertEqual(status, 200, outcome)
+        self.assertEqual((outcome['actual'], outcome['spend'], outcome['simulation']), (24, '45.30', sim))
+        self.assertEqual(self.ads('post-orders', lookup | {'orders': 0}, self.meta)[0], 200)
+        self.assertEqual(self.ads('post-outcome', lookup, self.meta)[1]['orders'], 0)
+        self.assertEqual(self.ads('post-orders', lookup | {'orders': -1}, self.meta)[0], 400)
+        self.assertGreaterEqual(self.ads('post-outcome', lookup, self.meta, owner=fixtures.OTHER)[0], 400)
+        self.assertEqual(self.ads('post-outcome', lookup | {'campaign_id':'999'}, self.meta)[0], 404)
+        self.insights = []
+        self.assertIsNone(self.ads('post-outcome', lookup, self.meta)[1]['actual'])
+
+    def test_invalid_simulation_goals_do_not_spend(self):
+        for goal, count in [('clicks', 3), ('messages', 0), ('messages', True), ('sales', 5), ('reach', 10000001)]:
+            self.assertEqual(self.ads('post-preview', self.body | {'goal_metric': goal, 'goal_count': count}, self.meta)[0], 400)
+        self.assertEqual(self.writes, [])
+
+    def test_history_uses_finished_same_plan_and_never_invents_missing_results(self):
+        self.body.update(destination='messenger', goal_metric='messages', goal_count=12)
+        self.assertEqual(self.ads('post-launch', self.review(), self.meta)[0], 200)
+        with self.connect() as conn:
+            row = dict(zip([d[0] for d in conn.execute('SELECT * FROM marketing_post_ads').description],
+                           conn.execute('SELECT * FROM marketing_post_ads').fetchone()))
+            for index in range(3):
+                key = str(index + 1) * 32
+                post = conn.execute('SELECT * FROM marketing_posts WHERE id=?', (fixtures.POST,))
+                p = dict(zip([d[0] for d in post.description], post.fetchone()))
+                conn.execute('INSERT INTO marketing_posts (' + ','.join(p) + ') VALUES (' + ','.join('?'*len(p)) + ')',
+                             list((p | {'id':key}).values()))
+                spec = json.loads(row['settings'])
+                spec['submitted_at'] -= 20*86400
+                new = row | {'post_id': key, 'adset_id': str(500+index), 'settings': json.dumps(spec)}
+                conn.execute('INSERT INTO marketing_post_ads (' + ','.join(new) + ') VALUES (' + ','.join('?'*len(new)) + ')', list(new.values()))
+            conn.execute('DELETE FROM marketing_post_ads WHERE post_id=?', (fixtures.POST,))
+        self.insights = [{'adset_id': str(500+i), 'account_currency': 'MYR', 'spend': '60.09',
+                          'actions': [{'action_type': 'onsite_conversion.messaging_conversation_started_7d', 'value': str(n)}]}
+                         for i,n in enumerate((0, 12, 20))]
+        _, preview = self.ads('post-preview', self.body, self.meta)
+        sim = preview['preview']['simulation']
+        self.assertEqual((sim['sample'], sim['range'], sim['historical_met']), (3,[0,20],2))
+        self.insights[0]['actions'] = []
+        self.assertIsNone(self.ads('post-preview', self.body, self.meta)[1]['preview']['simulation']['range'])

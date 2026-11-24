@@ -42,7 +42,7 @@ def check(browser, width, height):
         if body.get('after'):
             rows = [{'name': 'Kempen lain', 'id': '100', 'status': 'PAUSED', 'metrics': None}]
         else:
-            rows = [{'name': 'Promosi kedai', 'id': '99', 'status': 'ACTIVE',
+            rows = [{'name': 'Promosi kedai', 'id': '99', 'status': 'ACTIVE', 'simulation_post': 'b' * 32,
                      'metrics': {'spend': '8.40', 'account_currency': 'USD', 'impressions': '321', 'clicks': '0'}}]
         route.fulfill(json={'ok': True, 'after': '' if body.get('after') else 'next', 'campaigns': rows})
 
@@ -53,9 +53,23 @@ def check(browser, width, height):
     page.route('**/marketing/workspace', workspace)
     page.route('**/facebook-ads/report', report)
     page.route('**/facebook-ads/campaigns', create)
+    order_updates = []
+    def orders(route):
+        order_updates.append(route.request.post_data_json)
+        route.fulfill(json={'ok': True, 'orders': 4})
+    page.route('**/facebook-ads/post-orders', orders)
+    page.route('**/facebook-ads/post-outcome', lambda route: route.fulfill(json={'ok': True, 'actual': 24,
+        'spend': '45.00', 'currency': 'USD', 'orders': None, 'simulation': {'target': 30, 'metric': 'messages', 'range': [18, 28]}}))
     page.locator('#refresh-workspace').click()
     expect(page.locator('#ads-account')).to_contain_text('Akaun Ujian')
     expect(page.locator('#ads-rows')).to_contain_text('USD')
+    page.get_by_role('button', name='Banding dengan simulasi').click()
+    expect(page.locator('#ads-outcome-actual')).to_contain_text('80%')
+    page.locator('#ads-orders').fill('4')
+    page.get_by_role('button', name='Simpan jumlah tempahan').click()
+    expect(page.locator('#ads-outcome-status')).to_contain_text('disimpan')
+    assert order_updates == [{'account_id': '6789', 'campaign_id': '99', 'post_id': 'b' * 32, 'orders': 4}]
+    page.locator('#ads-outcome-dialog').get_by_role('button', name='Tutup').click()
     page.locator('#ads-more').click()
     expect(page.locator('#ads-rows')).to_contain_text('Kempen lain')
     with page.expect_request(lambda r: r.url.endswith('/facebook-ads/report')) as changed:
@@ -82,12 +96,16 @@ def check(browser, width, height):
                     'destination': destination}
         if destination == 'link':
             expected['destination_url'] = 'https://t.me/kedai'
+        sim = None
+        if destination == 'messenger':
+            expected.update(goal_metric='messages', goal_count=30)
+            sim = {'metric': 'messages', 'target': 30, 'sample': 0, 'range': None, 'advice': 'Nyatakan tawaran.'}
         assert body == expected
         previews.append(destination)
         route.fulfill(json={'ok': True, 'review_id': 'a' * 40, 'preview': {
             'page_name': 'Kedai', 'account_name': 'Akaun Ujian', 'account_id': '6789',
             'text': 'Menu hari ini', 'phone': '+60123456789', 'destination': destination,
-            'destination_url': body.get('destination_url'), 'currency': 'MYR', 'budget_minor': 6009,
+            'destination_url': body.get('destination_url'), 'simulation': sim, 'currency': 'MYR', 'budget_minor': 6009,
             'country': 'MY', 'days': 3, 'post_url': 'https://www.facebook.com/1001/posts/987'}})
     def launch_ad(route):
         approvals.append(route.request.post_data_json)
@@ -98,6 +116,8 @@ def check(browser, width, height):
     assert not previews
     for channel, recipient in [('whatsapp', '+60123456789'), ('link', 'https://t.me/kedai'), ('messenger', 'Messenger · Kedai')]:
         page.locator('#boost-channel').select_option(channel)
+        if channel == 'messenger':
+            page.locator('#boost-target').fill('30')
         if channel == 'link':
             page.locator('#boost-preview').click()
             assert previews == ['whatsapp']
@@ -110,6 +130,11 @@ def check(browser, width, height):
         if channel != 'messenger':
             page.locator('#boost-edit').click()
             expect(page.locator('#boost-review')).to_be_hidden()
+    expect(page.locator('#boost-threshold')).to_contain_text('2.00')
+    expect(page.locator('#boost-estimate')).to_contain_text('Belum cukup')
+    page.get_by_text('Cuba kos setiap hasil sendiri', exact=True).click()
+    page.locator('#boost-rate').fill('6')
+    expect(page.locator('#boost-whatif')).to_contain_text('10 perbualan')
     assert previews == ['whatsapp', 'link', 'messenger']
     expect(page.locator('#boost-launch')).to_be_visible()
     page.locator('#boost-launch').click()

@@ -32,3 +32,8 @@ input,select,textarea{display:block;width:100%;border:1px solid #39465c;backgrou
 #boost-picture { max-width: 100%; max-height: 16rem; object-fit: contain; }
 #boost-review .ads-confirm { display: flex; align-items: center; gap: .6rem; }
 #boost-dialog .dialog-body { font-size: 1rem; }
+
+.ad-simulation { min-width:0; display:grid; gap:.8rem; margin:0; padding:1rem; border:1px solid var(--line); border-radius:12px; }
+.ad-simulation legend { padding:0 .4rem; font-weight:650; }
+.ad-simulation p { overflow-wrap:anywhere; }
+#ads-orders-form { display:grid; gap:.75rem; }
