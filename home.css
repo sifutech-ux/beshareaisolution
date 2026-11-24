@@ -426,7 +426,7 @@ svg { flex-shrink: 0; }
 }
 .demo-pilihan label small { display: block; margin-top: 4px; font-size: 13px; color: #c2bdd0; }
 .demo-radio:checked + label {
-  --muka: var(--kaca-muka);
+  --muka: linear-gradient(110deg, #0f3732, #192d3d 48%, #352644);
   --bibir: var(--kaca-bibir);
   color: #fff;
   outline: 2px solid #90e7d4;
