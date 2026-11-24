@@ -146,6 +146,33 @@
   function brief(c) {
     return [`BESHARE AI MARKETING`, c.title, '', `Matlamat: ${GOALS[c.goal] || c.goal}`, `Produk / servis: ${c.product || 'Belum diisi'}`, `Tawaran: ${c.offer || 'Belum diisi'}`, `Sasaran pelanggan: ${c.audience || 'Belum diisi'}`, `Bajet dirancang: ${ringgit(c.budget_total)}`, `Tempoh: ${displayDate(c.start_date)} — ${displayDate(c.end_date)}`, `Saluran: ${(c.channels || []).map(p => PLATFORM[p]).join(', ') || 'Belum dipilih'}`, `Destinasi: ${c.destination_url || 'Belum diisi'}`, '', 'Bajet ini ialah perancangan. Ia tidak mengaktifkan atau membelanjakan wang untuk iklan.'].join('\n')
   }
+  const copyFormats = {
+    facebook: 'Tulis satu hantaran Facebook. Buka dengan situasi pelanggan atau manfaat khusus, kemudian terus kepada tawaran. Maksimum 4000 aksara.',
+    instagram: 'Tulis satu kapsyen Instagram. Letak manfaat atau situasi pelanggan pada baris pertama. Gunakan perenggan pendek. Jangan andaikan apa yang ada dalam gambar atau pautan bio. Maksimum 2000 aksara.',
+    threads: 'Tulis satu hantaran Threads dengan nada perbualan. Fokus satu idea dan maksimum 450 aksara.',
+    page: 'Tulis bahagian tawaran untuk halaman promosi, maksimum 2000 aksara. Gunakan 4P apabila sesuai: janji manfaat yang munasabah, gambaran penggunaan, bukti jika dibekalkan dan dorongan ke butang tindakan yang tersedia. Jangan cetak label formula atau ulang tajuk halaman.',
+    google_ads: 'Sediakan satu kumpulan iklan Google Search mengikut niat carian. Setiap tajuk mesti masuk akal sendiri. Dalam jawapan, pulangkan objek JSON sahaja tanpa pagar kod: keywords (frasa carian), negatives (kata kunci pengecualian yang relevan), headlines (3 tajuk berbeza, maksimum 30 aksara setiap satu), descriptions (2 perihalan berbeza, maksimum 90 aksara setiap satu).'
+  }
+  const questionPrefix = 'SOALAN_PENIAGA:'
+  function copyPrompt(format, campaign, details = {}) {
+    const facts = {
+      kempen: campaign.title, matlamat: GOALS[campaign.goal], produk: campaign.product,
+      tawaran_kempen: campaign.offer, sasaran: campaign.audience, ...details
+    }
+    return [
+      'Tulis dalam Bahasa Melayu Malaysia yang biasa digunakan pelanggan sasaran. Ikut tujuan peniaga dan tahap pengetahuan pembaca. Utamakan butiran tawaran semasa, kemudian kempen dan profil perniagaan sebenar jika berkaitan. Abaikan nama profil lalai BeShare Marketing.',
+      'Pilih satu ciri sebenar dan tunjuk bagaimana ia memudahkan pelanggan dalam situasi tertentu. Guna ayat pendek, satu idea setiap perenggan. Akhiri dengan satu tindakan mudah yang sesuai dengan matlamat dan saluran yang tersedia. Untuk balasan susulan, jawab soalan pelanggan dahulu dan ringkaskan ajakan jika perlu.',
+      'Sebut harga, ulasan, statistik, jaminan, stok, diskaun dan tarikh tutup hanya jika dinyatakan sebagai fakta. Kekalkan syarat sebenar. Jangan guna bajet, simulasi atau tarikh kempen sebagai bukti atau sebab mendesak. Tinggalkan butiran pilihan yang tiada.',
+      copyFormats[format],
+      'Letak hasil yang boleh terus digunakan dalam jawapan. Jangan masukkan nota kepada peniaga. Hanya jika satu fakta penting masih diperlukan untuk menulis dengan tepat, mulakan jawapan dengan ' + questionPrefix + ' diikuti satu soalan khusus kepada peniaga.',
+      'Maklumat untuk draf: ' + JSON.stringify(facts)
+    ].join('\n')
+  }
+  function merchantQuestion(answer) {
+    const clean = answer.trim()
+    if (!clean.startsWith(questionPrefix)) return ''
+    return clean.slice(questionPrefix.length).trim() || 'Apakah butiran tawaran yang ingin dipromosikan?'
+  }
   function monthDays(year, month) {
     const first = new Date(Date.UTC(year, month, 1))
     const offset = (first.getUTCDay() + 6) % 7
@@ -168,5 +195,5 @@
     if (!turns.length || turns.length > 8) throw Error('Maklumat terlalu panjang untuk satu permintaan. Ringkaskan kempen dahulu.')
     return turns
   }
-  return { CHANNELS, GOALS, PLATFORM, STATUS, MEDIA_TYPES, id, money, cents, ringgit, integer, https, mediaRules, mediaFile, fileSize, date, malaysiaDate, malaysiaInput, utcFromMalaysia, displayDate, campaign, result, metrics, utm, csvCell, csv, brief, monthDays, promptTurns }
+  return { CHANNELS, GOALS, PLATFORM, STATUS, MEDIA_TYPES, id, money, cents, ringgit, integer, https, mediaRules, mediaFile, fileSize, date, malaysiaDate, malaysiaInput, utcFromMalaysia, displayDate, campaign, result, metrics, utm, csvCell, csv, brief, copyPrompt, merchantQuestion, monthDays, promptTurns }
 })

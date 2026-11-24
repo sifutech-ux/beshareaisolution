@@ -98,6 +98,48 @@ function assertNoPublication(app) {
   assert.deepEqual(app.requests.filter(item => item.options.method !== 'GET').map(item => new URL(item.url).pathname), app.aiRequests.map(() => '/api/marketing/draf'))
 }
 
+test('merchant can answer one clarification without copying it or the advisor checklist into the post', async () => {
+  const question = 'Tempahan ini untuk kek yang mana?', instruction = 'Saya nak penuhkan tempahan hujung minggu ni.'
+  const caption = 'Nak bawa pencuci mulut? Kek batik dah siap dipotong. RM35 satu loyang. Ambil di Ampang Sabtu ini.'
+  const app = await workspace((_url, _options, attempt) => response(attempt === 1
+    ? result('SOALAN_PENIAGA: ' + question)
+    : { ...result(caption), langkah: ['Semak semula harga sebelum terbit.'] }))
+  app.get('ai-instruction').value = instruction
+  await app.generate()
+  assert.equal(app.get('ai-question').textContent, question)
+  assert.equal(app.get('ai-output-wrap').hidden, true)
+  assert.equal(app.get('ai-use').disabled, true)
+  await app.generate()
+  assert.equal(app.aiRequests.length, 1)
+  const answer = 'Kek batik siap dipotong, RM35 satu loyang, ambil di Ampang hari Sabtu.'
+  app.get('ai-answer').value = answer
+  await app.generate()
+  const prompt = JSON.parse(app.aiRequests[1].options.body).giliran.map(turn => turn.teks).join('')
+  for (const fact of [instruction, question, answer, campaign.product]) assert.ok(prompt.includes(fact))
+  assert.notEqual(key(app, 0), key(app, 1))
+  await app.get('ai-use').emit('click')
+  assert.equal(app.get('post-body').value, caption)
+  assertNoPublication(app)
+})
+
+test('a pending clarification belongs to its original brief and account', async () => {
+  const app = await workspace(() => response(result('SOALAN_PENIAGA: Apakah produk untuk tempahan ini?')))
+  await app.generate()
+  app.get('ai-answer').value = 'Kek batik'
+  app.get('ai-platform').value = 'threads'
+  await app.get('ai-platform').emit('change')
+  assert.equal(app.get('ai-question-wrap').hidden, true)
+  assert.equal(app.get('ai-answer').value, '')
+  await app.generate()
+  const prompt = JSON.parse(app.aiRequests[1].options.body).giliran.map(turn => turn.teks).join('')
+  assert.match(prompt, /Threads/)
+  assert.doesNotMatch(prompt, /Kek batik/)
+  app.get('ai-answer').value = 'Butiran akaun A'
+  app.setSession(sessionB); await tick()
+  assert.equal(app.get('ai-question-wrap').hidden, true)
+  assert.equal(app.get('ai-answer').value, '')
+})
+
 test('a successful draft can be regenerated deliberately and remains visible until its replacement arrives', async () => {
   const pending = deferred()
   const app = await workspace((_url, _options, attempt) => attempt === 1 ? response(result('Draf pertama.')) : pending.promise)
@@ -109,6 +151,7 @@ test('a successful draft can be regenerated deliberately and remains visible unt
   await app.generate()
   assert.equal(app.aiRequests.length, 2, 'Repeated clicks while active do not start another request')
   assert.notEqual(key(app, 0), key(app, 1))
+  assert.match(JSON.parse(app.aiRequests[1].options.body).giliran[0].teks, /Draf pertama/)
   pending.resolve(response(result('Draf kedua.'))); await generating
   assert.equal(app.get('ai-use').disabled, false)
   await app.get('ai-use').emit('click')

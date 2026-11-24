@@ -35,6 +35,25 @@ def check():
         owner.locator('#promo-campaign').select_option(key)
         owner.locator('#promo-business').fill('Dapur Ujian')
         owner.locator('#promo-area').fill('Ampang')
+        drafts = [
+            'SOALAN_PENIAGA: Pakej ini untuk berapa orang?',
+            'Makan tengah hari untuk 20 orang di pejabat. Pakej RM250 di Ampang.',
+            json.dumps({'keywords': ['katering pejabat Ampang'], 'negatives': ['kerja kosong'],
+                        'headlines': ['Katering Pejabat Ampang', 'Pakej Untuk 20 Orang', 'Minta Sebut Harga'],
+                        'descriptions': ['Sediakan makan tengah hari untuk pejabat.', 'Pakej 20 orang RM250 di Ampang.']})
+        ]
+        prompts = []
+        def handle_draft(route):
+            prompts.append(''.join(t['teks'] for t in route.request.post_data_json['giliran']))
+            route.fulfill(json={'ok': True, 'bukan_model': False, 'sumber': 'openai', 'jawapan': drafts[len(prompts)-1]})
+        owner.route('**/api/marketing/draf', handle_draft)
+        owner.locator('#promo-ai').click()
+        expect(owner.locator('#promo-feedback')).to_contain_text('Pakej ini untuk berapa orang?')
+        expect(owner.locator('#promo-offer')).to_have_value(plan['offer'])
+        owner.locator('#promo-offer').fill('Pakej katering pejabat untuk 20 orang RM250')
+        owner.locator('#promo-ai').click()
+        expect(owner.locator('#promo-offer')).to_have_value(drafts[1])
+        assert '4P' in prompts[1] and 'Pakej katering pejabat untuk 20 orang RM250' in prompts[1]
         owner.locator('#promo-draft').click()
         expect(owner.locator('#promo-feedback')).to_contain_text('draf')
         visitor = b.new_page(viewport={'width': 390, 'height': 844})
@@ -56,6 +75,9 @@ def check():
         owner.locator('#promo-leads select').select_option('tempahan')
         expect(owner.locator('#promo-count')).to_contain_text('1 tempahan')
         owner.locator('#search-form [name=budget]').fill('10')
+        owner.locator('#search-ai').click()
+        expect(owner.locator('#search-form [name=keywords]')).to_have_value('katering pejabat Ampang')
+        assert 'Google Search' in prompts[2] and '4P' not in prompts[2]
         with owner.expect_download() as downloaded:
             owner.get_by_role('button', name='Eksport CSV Google Ads Editor').click()
         with open(downloaded.value.path(), encoding='utf-8-sig') as f:
