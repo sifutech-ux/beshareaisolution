@@ -142,6 +142,15 @@ replyTransportCheck($flashLiteGeneration['maxOutputTokens'] === 512
     && $flashLiteGeneration['responseMimeType'] === 'application/json'
     && $flashLiteGeneration['responseSchema'] === $request['generationConfig']['responseSchema']
     && !isset($flashLiteRequest['tools']), 'Gemini 3.5 Flash-Lite preserves bounded JSON and no tools');
+// Preview and inbound replies use this transport. Exercise the real request builder
+// with both supported request profiles.
+foreach ([$request, $flashLiteRequest] as $profile) {
+    $style = $profile['systemInstruction']['parts'][0]['text'] ?? '';
+    foreach (['Comparing options', 'Permission:', 'Direct or assumptive close', '1–10', 'Risk reduction',
+        'silence as agreement', 'human handoff for scheduling'] as $required) {
+        replyTransportCheck(str_contains($style, $required), 'Decision guidance in both Gemini request profiles: ' . $required);
+    }
+}
 $flashLiteInvalid = [];
 $flashLiteInvalid['human_handoff'] = replyTransportGeminiAnswer(['reply' => 'Discard this text.', 'handoff' => true]);
 $flashLiteInvalid['wrong_type'] = replyTransportGeminiAnswer(['reply' => 'Answer', 'handoff' => 'false']);
