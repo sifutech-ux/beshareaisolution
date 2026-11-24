@@ -485,4 +485,96 @@ adminTest('Scheduled pass picks up a later read receipt and the open inbox sees 
         'Real receipt updates the tracked outbound message in the next snapshot');
 });
 
+adminTest('One consent schedules one WhatsApp, with revocation, template and tenant gates', function () use ($f,$pdo,$a,$b,$config,$connectionA,$wabaA,$phoneA,$now): void {
+    $pdo->exec(file_get_contents(__DIR__.'/../migrations/0010_ai_followups.up.sql'));
+    $pdo->exec(file_get_contents(__DIR__.'/../migrations/0010_ai_followups.up.sql'));
+    runtimeSettings($f,$a,$connectionA,'A','all',$now);
+    $clock = $now;
+    $calls = [];
+    $template = 'ABSENT';
+    $ambiguous = false;
+    $generator = static fn () => ['reply'=>'Ordinary inbound reply.','handoff'=>false];
+    $sender = static function ($token,$phone,$peer,$text,$replyTo,$media,$usesTemplate=false) use (&$calls,&$ambiguous): array {
+        $calls[] = compact('phone','peer','text','replyTo','usesTemplate');
+        if ($ambiguous && $replyTo === null) { return ['sent'=>false,'ambiguous'=>true]; }
+        return ['sent'=>true,'ambiguous'=>false,'message_id'=>'wamid.followup.out.'.count($calls)];
+    };
+    $worker = new AiReplyWorker($pdo,$f['seal'],$generator,$sender,function () use (&$clock) { return $clock; },null,true,true,
+        function () use (&$template) { return $template; });
+    $seq=0;
+    $peer='601199991234';
+    $input = function (string $text, bool $replay=false) use ($f,$a,$config,$wabaA,$phoneA,$peer,$worker,&$clock,&$seq): void {
+        $entry = runtimeEntry($wabaA,$phoneA,'wamid.followup.in.'.(++$seq),$peer);
+        $entry['changes'][0]['value']['messages'][0]['text']['body']=$text;
+        $entry['changes'][0]['value']['messages'][0]['timestamp']=(string)$clock;
+        runtimeBridge($f,$config,[$entry]);
+        if ($replay) { runtimeBridge($f,$config,[$entry]); }
+        $worker->run($a['business_id']);
+    };
+    $status = fn () => $pdo->query("SELECT status FROM ai_followups ORDER BY event_id DESC LIMIT 1")->fetchColumn();
+    $scheduled = fn () => (int)$pdo->query("SELECT COUNT(*) FROM ai_followups WHERE status='scheduled'")->fetchColumn();
+    $outbound = static function () use (&$calls) { return array_values(array_filter($calls,fn($c)=>$c['replyTo']===null)); };
+    $input('ok');
+    $input('SUSUL esok pukul 3');
+    adminAssert($scheduled()===0,'Neither assent alone nor an ambiguous time grants consent');
+    $input('Boleh follow up esok pukul 3 petang?');
+    // An in-window proposal using a relative time can be confirmed with one reply.
+    $input('Boleh follow up dalam 10 minit?');
+    adminAssert($scheduled()===0 && str_contains(end($calls)['text'],'Balas YA'),'A question only proposes the time');
+    $input('Ya');
+    adminAssert($scheduled()===1,'A direct affirmative answer accepts the immediately preceding service proposal');
+    $input('Tolong jangan hubungi saya lagi ya');
+    adminAssert($scheduled()===0,'Natural opt-out cancels the accepted time');
+    $input('SUSUL dalam 2 minit',true);
+    adminAssert($scheduled()===1 && str_contains(end($calls)['text'],'MYT'),'Acknowledgement names the agreed time and replay creates one row');
+    $input('SUSUL dalam 3 minit');
+    adminAssert($scheduled()===1,'An explicit replacement cancels the previous time');
+    $pdo->exec("UPDATE ai_followups SET due_at=UTC_TIMESTAMP() WHERE status='scheduled'");
+    $candidates = (new AiReplyDispatcher($pdo,true))->inspect()['next_businesses'];
+    adminAssert(in_array((int)$a['business_id'],$candidates,true),'Dispatcher sees due consent without any inbound event');
+    adminSql($pdo,"UPDATE ai_followups SET due_at=? WHERE status='scheduled'",[gmdate('Y-m-d H:i:s',$clock+180)]);
+    $clock+=179;
+    $worker->run($a['business_id']);
+    adminAssert($outbound()===[],'No early send');
+    $clock++;
+    $worker->run($b['business_id']);
+    adminAssert($outbound()===[],'Another tenant cannot send the follow-up');
+    $worker->run($a['business_id']);
+    $worker->run($a['business_id']);
+    adminAssert(count($outbound())===1 && !$outbound()[0]['usesTemplate'] && $status()==='sent','In-window text sent once at due time');
+    $input('SUSUL dalam 1 minit');
+    $input('BATAL SUSULAN');
+    $clock+=60;
+    $worker->run($a['business_id']);
+    adminAssert(count($outbound())===1 && $status()==='cancelled','Cancellation prevents a later outbound');
+    $input('SUSUL dalam 27 jam');
+    adminAssert($scheduled()===0 && str_contains(end($calls)['text'],'templat'),'Unsupported future time is not confirmed');
+    $template='APPROVED';
+    $input('SUSUL dalam 27 jam');
+    $clock+=27*3600;
+    $worker->run($a['business_id']);
+    adminAssert(count($outbound())===2 && $outbound()[1]['usesTemplate'] && $status()==='sent','Outside the window only the fixed approved marketing template is used');
+    $input('SUSUL dalam 26 jam');
+    $template='PAUSED';
+    $clock+=26*3600;
+    $worker->run($a['business_id']);
+    adminAssert(count($outbound())===2 && $status()==='cancelled','Paused template cannot fall back to free text');
+    $input('SUSUL dalam 1 minit');
+    $ambiguous=true;
+    $clock+=60;
+    $worker->run($a['business_id']);
+    $worker->run($a['business_id']);
+    adminAssert(count($outbound())===3 && $status()==='unknown','Uncertain delivery is never sent again');
+    $input('SUSUL dalam 1 minit');
+    $clock+=60;
+    adminSql($pdo,'UPDATE ai_reply_settings SET enabled=0 WHERE business_id=?',[$a['business_id']]);
+    $worker->run($a['business_id']);
+    adminAssert(count($outbound())===3 && $status()==='cancelled','Disabling AI prevents the scheduled send');
+    $base = strtotime('2026-10-24 06:00:00 UTC');
+    foreach (['SUSUL esok pukul 3 petang','SUSUL 25/10/2026 15:00','follow up tomorrow at 3 pm'] as $inputText) {
+        adminAssert(\BesharOs\WhatsAppFollowUp::command($inputText,$base)['due']===strtotime('2026-10-25 07:00:00 UTC'),'Explicit local date and time use MYT');
+    }
+    adminAssert(\BesharOs\WhatsAppFollowUp::command('SUSUL 31/02/2027 15:00',$base)['action']==='clarify','Invalid calendar dates are not silently normalized');
+});
+
 fwrite(STDOUT, 'PASS ' . $adminChecks . " customer AI runtime checks; synthetic DB and injected transports only.\n");

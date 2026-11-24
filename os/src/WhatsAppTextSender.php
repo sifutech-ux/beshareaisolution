@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace BesharOs;
 
 require_once __DIR__ . '/WhatsAppDeliveryError.php';
+require_once __DIR__ . '/WhatsAppFollowUp.php';
 
 /**
  * One bounded text or image-send attempt. The caller owns authorization, consent,
@@ -39,8 +40,10 @@ final class WhatsAppTextSender
         string $recipient,
         string $text,
         ?string $replyToMessageId = null,
-        ?array $media = null
+        ?array $media = null,
+        bool $followUpTemplate = false
     ): array {
+        if ($followUpTemplate && ($media !== null || $replyToMessageId !== null || $text !== WhatsAppFollowUp::MESSAGE)) { return $this->failed(false, 'invalid_template'); }
         if ($media !== null) {
             return $this->sendImage($token, $phoneId, $recipient, $text, $replyToMessageId, $media);
         }
@@ -60,6 +63,11 @@ final class WhatsAppTextSender
                 'type' => 'text',
                 'text' => ['preview_url' => false, 'body' => trim($text)],
             ];
+            if ($followUpTemplate) {
+                unset($request['text']);
+                $request['type'] = 'template';
+                $request['template'] = ['name'=>WhatsAppFollowUp::TEMPLATE, 'language'=>['code'=>WhatsAppFollowUp::LANGUAGE]];
+            }
             if ($replyToMessageId !== null) {
                 $request['context'] = ['message_id' => $replyToMessageId];
             }

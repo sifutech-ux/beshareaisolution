@@ -8,6 +8,7 @@ use PDO;
 use Throwable;
 
 require_once __DIR__ . '/KnowledgeReply.php';
+require_once __DIR__ . '/WhatsAppFollowUp.php';
 require_once __DIR__ . '/PlatformAccess.php';
 require_once __DIR__ . '/AiReplyPolicy.php';
 require_once __DIR__ . '/WhatsAppDeliveryError.php';
@@ -25,6 +26,7 @@ final class AiReplyWorker
     private Closure $generate;
     private Closure $send;
     private Closure $now;
+    private ?Closure $templateStatus;
     private const LEASE_SECONDS = 180;
     private const SEND_MARGIN_SECONDS = 60;
 
@@ -35,8 +37,11 @@ final class AiReplyWorker
         callable $send,
         ?callable $now = null,
         private ?KnowledgeCentre $knowledgeCentre = null,
-        private bool $allCustomerReplies = false
+        private bool $allCustomerReplies = false,
+        private bool $followups = false,
+        ?callable $templateStatus = null
     ) {
+        $this->templateStatus = $templateStatus === null ? null : Closure::fromCallable($templateStatus);
         $this->generate = Closure::fromCallable($generate);
         $this->send = Closure::fromCallable($send);
         $this->now = Closure::fromCallable($now ?? static fn (): int => time());
@@ -87,9 +92,11 @@ final class AiReplyWorker
                 }
                 $counts['archived']++;
                 try {
-                    $result = ($this->generate)($claim['knowledge'], $claim['body']['text'], $claim['history'],
+                    $result = $claim['followup_answer'] ?? ($this->generate)($claim['knowledge'], $claim['body']['text'], $claim['history'],
                         KnowledgeReply::catalog($claim['runtime']));
                     $plan = is_array($result) ? KnowledgeReply::plan($claim['runtime'], $result) : null;
+                    if ($plan !== null && $claim['offer'] !== null) { $plan['followup_offer'] = $claim['offer']; }
+                    if ($plan !== null && $claim['due'] !== null) { $plan['followup_due'] = $claim['due']; }
                 } catch (Throwable) {
                     $this->stop($businessId, (int) $id, 'generation_failed');
                     $counts['handoff']++;
@@ -111,6 +118,9 @@ final class AiReplyWorker
                 }
                 $outcome = $this->dispatch($businessId, (int) $id, $claim['body'], $plan);
                 $counts[$outcome]++;
+            }
+            if ($this->followups && ($deadline === null || microtime(true) < $deadline)) {
+                $this->sendDueFollowups($businessId, $limit, $deadline);
             }
         } finally {
             if ($this->pdo->inTransaction()) {
@@ -225,6 +235,23 @@ final class AiReplyWorker
                 );
             }
             $context = $this->context($businessId, $connectionId, $conversationId);
+            $command = $body['type'] === 'text' ? WhatsAppFollowUp::command($body['text'], $original) : null;
+            if ($this->followups && preg_match('/^(?:ya(?: susul)?|yes|setuju|boleh)[.!]?$/iu',trim($body['text']))) {
+                // Only the immediately preceding, successfully delivered-to-Meta server proposal can grant context to "yes".
+                $previous = $this->one("SELECT * FROM ai_messages WHERE business_id=? AND conversation_id=?
+                    AND id < (SELECT id FROM ai_messages WHERE business_id=? AND source_event_id=? AND direction='in')
+                    ORDER BY id DESC LIMIT 1", [$businessId,$conversationId,$businessId,$eventId]);
+                if ($previous && $previous['direction'] === 'out' && in_array($previous['status'],['sent','delivered','read'],true)
+                    && $original >= $this->timeOf($previous['message_at'])) {
+                    $proposal = json_decode($this->open($previous,'body'),true);
+                    if (is_int($proposal['followup_offer'] ?? null)) {
+                        $command = ['action'=>'schedule','due'=>$proposal['followup_offer']];
+                    }
+                }
+            }
+            if ($this->followups && (($command['action'] ?? '') === 'cancel' || $this->wantsHuman($body['text']))) {
+                $this->cancelFollowups($businessId, $conversationId);
+            }
             $reason = $this->gate($context, $body, null);
             $knowledge = '';
             $history = [];
@@ -251,6 +278,29 @@ final class AiReplyWorker
                 } catch (Throwable) {
                     $reason = 'knowledge_or_history_unreadable';
                 }
+            }
+            $followupAnswer = null;
+            $due = null;
+            $offer = null;
+            if ($reason === null && $command !== null) {
+                $text = WhatsAppFollowUp::GUIDE;
+                if (!$this->followups) {
+                    $text = 'Penjadual susulan belum tersedia untuk nombor ini.';
+                } elseif ($command['action'] === 'cancel') {
+                    $text = 'Baik, tiada susulan berjadual yang akan dihantar untuk perbualan ini.';
+                } elseif (in_array($command['action'],['schedule','offer'],true) && $command['due'] > $now
+                    && $this->timeOf($context['conversation']['last_inbound_at']) <= $original) {
+                    if ($command['due'] >= $original + 86400 - self::SEND_MARGIN_SECONDS && !$this->approvedTemplate($context['connection'])) {
+                        $text = 'Masa itu memerlukan templat WhatsApp yang belum dapat disahkan. Pilih masa dalam tempoh 24 jam daripada mesej ini. '.WhatsAppFollowUp::GUIDE;
+                    } elseif ($command['action'] === 'offer') {
+                        $offer = $command['due'];
+                        $text = 'Boleh kami hantar satu WhatsApp susulan pada '.WhatsAppFollowUp::localTime($offer).'? Balas YA untuk setuju.';
+                    } else {
+                        $due = $command['due'];
+                        $text = 'Baik, kami akan WhatsApp sekali pada '.WhatsAppFollowUp::localTime($due).'. Untuk batalkan, balas BATAL SUSULAN.';
+                    }
+                }
+                $followupAnswer = ['reply'=>$text,'handoff'=>false];
             }
             if ($reason === null) {
                 $settings = $context['settings'];
@@ -293,7 +343,7 @@ final class AiReplyWorker
                  locked_until = ?, next_retry_at = NULL WHERE id = ? AND business_id = ?",
                 [$this->date($now + self::LEASE_SECONDS), $eventId, $businessId]
             );
-            return ['kind' => 'generate', 'body' => $body, 'knowledge' => $knowledge, 'history' => $history, 'runtime' => $runtime];
+            return ['kind' => 'generate', 'body' => $body, 'knowledge' => $knowledge, 'history' => $history, 'runtime' => $runtime, 'followup_answer' => $followupAnswer, 'due' => $due, 'offer' => $offer];
         });
     }
 
@@ -416,6 +466,12 @@ final class AiReplyWorker
                      WHERE id = ? AND business_id = ? AND token_state = 'verified' AND disconnected_at IS NULL",
                     [$this->date($this->clock()), $job['connection_id'], $businessId]
                 );
+                if (isset($plan['followup_due'])) {
+                    $this->cancelFollowups($businessId, (int)$job['conversation_id']);
+                    $this->execute("INSERT INTO ai_followups (event_id,business_id,connection_id,conversation_id,consent_at,due_at,status)
+                        VALUES (?,?,?,?,?,?,'scheduled')", [$eventId,$businessId,$job['connection_id'],$job['conversation_id'],
+                        $this->date($this->originalTime($body)),$this->date($plan['followup_due'])]);
+                }
                 $this->terminal($job, 'sent', null, false);
                 return 'sent';
             }
@@ -425,6 +481,80 @@ final class AiReplyWorker
                 $definiteFailure ? WhatsAppDeliveryError::reason($result, 'send_rejected') : 'send_unknown', true);
             return $definiteFailure ? 'failed' : 'unknown';
         });
+    }
+
+    private function cancelFollowups(int $business, int $conversation): void
+    {
+        $this->execute("UPDATE ai_followups SET status='cancelled' WHERE business_id=? AND conversation_id=? AND status='scheduled'", [$business,$conversation]);
+    }
+
+    private function approvedTemplate(array $connection): bool
+    {
+        if ($this->templateStatus === null) { return false; }
+        try {
+            return ($this->templateStatus)($this->open($connection, 'token'), $connection['waba_id']) === 'APPROVED';
+        } catch (Throwable) { return false; }
+    }
+
+    private function sendDueFollowups(int $business, int $limit, ?float $deadline): void
+    {
+        $query = $this->pdo->prepare("SELECT event_id,conversation_id,connection_id,consent_at,due_at FROM ai_followups
+            WHERE business_id=? AND status='scheduled' AND due_at<=? ORDER BY due_at,event_id LIMIT ".$limit);
+        $query->execute([$business, $this->date($this->clock())]);
+        foreach ($query->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if ($deadline !== null && microtime(true) >= $deadline) { break; }
+            // Commit an uncertain terminal state before the sole outbound attempt.
+            // A process crash or lost response can never requeue this consent.
+            $claimed = $this->transaction(function () use ($business,$row): bool {
+                $current = $this->one("SELECT status FROM ai_followups WHERE business_id=? AND event_id=? FOR UPDATE", [$business,$row['event_id']]);
+                if (($current['status'] ?? '') !== 'scheduled' || $this->pendingInbound($business,(int)$row['connection_id'])) { return false; }
+                $expired = $this->clock() - $this->timeOf($row['due_at']) > 300;
+                $this->execute('UPDATE ai_followups SET status=? WHERE business_id=? AND event_id=?', [$expired ? 'expired' : 'unknown',$business,$row['event_id']]);
+                return !$expired;
+            });
+            if (!$claimed) { continue; }
+            $this->transaction(function () use ($business,$row): void {
+                $context = $this->context($business,(int)$row['connection_id'],(int)$row['conversation_id']);
+                $connection = $context['connection'];
+                $thread = $context['conversation'];
+                $body = ['waba_id'=>$connection['waba_id'] ?? '', 'phone_number_id'=>$connection['phone_number_id'] ?? '',
+                    'from'=>$thread['recipient'] ?? '', 'timestamp'=>(string)$this->timeOf($row['consent_at'])];
+                $reason = $this->gate($context,$body,null,true);
+                $now = $this->clock();
+                $settings = $context['settings'];
+                $day = gmdate('Y-m-d',$now);
+                $used = ($settings['quota_date'] ?? null) === $day ? (int)$settings['quota_used'] : 0;
+                $template = $now + self::SEND_MARGIN_SECONDS >= $this->timeOf($thread['last_inbound_at'] ?? null) + 86400;
+                if ($reason !== null || $used >= (int)($settings['daily_limit'] ?? 0)
+                    || $this->pendingInbound($business,(int)$row['connection_id'])
+                    || ($template && !$this->approvedTemplate($connection))) {
+                    $this->execute("UPDATE ai_followups SET status='cancelled' WHERE business_id=? AND event_id=?",[$business,$row['event_id']]);
+                    return;
+                }
+                $this->execute('UPDATE ai_reply_settings SET quota_date=?,quota_used=? WHERE business_id=?',[$day,$used+1,$business]);
+                $token = $this->open($connection,'token');
+                try {
+                    $result = ($this->send)($token,$connection['phone_number_id'],$thread['recipient'],WhatsAppFollowUp::MESSAGE,null,null,$template);
+                } catch (Throwable) { $result = []; }
+                $wamid = $result['message_id'] ?? null;
+                $status = 'unknown';
+                if (($result['ambiguous'] ?? true) === false) {
+                    if (($result['sent'] ?? null) === false) { $status = 'failed'; }
+                    elseif (($result['sent'] ?? false) === true && is_string($wamid) && preg_match('/\A[A-Za-z0-9._+\/=-]{8,180}\z/',$wamid)) { $status = 'sent'; }
+                }
+                $archive = $this->seal->seal(json_encode(['type'=>'text','text'=>WhatsAppFollowUp::MESSAGE],JSON_THROW_ON_ERROR),200000);
+                $date = $this->date($now);
+                $this->execute("INSERT INTO ai_messages (business_id,connection_id,conversation_id,direction,wamid,body_ciphertext,body_nonce,body_tag,body_key_version,message_at,status,created_at,updated_at)
+                    VALUES (?,?,?,'out',?,?,?,?,?,?,?,?,?)",[$business,$row['connection_id'],$row['conversation_id'],$status==='sent'?$wamid:null,
+                    $archive['ciphertext'],$archive['nonce'],$archive['tag'],$archive['version'],$date,$status,$date,$date]);
+                $this->execute('UPDATE ai_followups SET status=? WHERE business_id=? AND event_id=?',[$status,$business,$row['event_id']]);
+            });
+        }
+    }
+
+    private function pendingInbound(int $business,int $connection): bool
+    {
+        return $this->one("SELECT id FROM webhook_events WHERE business_id=? AND connection_id=? AND event_kind='message' AND status='accepted' LIMIT 1",[$business,$connection]) !== null;
     }
 
     private function recover(int $businessId): int
@@ -516,7 +646,7 @@ final class AiReplyWorker
     }
 
     /** Returns a fixed, non-secret refusal code or null. */
-    private function gate(array $context, array $body, ?int $revision): ?string
+    private function gate(array $context, array $body, ?int $revision, bool $scheduled = false): ?string
     {
         $s = $context['settings'];
         $b = $context['business'];
@@ -565,7 +695,7 @@ final class AiReplyWorker
             return 'invalid_timestamp';
         }
         // Reserve both bounded image upload and message dispatch inside the original window.
-        if ($original + 86400 <= $now + self::SEND_MARGIN_SECONDS) {
+        if (!$scheduled && $original + 86400 <= $now + self::SEND_MARGIN_SECONDS) {
             return 'expired_window';
         }
         $activated = $this->timeOf($s['activation_at']);

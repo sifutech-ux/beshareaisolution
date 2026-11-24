@@ -11,14 +11,14 @@ final class AiReplyDispatcher
 {
     private const LOCK = 'beshare_ai_dispatch_all';
 
-    public function __construct(private PDO $pdo) {}
+    public function __construct(private PDO $pdo, private bool $followups = false) {}
 
     /** Read-only: no lease, cursor update, queue claim, or provider call. */
     public function inspect(int $businessLimit = 20): array
     {
         $this->bounds($businessLimit, 1);
         $cursor = $this->cursor();
-        $query = $this->pdo->query('SELECT COUNT(*) FROM businesses b ' . self::ELIGIBLE);
+        $query = $this->pdo->query('SELECT COUNT(*) FROM businesses b ' . $this->eligible());
         return [
             'candidate_businesses' => (int) $query->fetchColumn(),
             'last_business_id' => $cursor,
@@ -97,9 +97,15 @@ final class AiReplyDispatcher
                 AND j.status IN ('generating','generated','sending')
                 AND (j.locked_until IS NULL OR j.locked_until<=UTC_TIMESTAMP())))";
 
+    private function eligible(): string
+    {
+        return self::ELIGIBLE . ($this->followups ? " OR EXISTS (SELECT 1 FROM ai_followups f
+            WHERE f.business_id=b.id AND f.status='scheduled' AND f.due_at<=UTC_TIMESTAMP())" : '');
+    }
+
     private function candidates(int $cursor, int $limit): array
     {
-        $query = $this->pdo->prepare('SELECT b.id FROM businesses b ' . self::ELIGIBLE
+        $query = $this->pdo->prepare('SELECT b.id FROM businesses b ' . $this->eligible()
             . ' ORDER BY (b.id<=?),b.id LIMIT ' . $limit);
         $query->execute([$cursor]);
         return array_map('intval', $query->fetchAll(PDO::FETCH_COLUMN));

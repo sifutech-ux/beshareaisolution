@@ -111,6 +111,15 @@ final class AuthHttp
         // Platform restrictions are separate from the customer's own business status.
         // Switching to another membership and signing out remain available.
         if ($action !== 'pilih') { PlatformAccess::assertBusinessAccess($this->pdo, $actor['business_id']); }
+        if ($action === 'templatsusulan') {
+            if ($actor['role'] !== 'owner' || $actor['user_id'] !== $actor['owner_user_id']) { throw new AuthException('Akses pemilik diperlukan.',403); }
+            if (!$this->whatsapp || $actor['public_id'] !== ($body['expected_business_public_id'] ?? null)
+                || !is_int($body['connection_id'] ?? null)) { throw new AuthException('Semak semula sambungan semasa.',409); }
+            if (!$this->rates->consume('followup-template|'.$actor['business_id'].'|'.$actor['user_id'])) { throw new AuthException('Tunggu sebentar sebelum menyemak semula.',429); }
+            try { $status = $this->whatsapp->prepareFollowUpTemplate($actor,$body['connection_id']); }
+            catch (MetaCallException $error) { throw new AuthException('Meta belum mengesahkan templat. Semak kebenaran pengurusan WhatsApp. Kod Meta: '.$error->metaCode,502); }
+            return $this->respond($session,false,['ok'=>true,'template_status'=>$status,'scheduler_ready'=>WhatsAppFollowUp::installed($this->pdo)]);
+        }
         if ($action === 'webhook') {
             if ($actor['role'] !== 'owner' || $actor['user_id'] !== $actor['owner_user_id'] || $actor['status'] !== 'active') {
                 throw new AuthException('Hanya pemilik perniagaan aktif boleh menyambungkan webhook.', 403);

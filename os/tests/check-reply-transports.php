@@ -4,7 +4,12 @@ declare(strict_types=1);
 require_once __DIR__ . '/../src/GeminiTransport.php';
 require_once __DIR__ . '/../src/WhatsAppTextSender.php';
 
+require_once __DIR__ . '/../src/MetaGraph.php';
+
 use BesharOs\GeminiTransport;
+use BesharOs\MetaGraph;
+use BesharOs\MetaTransport;
+use BesharOs\WhatsAppFollowUp;
 use BesharOs\WhatsAppTextSender;
 
 // Every adapter below receives an injected transport. No network is used.
@@ -147,7 +152,7 @@ replyTransportCheck($flashLiteGeneration['maxOutputTokens'] === 512
 foreach ([$request, $flashLiteRequest] as $profile) {
     $style = $profile['systemInstruction']['parts'][0]['text'] ?? '';
     foreach (['Comparing options', 'Permission:', 'Direct or assumptive close', '1–10', 'Risk reduction',
-        'silence as agreement', 'human handoff for scheduling'] as $required) {
+        'silence as agreement', 'BATAL SUSULAN'] as $required) {
         replyTransportCheck(str_contains($style, $required), 'Decision guidance in both Gemini request profiles: ' . $required);
     }
 }
@@ -381,5 +386,41 @@ try {
     $denied = $error->getMessage() === 'sender_configuration';
 }
 replyTransportCheck($denied, 'Invalid Graph version denied');
+
+// Template provisioning and delivery use exactly the reviewed Malay marketing body.
+$meta = new class implements MetaTransport {
+    public array $templates = [];
+    public array $calls = [];
+    public function call(string $method, string $url, array $headers, string $body): array
+    {
+        $this->calls[] = [$method, $url, $headers, $body];
+        if ($method === 'GET') { return ['status'=>200,'json'=>['data'=>$this->templates]]; }
+        $this->templates[] = json_decode($body,true,32,JSON_THROW_ON_ERROR) + ['status'=>'PENDING'];
+        return ['status'=>200,'json'=>['id'=>'123456','status'=>'PENDING']];
+    }
+};
+$graph = new MetaGraph('123456','synthetic_secret','v23.0',$meta);
+replyTransportCheck($graph->followUpTemplate($token,$phoneId) === 'ABSENT' && count($meta->calls) === 1,
+    'Read-only template check never creates a template');
+replyTransportCheck($graph->followUpTemplate($token,$phoneId,true) === 'PENDING'
+    && $meta->calls[2][0] === 'POST' && $meta->calls[2][1] === 'https://graph.facebook.com/v23.0/'.$phoneId.'/message_templates'
+    && $meta->calls[2][2]['authorization'] === 'Bearer '.$token
+    && $meta->templates[0]['components'] === [['type'=>'BODY','text'=>WhatsAppFollowUp::MESSAGE]], 'Provision one fixed template on the current WABA');
+$meta->templates[0]['status'] = 'APPROVED';
+replyTransportCheck($graph->followUpTemplate($token,$phoneId,true) === 'APPROVED' && count($meta->calls) === 4,
+    'Previously approved template is reused');
+$meta->templates[0]['components'][0]['text'] = 'Unrelated promotion';
+replyTransportCheck($graph->followUpTemplate($token,$phoneId) === 'MISMATCH','Divergent approved body is blocked');
+$templateRequests = [];
+$templateSender = new WhatsAppTextSender('v23.0', function ($method,$url,$headers,$body) use (&$templateRequests): array {
+    $templateRequests[] = json_decode($body,true,32,JSON_THROW_ON_ERROR);
+    return replyTransportJson(200,replyTransportSendAnswer());
+});
+$sentTemplate = $templateSender->send($token,$phoneId,$recipient,WhatsAppFollowUp::MESSAGE,null,null,true);
+replyTransportCheck($sentTemplate['sent'] && $templateRequests === [['messaging_product'=>'whatsapp','recipient_type'=>'individual',
+    'to'=>$recipient,'type'=>'template','template'=>['name'=>WhatsAppFollowUp::TEMPLATE,'language'=>['code'=>WhatsAppFollowUp::LANGUAGE]]]],
+    'Out-of-window delivery sends only the named, language-bound template');
+$invalidTemplate = $templateSender->send($token,$phoneId,$recipient,'Other copy',null,null,true);
+replyTransportCheck(!$invalidTemplate['sent'] && count($templateRequests) === 1,'Unapproved template copy is never dispatched');
 
 echo "Reply transport checks passed (synthetic; no network).\n";

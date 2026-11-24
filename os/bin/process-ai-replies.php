@@ -89,10 +89,20 @@ try {
     if (!$seal instanceof TokenSeal || !function_exists('curl_init')) { throw new RuntimeException('configuration_unavailable'); }
     $generator = new GeminiTransport($config['gemini_api_key'], $config['gemini_model']);
     $sender = new WhatsAppTextSender(BESHARE_META_GRAPH);
+    $followups = \BesharOs\WhatsAppFollowUp::installed($pdo);
+    if (!$followups && $all) {
+        try {
+            // Install only this additive queue, with the existing private CLI worker.
+            $pdo->exec(file_get_contents(dirname(__DIR__).'/migrations/0010_ai_followups.up.sql'));
+            $followups = true;
+        } catch (Throwable) { fwrite(STDERR,"Jadual ai_followups belum tersedia. Semak izin pemasangan migrasi 0010.\n"); }
+    }
+    $graph = !empty($config['app_secret']) && BESHARE_META_APP_ID !== ''
+        ? new \BesharOs\MetaGraph(BESHARE_META_APP_ID,$config['app_secret'],BESHARE_META_GRAPH) : null;
     $worker = new AiReplyWorker($pdo, $seal, [$generator, 'reply'], [$sender, 'send'], null,
-        new KnowledgeCentre($pdo, $seal), $rollout);
+        new KnowledgeCentre($pdo, $seal), $rollout, $followups, $graph ? [$graph, 'followUpTemplate'] : null);
     $result = $all
-        ? (new AiReplyDispatcher($pdo))->run([$worker, 'run'], $businessLimit, $limit, 58.0, true)
+        ? (new AiReplyDispatcher($pdo,$followups))->run([$worker, 'run'], $businessLimit, $limit, 58.0, true)
         : $worker->run($businessId, $limit);
     // Aggregate counters only. Tokens, prompts and message bodies never leave the host.
     fwrite(STDOUT, json_encode($result, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n");
