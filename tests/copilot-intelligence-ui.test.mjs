@@ -8,7 +8,7 @@ const flush = () => new Promise(resolve => setImmediate(resolve))
 
 function harness({ micFail = false, fetchFail = false, deferMic = false, playFail = false,
   liveProvider = 'elevenlabs', synth = async () => speech } = {}) {
-  const effects = { played: 0, paused: 0, revoked: 0, reviewed: null }
+  const effects = { primed: 0, played: 0, paused: 0, revoked: 0, reviewed: null }
   class Element {
     constructor() { this.children = []; this.listeners = {}; this.dataset = {}; this.classList = { add() {} }; this.disabled = false; this.value = ''; this.textContent = ''; this.isConnected = true; this.open = false }
     addEventListener(name, fn) { (this.listeners[name] ||= []).push(fn) }
@@ -17,6 +17,7 @@ function harness({ micFail = false, fetchFail = false, deferMic = false, playFai
     replaceChildren(...nodes) { this.children = nodes }
     setAttribute() {} scrollIntoView() {} showModal() { this.open = true } close() { this.closed = true; this.open = false; this.emit('close') } focus() {}
     async play() {
+      if (this.src?.startsWith('data:audio/wav')) { effects.primed++; return }
       effects.played++
       if (playFail && effects.played === 1) throw new Error('blocked')
     }
@@ -190,4 +191,110 @@ test('unmarked speech cannot play even after an acknowledged live session starts
   assert.equal(h.get('suara-panel').dataset.state, 'active')
   assert.equal(h.get('suara-transkrip').children.length, 1)
   assert.match(h.get('suara-status').textContent, /baca transkrip/)
+})
+
+
+test('playback is primed by Start before the microphone permission prompt resolves', async () => {
+  const h = harness({ deferMic: true })
+  const starting = h.api.startVoice()
+  assert.equal(h.effects.primed, 1)
+  assert.equal(h.requests.length, 0)
+  h.releaseMic(); await starting
+})
+
+test('synthesis failure retains the active turn and retries the same text only on demand', async () => {
+  let calls = 0
+  const h = harness({ synth: async () => { if (++calls === 1) throw new Error('offline'); return speech } })
+  h.api.init(); await h.api.startVoice()
+  h.reply('retry'); await flush()
+  assert.equal(h.get('suara-main').textContent, 'Cuba semula audio')
+  assert.equal(h.get('suara-main').hidden, false)
+  h.get('suara-main').emit('click'); h.get('suara-main').emit('click'); await flush()
+  assert.equal(calls, 2)
+  assert.equal(h.effects.played, 1)
+  assert.equal(h.get('suara-transkrip').children.length, 1)
+})
+
+function connection(h, state) {
+  h.peer().connectionState = state
+  h.peer().emit('connectionstatechange')
+}
+
+test('temporary disconnect recovers within the same call and retains microphone and transcript', async () => {
+  const h = harness(); await h.api.startVoice()
+  h.peer().channel.readyState = 'open'; h.peer().channel.emit('open')
+  h.reply('one'); await flush()
+  connection(h, 'disconnected')
+  const grace = [...h.timers].at(-1)
+  connection(h, 'disconnected')
+  assert.equal(h.timers.size, 2)
+  connection(h, 'connected')
+  assert.equal(h.timers.has(grace), false)
+  grace()
+  assert.equal(h.get('suara-panel').dataset.state, 'active')
+  assert.equal(h.tracks[0].stopped, false)
+  assert.equal(h.get('suara-transkrip').children.length, 1)
+  assert.equal(h.requests.length, 2)
+})
+
+test('sustained disconnection closes the microphone and releases the session once', async () => {
+  const h = harness(); await h.api.startVoice()
+  connection(h, 'disconnected'); [...h.timers].at(-1)()
+  assert.ok(h.tracks[0].stopped)
+  assert.equal(h.timers.size, 0)
+  assert.equal(h.get('suara-panel').dataset.state, 'error')
+  assert.equal(h.requests.filter(x => JSON.parse(x.options.body).henti).length, 1)
+})
+
+test('a recoverable Realtime error leaves the data channel open for the next turn', async () => {
+  const h = harness(); await h.api.startVoice()
+  h.emit({ type: 'error', error: { type: 'invalid_request_error' } })
+  assert.equal(h.tracks[0].stopped, false)
+  h.reply('next'); await flush()
+  assert.equal(h.effects.played, 1)
+  h.emit({ type: 'error', error: { code: 'session_expired' } })
+  assert.ok(h.tracks[0].stopped)
+})
+
+const firstSentence = 'Mulakan dengan pelanggan yang selalu datang.'
+const restOfAnswer = 'Tanya produk yang mereka suka dan catat jawapannya.'
+function beginLongReply(h) {
+  h.emit({ type: 'response.created', response: { id: 'long' } })
+  h.emit({ type: 'response.output_text.delta', response_id: 'long', output_index: 0, content_index: 0, delta: firstSentence + ' ' + restOfAnswer })
+}
+function finishLongReply(h, status = 'completed') {
+  h.emit({ type: 'response.done', response: { id: 'long', status, output: [
+    { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: firstSentence + ' ' + restOfAnswer }] },
+  ] } })
+}
+function finishClip(h) {
+  const player = h.get('audio-bijak')
+  player.ended = true
+  player.onended()
+}
+
+test('long answers can start before response.done and play each part in order', async () => {
+  const h = harness(); await h.api.startVoice()
+  beginLongReply(h); await flush()
+  assert.equal(h.effects.played, 1)
+  assert.equal(JSON.parse(h.requests[1].options.body).jawapan, firstSentence)
+  finishLongReply(h); await flush()
+  assert.equal(JSON.parse(h.requests[2].options.body).jawapan, restOfAnswer)
+  assert.equal(h.effects.played, 1)
+  finishClip(h); await flush()
+  assert.equal(h.effects.played, 2)
+  finishClip(h)
+  assert.equal(h.effects.revoked, 2)
+  assert.equal(h.get('suara-transkrip').children.length, 1)
+  assert.match(h.get('suara-status').textContent, /Anda boleh bercakap/)
+})
+
+test('a cancelled long response discards preloaded audio and never speaks a late result', async () => {
+  let complete
+  const h = harness({ synth: () => new Promise(resolve => { complete = resolve }) }); await h.api.startVoice()
+  beginLongReply(h); finishLongReply(h, 'cancelled')
+  assert.equal(h.requests[1].options.signal.aborted, true)
+  complete(speech); await flush()
+  assert.equal(h.effects.played, 0)
+  assert.equal(h.get('suara-transkrip').children.length, 0)
 })
