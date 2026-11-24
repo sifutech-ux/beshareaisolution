@@ -12,9 +12,9 @@
     <meta property="og:title" content="BeShare AI Solution | AI untuk bisnes anda" />
     <meta property="og:description" content="Rancang kerja mingguan, urus pertanyaan WhatsApp dan jalankan kempen pemasaran. Bandingkan tiga sistem dan harga BeShare." />
     <meta property="og:url" content="https://beshareaisolution.com/" />
-    <meta property="og:image" content="https://beshareaisolution.com/assets/copilot-dashboard-1440.webp" />
+    <meta property="og:image" content="https://beshareaisolution.com/assets/be-share-aurora.webp" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-    <link rel="stylesheet" href="home.css?v=20261124-jualan" />
+    <link rel="stylesheet" href="home.css?v=20261125-demo-aurora" />
   </head>
   <body class="laman laman--aurora">
     <a class="lompat" href="#kandungan">Langkau ke kandungan</a>
@@ -30,6 +30,7 @@
         <span>BeShare AI</span>
       </a>
       <nav class="nav__links" aria-label="Utama">
+        <a href="#demo">Demo</a>
         <a href="#copilot">Copilot</a>
         <a href="#marketing">AI Marketing</a>
         <a href="#ai-os">WhatsApp AI OS</a>
@@ -38,6 +39,7 @@
       <details class="nav__menu">
         <summary>Menu <span aria-hidden="true">☰</span></summary>
         <nav class="nav__panel" aria-label="Utama telefon">
+          <a href="#demo">Demo</a>
           <a href="#copilot">Copilot</a>
           <a href="#marketing">AI Marketing</a>
           <a href="#ai-os">WhatsApp AI OS</a>
@@ -47,39 +49,85 @@
     </header>
 
     <main id="kandungan">
-      <section class="hero" aria-labelledby="tajuk-utama">
-        <div class="hero__atmosfera" aria-hidden="true">
-          <div class="hero__kabut"></div>
-          <div class="hero__orbit"></div>
-          <div class="hero__sinar hero__sinar--kiri"></div>
-          <div class="hero__sinar hero__sinar--kanan"></div>
-        </div>
-        <div class="hero__salinan">
-          <p class="ekosistem-nama">EKOSISTEM AI UNTUK PERNIAGAAN</p>
-          <h1 id="tajuk-utama">Rancang bisnes.<br /><span>Gerakkan jualan.</span></h1>
-          <p class="sub">Dapatkan pelan kerja dalam Bahasa Melayu, jawab pelanggan di WhatsApp dan jalankan kempen pemasaran dengan tiga sistem BeShare.</p>
-          <div class="tindakan">
-            <a class="butang" href="#ekosistem">Lihat sistem dan harga <span aria-hidden="true">↓</span></a>
-            <a class="butang butang--senyap" href="https://wa.me/60175457957?text=Salam%20BeShare%2C%20saya%20mahu%20pilih%20sistem%20yang%20sesuai%20untuk%20bisnes%20saya.">Tanya melalui WhatsApp</a>
+      <section class="aurora-hero" aria-labelledby="tajuk-utama">
+        <div class="aurora-hero__isi">
+          <div>
+            <h1 id="tajuk-utama">Rancang bisnes.<br><span>Gerakkan jualan.</span></h1>
+            <p>Pilih kerja yang anda mahu AI bantu hari ini.</p>
+            <a class="aurora-cta" href="#ekosistem">Lihat sistem dan harga <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h17m-7-7 7 7-7 7"/></svg></a>
           </div>
+          <img class="aurora-hero__seni" src="assets/be-share-aurora.webp" width="792" height="656" alt="" fetchpriority="high">
         </div>
+      </section>
 
-        <figure class="pentas">
-          <div class="pentas__bingkai">
-            <div class="pentas__bar"><span>BeShare AI <span class="pentas__pemisah">/</span> Business Copilot</span><span class="pentas__demo"><span aria-hidden="true">▣</span> Paparan contoh</span></div>
-            <img src="assets/copilot-dashboard-1440.webp"
-              srcset="assets/copilot-dashboard-960.webp 960w, assets/copilot-dashboard-1440.webp 1440w"
-              sizes="(max-width: 739px) calc(100vw - 42px), (max-width: 1140px) calc(100vw - 82px), 1058px"
-              width="1440" height="900" fetchpriority="high"
-              alt="Paparan Business Copilot: modul Utama, Nasihat, Pelan, Angka dan Profil, dengan fokus perniagaan, wawasan penasihat serta tindakan Kedai Kopi Aurora. Semua data ialah contoh." />
-          </div>
-          <figcaption>Contoh ruang kerja Business Copilot.</figcaption>
-        </figure>
+      <section class="demo-aurora" id="demo" aria-labelledby="tajuk-demo">
+        <h2 id="tajuk-demo">Apa yang bisnes anda perlukan?</h2>
+        <fieldset class="demo-pilihan" aria-labelledby="tajuk-demo">
+          <input class="demo-radio" type="radio" name="tugas" id="pilih-pelan" aria-controls="contoh-pelan" checked>
+          <label for="pilih-pelan">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2.5 6 1.5 1.5L7 4m-4.5 9L4 14.5 7 11m-4.5 9L4 21l3-3M10 6h11M10 13h11M10 20h8"/></svg>
+            <span><strong>Rancang promosi</strong><small>Business Copilot</small></span>
+          </label>
+          <input class="demo-radio" type="radio" name="tugas" id="pilih-post" aria-controls="contoh-post">
+          <label for="pilih-post">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18"/><circle cx="15.5" cy="16" r="1.3"/></svg>
+            <span><strong>Jadualkan post</strong><small>AI Marketing</small></span>
+          </label>
+          <input class="demo-radio" type="radio" name="tugas" id="pilih-balas" aria-controls="contoh-balas">
+          <label for="pilih-balas">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 10a6 6 0 0 1-6 6H7l-4 3v-6a6 6 0 0 1 5-9h3a6 6 0 0 1 6 6Z"/><path d="M19 9a5 5 0 0 1 2 8v4l-3-2h-3"/></svg>
+            <span><strong>Balas WhatsApp</strong><small>AI OS</small></span>
+          </label>
+
+          <article class="contoh" id="contoh-pelan" aria-labelledby="tajuk-contoh-pelan">
+            <div class="contoh__isi">
+              <p class="contoh__konteks">Contoh · Kedai Kopi Aurora</p>
+              <h3 id="tajuk-contoh-pelan">Pelan promosi kopi Jumaat</h3>
+              <p>Satu tawaran latte ais RM8, tiga hari untuk sediakan dan jalankan promosi.</p>
+              <a class="contoh__pautan" href="#copilot">Lihat pakej Business Copilot <span aria-hidden="true">→</span></a>
+            </div>
+            <ol class="pelan-kopi">
+              <li><strong>Rabu</strong><span>Tetapkan tawaran latte ais RM8 untuk Jumaat, 2–6 petang.</span></li>
+              <li><strong>Khamis</strong><span>Ambil gambar latte dan jadualkan post untuk pagi Jumaat.</span></li>
+              <li><strong>Jumaat</strong><span>Jalankan promosi dan catat jumlah latte yang terjual.</span></li>
+            </ol>
+          </article>
+
+          <article class="contoh" id="contoh-post" aria-labelledby="tajuk-contoh-post">
+            <div class="contoh__isi">
+              <p class="contoh__konteks">Contoh · Kedai Kopi Aurora</p>
+              <h3 id="tajuk-contoh-post">Post untuk pagi Jumaat</h3>
+              <p>Gambar, kapsyen dan waktu siaran untuk promosi yang sama, dalam satu draf.</p>
+              <a class="contoh__pautan" href="#marketing">Lihat pakej AI Marketing <span aria-hidden="true">→</span></a>
+            </div>
+            <figure class="post-kopi">
+              <img src="assets/latte-aurora.webp" width="360" height="270" alt="Segelas latte ais di kaunter kedai kopi" loading="lazy">
+              <figcaption>
+                <strong>Facebook &amp; Instagram</strong>
+                <p>Singgah minum latte ais petang ni? RM8 segelas di Kedai Kopi Aurora, Jumaat ni dari 2 hingga 6 petang.</p>
+                <small>Jadual siaran · Jumaat, 10 pagi</small>
+              </figcaption>
+            </figure>
+          </article>
+
+          <article class="contoh" id="contoh-balas" aria-labelledby="tajuk-contoh-balas">
+            <div class="contoh__isi">
+              <p class="contoh__konteks">Contoh · Kedai Kopi Aurora</p>
+              <h3 id="tajuk-contoh-balas">Bila pelanggan tanya di WhatsApp</h3>
+              <p>AI guna harga dan waktu promosi kedai untuk menjawab soalan pelanggan.</p>
+              <a class="contoh__pautan" href="#ai-os">Lihat pakej WhatsApp AI OS <span aria-hidden="true">→</span></a>
+            </div>
+            <div class="sembang-kopi">
+              <p><strong>Pelanggan</strong>Promo kopi Jumaat ni sampai pukul berapa?</p>
+              <p><strong>Kedai Kopi Aurora · AI</strong>Sampai pukul 6 petang. Latte ais RM8 segelas dari pukul 2 hingga 6 petang Jumaat ni.</p>
+            </div>
+          </article>
+        </fieldset>
       </section>
 
       <div class="aurora-bawah">
         <section class="bahagian bahagian--ekosistem" id="ekosistem" aria-labelledby="tajuk-eko">
-          <h2 id="tajuk-eko">Apa yang bisnes anda <span>perlukan?</span></h2>
+          <h2 id="tajuk-eko">Sistem dan harga BeShare</h2>
           <p class="bahagian__ayat">Pilih satu sistem untuk bermula, atau gabungkan ketiga-tiganya dalam Pakej Lengkap.</p>
 
           <div class="papan">
