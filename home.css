@@ -307,6 +307,217 @@ svg { flex-shrink: 0; }
   .laluan p { margin-left: 0; }
   .bahagian--laluan .bahagian__ayat { max-width: 460px; }
 }
+/* Homepage hero and the three examples from Kedai Kopi Aurora. */
+.aurora-hero {
+  background: radial-gradient(ellipse at 76% 57%, #202043 0, transparent 52%),
+    radial-gradient(ellipse at 10% 0, #10252d70, transparent 50%), #080916;
+  border-bottom: 1px solid #9591bc38;
+}
+.aurora-hero__isi, .demo-aurora {
+  width: min(1200px, calc(100% - 64px));
+  margin-inline: auto;
+}
+.aurora-hero__isi {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  min-height: clamp(400px, 39vw, 560px);
+  padding-block: 24px;
+}
+.aurora-hero h1 {
+  color: #fcfbff;
+  font-size: clamp(44px, 5.2vw, 78px);
+  font-weight: 760;
+  letter-spacing: -.06em;
+  line-height: 1.04;
+}
+.aurora-hero h1 span { color: #97edcb; }
+.aurora-hero p {
+  color: #e0dae9;
+  font-size: clamp(16px, 1.55vw, 22px);
+  line-height: 1.5;
+  margin-top: 18px;
+  max-width: 28ch;
+}
+.aurora-cta, .contoh__pautan {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 650;
+}
+.aurora-cta {
+  margin-top: 25px;
+  padding: 13px 19px;
+  border-radius: 10px;
+  color: #092320;
+  background: #98edcd;
+}
+.aurora-cta:hover { background: #b8f9e2; }
+.aurora-hero__seni {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 490px;
+  object-fit: contain;
+  mask-image: linear-gradient(to right, transparent, black 7%, black 92%, transparent),
+    linear-gradient(to bottom, transparent, black 13%, black 83%, transparent);
+  mask-composite: intersect;
+}
+.demo-aurora { padding-top: clamp(28px, 4vw, 60px); }
+.demo-aurora h2 {
+  font-size: clamp(26px, 3.1vw, 43px);
+  line-height: 1.15;
+  letter-spacing: -.045em;
+}
+.demo-pilihan {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 12px;
+  border: 0;
+  margin: 22px 0 0;
+  padding: 0;
+  min-width: 0;
+}
+.demo-radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+}
+.demo-pilihan label {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 1.4vw, 20px);
+  min-height: 76px;
+  padding: 10px clamp(10px, 1.5vw, 23px);
+  color: #dddce8;
+  border-bottom: 2px solid #88849b50;
+  cursor: pointer;
+}
+.demo-pilihan label:hover { background: #ffffff08; }
+.demo-pilihan svg {
+  width: clamp(23px, 2.4vw, 34px);
+  height: auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.demo-pilihan label strong {
+  display: block;
+  font-size: clamp(16px, 1.65vw, 23px);
+  letter-spacing: -.03em;
+  line-height: 1.2;
+}
+.demo-pilihan label small { display: block; margin-top: 4px; font-size: 13px; color: #c2bdd0; }
+.demo-radio:checked + label {
+  color: #a4f3d7;
+  background: linear-gradient(0deg, #76d9bd15, transparent);
+  border-bottom-color: #8ee7c9;
+}
+.demo-radio:focus-visible + label { outline: 3px solid #b7f3df; outline-offset: 2px; }
+.contoh {
+  display: none;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 5fr);
+  align-items: center;
+  gap: clamp(24px, 5vw, 78px);
+  margin-top: 18px;
+  padding: clamp(20px, 3.2vw, 44px);
+  border: 1px solid #8887ab4a;
+  border-radius: 16px;
+  background: linear-gradient(120deg, #142128, #151523 50%, #181529);
+}
+#pilih-pelan:checked ~ #contoh-pelan,
+#pilih-post:checked ~ #contoh-post,
+#pilih-balas:checked ~ #contoh-balas { display: grid; }
+.contoh__konteks { color: #a5d7ca; font-size: 13px; font-weight: 600; }
+.contoh h3 { margin: 10px 0; font-size: clamp(23px, 2.1vw, 32px); line-height: 1.17; letter-spacing: -.035em; }
+.contoh__isi > p:not(.contoh__konteks), .pelan-kopi, .post-kopi p, .sembang-kopi p {
+  color: #e1ddeb;
+  font-size: 15px;
+  line-height: 1.55;
+}
+.contoh__pautan { margin-top: 8px; color: #a4f3d7; }
+.contoh__pautan:hover { text-decoration: underline; text-underline-offset: 4px; }
+.pelan-kopi { list-style: none; margin: 0; padding: 0; }
+.pelan-kopi li {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  gap: 13px;
+  padding: 12px 0;
+}
+.pelan-kopi li + li { border-top: 1px solid #c7c3d227; }
+.pelan-kopi strong { color: #a4f3d7; }
+.post-kopi {
+  display: grid;
+  grid-template-columns: minmax(88px, 36%) 1fr;
+  align-items: center;
+  gap: 18px;
+}
+.post-kopi img { display: block; width: 100%; height: auto; border-radius: 9px; }
+.post-kopi figcaption > strong { font-size: 14px; }
+.post-kopi p { margin: 6px 0; }
+.post-kopi small { color: #a6dccd; font-size: 12px; }
+.sembang-kopi { display: grid; justify-items: start; gap: 8px; }
+.sembang-kopi p {
+  max-width: 89%;
+  padding: 10px 14px;
+  background: #2c293e;
+  border-radius: 12px 12px 12px 3px;
+}
+.sembang-kopi p + p { justify-self: end; background: #193c35; color: #effaf6; border-radius: 12px 12px 3px 12px; }
+.sembang-kopi strong { display: block; margin-bottom: 2px; font-size: 12px; color: #d6cded; }
+.sembang-kopi p + p strong { color: #a9edd5; }
+@media (max-width: 859px) {
+  .aurora-hero__isi, .demo-aurora { width: calc(100% - 40px); }
+  .aurora-hero__isi { min-height: 330px; }
+  .aurora-hero h1 { font-size: clamp(38px, 5.7vw, 48px); }
+  .demo-pilihan { column-gap: 5px; }
+  .demo-pilihan label { padding-inline: 8px; }
+}
+@media (max-width: 620px) {
+  .aurora-hero__isi {
+    position: relative;
+    isolation: isolate;
+    display: block;
+    min-height: 0;
+    padding-block: 37px 33px;
+  }
+  .aurora-hero__seni {
+    position: absolute;
+    z-index: -1;
+    right: -8px;
+    bottom: 10px;
+    width: 39%;
+    height: auto;
+  }
+  .aurora-hero h1 { font-size: clamp(37px, 8.7vw, 52px); }
+  .aurora-hero p { max-width: 59%; margin-top: 14px; font-size: 16px; }
+  .aurora-cta { margin-top: 18px; font-size: 13px; padding: 10px 12px; }
+  .demo-pilihan { grid-template-columns: 1fr; margin-top: 14px; }
+  .demo-pilihan label { min-height: 54px; padding: 9px 12px; gap: 13px; }
+  .demo-pilihan label > span { flex: 1; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .demo-pilihan label small { margin: 0; font-size: 11px; }
+  .contoh { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 18px; }
+  .contoh__isi { display: contents; }
+  .contoh h3, .contoh__pautan { margin: 0; }
+  .contoh__pautan { grid-row: 5; }
+  .pelan-kopi li { grid-template-columns: 54px 1fr; }
+  .post-kopi { grid-template-columns: 1fr; gap: 12px; }
+  .post-kopi img { max-height: 180px; object-fit: cover; }
+}
+@media (forced-colors: active) {
+  .demo-radio:checked + label { outline: 2px solid Highlight; outline-offset: -3px; }
+  .aurora-cta { border: 1px solid ButtonText; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
