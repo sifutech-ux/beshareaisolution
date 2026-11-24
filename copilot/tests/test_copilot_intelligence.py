@@ -134,7 +134,7 @@ class PostgresIntelligenceTests(IntelligenceTests):
         for name in ('copilot_memory', 'copilot_action_receipt', 'copilot_voice_usage',
                      'pelanggan_import', 'pelanggan_angka', 'pelanggan_tugas', 'pelanggan_pelan',
                      'copilot_service_nonce', 'copilot_usage_reservation', 'copilot_usage_counter',
-                     'copilot_quota_policy', 'pelanggan_akaun'):
+                     'copilot_quota_policy', 'pelanggan_akses', 'pelanggan_pulih', 'pelanggan_akses_audit', 'pelanggan_akaun'):
             cur.execute(f'DROP TABLE IF EXISTS {name}')
         conn.commit()
         conn.close()
