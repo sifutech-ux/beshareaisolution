@@ -1,0 +1,7 @@
+# Add campaign pages to the current production account image.
+ARG ACCOUNT_BASE_IMAGE
+FROM ${ACCOUNT_BASE_IMAGE}
+RUN echo 'd2472797bb6db2f98692b0e47a7801a0de57834002fe9e6a4337b97aeb5909fd  /app/pelanggan_akaun.py' | sha256sum -c -
+RUN echo '6e7861ef8181c18f15f9e7cafae5b2722db5c34c385ee2263c10de4eabb009b7  /app/pelanggan_marketing.py' | sha256sum -c -
+COPY copilot/account/pelanggan_akaun.py copilot/account/pelanggan_marketing.py copilot/account/marketing_promos.py /app/
+RUN python -B -c 'import pelanggan_akaun, pelanggan_marketing, marketing_promos'

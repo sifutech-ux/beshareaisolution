@@ -17,7 +17,7 @@ RUN apt-get update \
  && python -m pip install --no-cache-dir --only-binary=:all: -r /tmp/requirements-media.txt \
  && rm /tmp/requirements-media.txt
 
-COPY copilot/account/akaun_pelayan.py copilot/account/marketing_facebook_ads.py copilot/account/marketing_post_ads.py copilot/account/marketing_ad_simulation.py copilot/account/pelanggan_marketing.py \
+COPY copilot/account/akaun_pelayan.py copilot/account/marketing_facebook_ads.py copilot/account/marketing_post_ads.py copilot/account/marketing_ad_simulation.py copilot/account/marketing_promos.py copilot/account/pelanggan_marketing.py \
      copilot/account/marketing_media.py /app/
 USER nobody
 RUN python -c 'from PIL import Image; import marketing_media; import shutil; assert shutil.which("ffprobe")' \

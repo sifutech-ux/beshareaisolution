@@ -137,6 +137,55 @@ class MarketingTests(unittest.TestCase):
         manual = {**SOURCE, 'campaign_id': '', 'source_type': 'manual', 'url': ''}
         self.assertEqual(self.call('PUT', '/sources/' + SOURCE_ID, manual, OTHER)[0], 200)
 
+    def test_published_promos_collect_private_enquiries_and_count_confirmed_orders(self):
+        from access_fixture import grant_existing
+        from marketing_promos import PUBLIC, public
+        self.seed_campaign()
+        with self.connect() as db:
+            grant_existing(db, postgres=self.postgres)
+        endpoint = '/promos/' + CAMPAIGN_ID
+        detail = dict(revision=0, published=False, business='Kopi Aurora', area='Ampang',
+                      title='Pakej pejabat', offer='Kopi untuk 20 orang', cta='Minta sebut harga')
+        lead = dict(id='9' * 32, name='Visitor', contact='sample@example.test', note='Friday',
+                    source='google', consent=True)
+
+        def visitor(method='GET', suffix='', **payload):
+            db = self.connect()
+            try:
+                return public(method, PUBLIC + CAMPAIGN_ID + suffix, db, self.postgres,
+                              payload, STAMP, 'synthetic-address', 'test-key')
+            finally:
+                db.close()
+
+        self.assertEqual(self.call('PUT', endpoint, detail)[0], 200)
+        self.assertEqual(visitor()[0], 404)
+        self.assertEqual(visitor('POST', '/enquiries', **lead)[0], 404)
+        detail.update(revision=1, published=True)
+        self.assertEqual(self.call('PUT', endpoint, detail)[0], 200)
+        self.assertEqual(self.call('PUT', endpoint, {**detail, 'title': 'stale'})[0], 409)
+        self.assertEqual(set(visitor()[1]['page']), {'business','area','title','offer','cta','image'})
+        for bad in ({'consent':False}, {'contact':'abc'}, {'source':'invalid'}):
+            self.assertEqual(visitor('POST','/enquiries', **{**lead, **bad})[0], 400)
+        self.assertEqual(visitor('POST', '/enquiries', **lead), (201, {'ok':True}))
+        self.assertEqual(visitor('POST', '/enquiries', **lead), (200, {'ok':True}))
+        self.assertEqual(visitor('GET','/enquiries')[0], 404)
+        self.assertEqual(self.call('GET',endpoint+'/enquiries',owner=OTHER)[0], 404)
+        status_url = endpoint+'/enquiries/'+lead['id']
+        change = {'previous':'baru','status':'tempahan'}
+        self.assertEqual(self.call('PUT',status_url,change,OTHER)[0], 404)
+        self.assertEqual(self.call('PUT',status_url,change)[0], 200)
+        self.assertEqual(self.call('PUT',status_url,{**change,'status':'dihubungi'})[0], 409)
+        inbox = self.call('GET', endpoint+'/enquiries')[1]
+        self.assertEqual(inbox['totals'], [{'source':'google','enquiries':1,'orders':1}])
+        self.assertEqual(inbox['leads'][0]['contact'], lead['contact'])
+        self.assertNotIn('sender', inbox['leads'][0])
+        self.execute("UPDATE pelanggan_akses SET state='suspended' WHERE owner=?", (OWNER,))
+        self.assertEqual(visitor()[0], 404)
+        self.assertEqual(visitor('POST', '/enquiries', **lead)[0], 404)
+        self.execute("UPDATE pelanggan_akses SET state='free' WHERE owner=?", (OWNER,))
+        self.assertEqual(self.call('PUT', endpoint, {**detail,'revision':2,'published':False})[0], 200)
+        self.assertEqual(visitor()[0], 404)
+
     def test_canonical_retry_and_lost_update_protection(self):
         current = self.seed_campaign()
         self.assertEqual(current['budget_total'], '500.50')

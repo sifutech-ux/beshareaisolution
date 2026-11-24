@@ -37,6 +37,7 @@ jobs:
         run: |
           python3 -m pip install playwright cryptography
           python3 marketing/tests/facebook_ads_browser.py
+          python3 marketing/tests/promo_browser.py
       - name: Test dependencies
         shell: bash
         run: |

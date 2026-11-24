@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Promosi perniagaan · BeShare</title>
+  <link rel="icon" href="../favicon.svg">
+  <link rel="stylesheet" href="promo.css?v=1">
+  <script defer src="../akaun-asal.js"></script>
+  <script defer src="promo-public.js?v=1"></script>
+</head>
+<body class="promo-public">
+  <main>
+    <p id="loading" role="status">Memuatkan promosi…</p>
+    <div id="promotion" hidden>
+      <article>
+        <header><span class="merchant" id="business"></span><span class="area" id="area"></span></header>
+        <img id="cover" hidden alt="Gambar tawaran" referrerpolicy="no-referrer">
+        <h1 id="title"></h1>
+        <p id="offer"></p>
+      </article>
+      <section class="enquiry-card" aria-labelledby="cta">
+        <h2 id="cta"></h2>
+        <form id="enquiry">
+          <label>Nama anda<input name="name" autocomplete="name" maxlength="100" required></label>
+          <label>Telefon atau e-mel<input name="contact" maxlength="160" required></label>
+          <label>Butiran pertanyaan <small>(pilihan)</small><textarea name="note" rows="4" maxlength="1000" placeholder="Contohnya tarikh tempahan atau kuantiti yang diperlukan"></textarea></label>
+          <label hidden aria-hidden="true">Laman web<input name="website" tabindex="-1" autocomplete="off"></label>
+          <label class="consent"><input name="consent" type="checkbox" required><span>Saya bersetuju maklumat ini dihantar kepada <strong id="recipient"></strong> untuk menghubungi saya tentang pertanyaan ini.</span></label>
+          <button type="submit">Hantar pertanyaan</button>
+        </form>
+        <p id="receipt" role="status" tabindex="-1"></p>
+      </section>
+    </div>
+    <footer>Disediakan melalui BeShare AI Marketing · <a href="privasi.html">Privasi</a></footer>
+  </main>
+</body>
+</html>

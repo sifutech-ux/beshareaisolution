@@ -8,5 +8,5 @@ RUN echo 'e74fbca1bcdce79bc92af2828bfcc19879ae58baa0344f08e018d91765bcfed3  /app
  && echo '7ff7dfc769dc59dde3d87a002eb36bb447ed0c9b5d44ab2293e7e11805e1c405  /app/marketing_lifecycle.py' | sha256sum -c - \
  && echo '5469759c6b2af14e343ada7932546c55180d747f9afaf69c65e1844a09fe5127  /app/akaun_pelayan.py' | sha256sum -c -
 
-COPY copilot/account/marketing_social.py copilot/account/marketing_publication.py copilot/account/marketing_facebook_ads.py copilot/account/marketing_post_ads.py copilot/account/marketing_ad_simulation.py copilot/account/pelanggan_marketing.py copilot/account/marketing_lifecycle.py /app/
+COPY copilot/account/marketing_social.py copilot/account/marketing_publication.py copilot/account/marketing_facebook_ads.py copilot/account/marketing_post_ads.py copilot/account/marketing_ad_simulation.py copilot/account/marketing_promos.py copilot/account/pelanggan_marketing.py copilot/account/marketing_lifecycle.py /app/
 RUN python -B -c 'import marketing_publication, marketing_lifecycle, pelanggan_marketing, marketing_social; assert marketing_social.capabilities()["publication_receipts"] is True'
