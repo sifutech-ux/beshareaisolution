@@ -11,7 +11,7 @@ require_once __DIR__ . '/PlatformAccess.php';
 
 final class AuthHttp
 {
-    public function __construct(private PDO $pdo, private RateLimit $rates, private ?WhatsAppGateway $whatsapp = null, private ?AiReplyStore $ai = null, private ?KnowledgeCentre $knowledge = null, private ?PasswordRecovery $recovery = null, private ?AiReplyPreview $preview = null, private ?StripeBilling $billing = null)
+    public function __construct(private PDO $pdo, private RateLimit $rates, private ?WhatsAppGateway $whatsapp = null, private ?AiReplyStore $ai = null, private ?KnowledgeCentre $knowledge = null, private ?PasswordRecovery $recovery = null, private ?AiReplyPreview $preview = null, private ?StripeBilling $billing = null, private ?WhatsAppWebhookSubscription $subscription = null)
     {
     }
 
@@ -89,6 +89,22 @@ final class AuthHttp
         // Platform restrictions are separate from the customer's own business status.
         // Switching to another membership and signing out remain available.
         if ($action !== 'pilih') { PlatformAccess::assertBusinessAccess($this->pdo, $actor['business_id']); }
+        if ($action === 'webhook') {
+            if ($actor['role'] !== 'owner' || $actor['user_id'] !== $actor['owner_user_id'] || $actor['status'] !== 'active') {
+                throw new AuthException('Hanya pemilik perniagaan aktif boleh menyambungkan webhook.', 403);
+            }
+            if ($this->text($body, 'expected_business_public_id') !== $actor['public_id']) {
+                throw new AuthException('Ruang perniagaan telah berubah. Muat semula halaman Sambungan.', 409);
+            }
+            $id = $body['connection_id'] ?? null;
+            if (!is_int($id) || $id < 1) { throw new AuthException('Sambungan tidak sah.', 400); }
+            if (!$this->subscription) { throw new AuthException('Perkhidmatan webhook belum tersedia.', 503); }
+            $key = 'webhook|' . $actor['business_id'] . '|' . $actor['user_id'];
+            if ($this->rates->tooMany($key)) { throw new AuthException('Tunggu sebentar sebelum mencuba lagi.', 429); }
+            $this->rates->hit($key);
+            $result = $this->subscription->connect($actor['business_id'], $actor['user_id'], $id, $this->text($body, 'expected_phone'));
+            return $this->respond($session, false, $this->payload($actor) + ['result' => $result]);
+        }
         if (in_array($action, ['bilcheckout','bilportal'], true)) {
             if (!$this->billing instanceof StripeBilling) { throw new AuthException('Pembayaran sedang disediakan.', 503); }
             $key = 'billing|' . $actor['business_id'] . '|' . $actor['user_id'];
@@ -354,10 +370,6 @@ final class AuthHttp
             $payload['state'] = $started['state'];
             return $this->respond($session, false, $payload);
         }
-        if ($action === 'peristiwa') {
-            $this->whatsapp->record($actor, $sessionKey, $body);
-            return $this->respond($session, false, $this->payload($this->actor($session)));
-        }
         if ($action === 'segera') {
             $key = 'segera|' . $actor['user_id'] . '|' . $remote;
             if ($this->rates->tooMany($key)) {
@@ -380,13 +392,20 @@ final class AuthHttp
             $payload['sync'] = $sync;
             return $this->respond($session, false, $payload);
         }
-        $key = 'tukar|' . $actor['user_id'] . '|' . $remote;
-        if ($this->rates->tooMany($key)) {
-            throw new AuthException('Terlalu banyak percubaan. Cuba lagi kemudian.', 429);
+        $state = $this->text($body, 'state');
+        if ($action === 'peristiwa') {
+            $this->whatsapp->record($actor, $sessionKey, $body);
+        } else {
+            $key = 'tukar|' . $actor['user_id'] . '|' . $remote;
+            if ($this->rates->tooMany($key)) {
+                throw new AuthException('Terlalu banyak percubaan. Cuba lagi kemudian.', 429);
+            }
+            $this->rates->hit($key);
+            $this->whatsapp->exchangeCode($actor, $sessionKey, $state, $this->text($body, 'code'), ($body['coexistence'] ?? false) === true);
         }
-        $this->rates->hit($key);
-        $this->whatsapp->exchangeCode($actor, $sessionKey, $this->text($body, 'state'), $this->text($body, 'code'));
-        return $this->respond($session, false, $this->payload($this->actor($session)));
+        $payload = $this->payload($this->actor($session));
+        $payload['attempt'] = $this->whatsapp->attemptResult($actor, $state, $sessionKey);
+        return $this->respond($session, false, $payload);
     }
 
     /**

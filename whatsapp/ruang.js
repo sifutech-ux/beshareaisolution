@@ -179,6 +179,7 @@ function serverConnection() {
     registration: typeof source.registration === "string" && source.registration ? source.registration : "Belum",
     messaging: source.linked === true && source.messaging === "Belum" ? "Belum ada bukti mesej" : (typeof source.messaging === "string" && source.messaging ? source.messaging : "Belum"),
     note: typeof source.note === "string" ? source.note : "",
+    webhookConnectionId: Number.isSafeInteger(source.webhook_connection_id) ? source.webhook_connection_id : null,
     phone: typeof source.phone === "string" ? source.phone : ""
   };
 }
@@ -1414,6 +1415,7 @@ function connection(state) {
   const saved = draft.savedAt ? `Draf disimpan dalam pelayar pada ${esc(draft.savedAt)}. Tidak dihantar ke Meta.` : 'Draf belum disimpan.';
   return `<article class="panel record-screen os-connect"><header class="os-page-heading"><span class="os-heading-icon">${osIcon('sambungan')}</span><p class="os-eyebrow">HUBUNGKAN PERNIAGAAN</p><h1>Sambungan WhatsApp</h1><p class="muted">Sambungkan nombor perniagaan dan lihat setiap langkah pengaktifannya di sini.</p></header>
     <div class="os-section-heading"><h2>Keadaan sambungan anda</h2>${state.connection.phone ? `<span class="os-phone-number">${esc(state.connection.phone)}</span>` : ''}</div>${connectionCards(state)}<p class="os-panel-note">Token tersimpan sahaja belum mengesahkan nombor boleh menghantar mesej. Pendaftaran nombor diurus melalui pengaktifan sambungan oleh pemilik sistem.</p>${state.connection.note ? `<p class="os-notice" role="status">${esc(state.connection.note)}</p>` : ''}
+    ${role(state) === 'owner' && state.connection.webhookConnectionId ? `<button class="btn" type="button" data-act="connect-webhook" data-connection="${esc(state.connection.webhookConnectionId)}">Sambungkan webhook</button><p class="os-panel-note">Benarkan BeShare menerima pemberitahuan mesej daripada Meta untuk akaun WhatsApp ini.</p>` : ''}
     <div class="os-connect-options"><section><span class="os-connect-option-icon">${osIcon('sambungan')}</span><h2>Sambung melalui Meta</h2><p class="muted">Pilih atau sediakan akaun WhatsApp Business melalui aliran rasmi Meta.</p><button class="btn" type="button" data-act="connect"><span>Buka tetingkap Meta</span> ${osIcon('arrow')}</button><p class="muted os-small" id="signup-hint">Log masuk ke Facebook untuk memberikan kebenaran kepada akaun WhatsApp perniagaan anda.</p></section>${role(state) === 'owner' ? `<section><span class="os-connect-option-icon os-tone-teal">${osIcon('peti')}</span><h2>Guna WhatsApp Business App</h2><p class="muted">Untuk nombor yang sudah digunakan dalam aplikasi WhatsApp Business.</p><button class="btn btn--ghost" type="button" data-act="connect-app">Sambung WhatsApp Business App</button><p class="muted os-small" id="signup-app-hint">Gunakan aliran ini bagi nombor sedia ada. Kelayakan sambungan ditentukan oleh Meta.</p></section>` : ''}</div>
     ${state.ai.available || state.knowledgeCentre.available ? `<a class="os-connection-next" href="#pengetahuan">${osIcon('pengetahuan')}<span><strong>Sediakan pengetahuan dan balasan AI</strong><small>Lengkapkan maklumat perniagaan sebelum mengaktifkan AI.</small></span>${osIcon('arrow')}</a>` : ''}
     <details class="os-disclosure"><summary>Draf templat mesej <span>Disimpan dalam pelayar</span></summary><div class="os-disclosure-body"><p class="muted">Sediakan nama, bahasa dan isi templat. Draf ini tidak dihantar ke Meta dan belum menjadi templat yang diluluskan.</p><form id="template-draft"><p class="error" id="form-error" hidden></p><div class="pair"><label class="field">Nama templat<input name="name" required maxlength="512" autocomplete="off" value="${esc(draft.name)}" placeholder="sambutan_kedai"></label><label class="field">Bahasa<select name="language"><option value="ms" ${draft.language === 'ms' ? 'selected' : ''}>Bahasa Melayu</option><option value="en" ${draft.language === 'en' ? 'selected' : ''}>English</option></select></label></div><label class="field">Isi templat<textarea name="body" required maxlength="1024" rows="4">${esc(draft.body)}</textarea></label><button class="btn btn--ghost" type="submit">Simpan draf dalam pelayar</button></form><p class="muted os-small">${saved}</p></div></details>
@@ -1648,6 +1650,20 @@ function onClick(event) {
       }
       applyLive(data);
       route();
+    });
+    return;
+  }
+  if (act === "connect-webhook") {
+    if (!state || role(state) !== "owner" || button.disabled) return;
+    const connectionId = Number(button.getAttribute("data-connection"));
+    if (!connectionId || connectionId !== state.connection.webhookConnectionId) return;
+    const publicId = state.business.public_id;
+    button.disabled = true;
+    button.textContent = "Menyambungkan webhook…";
+    callApi("webhook", { expected_business_public_id: publicId, connection_id: connectionId, expected_phone: state.connection.phone }).then(data => {
+      if (live?.business?.public_id !== publicId || (data.business && data.business.public_id !== publicId)) return;
+      if (data.ok && data.user) applyLive(data);
+      showSignupNote(data.ok && data.result?.status === "subscribed" ? data.result.message : data.error || "Webhook belum dapat disahkan.");
     });
     return;
   }
@@ -1973,11 +1989,11 @@ function signupPayload(origin, data) {
 }
 
 function signupResultNote(data) {
-  const connection = data && data.connection && typeof data.connection === "object" ? data.connection : null;
-  if (data && data.ok === true && connection && connection.linked === true) return "Sambungan WhatsApp disimpan.";
-  if (connection && typeof connection.note === "string" && connection.note) return connection.note;
-  if (data && data.ok === true) return "Hasil Meta belum lengkap. Sambungan tidak disimpan.";
-  return (data && data.error) || "Hasil Embedded Signup tidak diterima. Sambungan tidak disimpan.";
+  if (!data || data.ok !== true) return (data && data.error) || "Hasil Embedded Signup tidak diterima. Sambungan tidak disimpan.";
+  const attempt = data.attempt;
+  if (attempt && attempt.status === "completed") return "Sambungan WhatsApp disimpan.";
+  if (attempt && attempt.note) return attempt.note;
+  return "Hasil Meta belum lengkap. Sambungan belum disahkan.";
 }
 
 function signupClientHint(agent) {
@@ -2251,7 +2267,8 @@ function beginSignup(options) {
   window.clearTimeout(signupLaunchTimer);
   const pending = { code: "", finish: false };
   signupQueue = pending;
-  writeSignupRecord({ state: "", code: "", events: [], at: Date.now(), codeSent: false, finish: false, reported: false, hidden: false });
+  signupState = "";
+  writeSignupRecord({ coexistence: options.extras?.featureType === "whatsapp_business_app_onboarding", state: "", code: "", events: [], at: Date.now(), codeSent: false, finish: false, reported: false, hidden: false });
   const hint = document.getElementById("signup-hint");
   if (hint) hint.textContent = "Meminta tetingkap Meta. Jika tiada tetingkap muncul, benarkan pop-up atau buka workspace dalam pelayar biasa.";
   signupLaunchTimer = window.setTimeout(() => {
@@ -2314,19 +2331,26 @@ function exchangeSignupCode(code) {
     showSignupNote("Sesi sambungan tidak sah. Buka tetingkap Meta sekali lagi. Sambungan tidak disimpan.");
     return;
   }
-  callApi("tukar", { state, code }).then((data) => {
-    if (data && data.user) applyLive(data);
-    inboxLoad = "";
-    const linked = data && data.connection && data.connection.linked === true;
-    if (linked) clearSignupRecord();
-    else flushSignup();
-    showSignupNote(signupResultNote(data));
-  });
+  const coexistence = readSignupRecord()?.coexistence === true;
+  callApi("tukar", { state, code, coexistence }).then((data) => handleSignupResult(state, data));
+}
+
+function handleSignupResult(state, data) {
+  const record = readSignupRecord();
+  if (!record || record.state !== state) return;
+  if (data && data.user) applyLive(data);
+  inboxLoad = "";
+  if (data && data.ok === true && ["completed", "incomplete", "abandoned", "rejected", "expired"].includes(data.attempt?.status)) {
+    clearSignupRecord();
+    signupQueue = null;
+    signupState = "";
+  }
+  showSignupNote(signupResultNote(data));
 }
 
 window.addEventListener("message", (event) => {
   const parsed = signupPayload(event.origin, event.data);
-  if (!parsed) return;
+  if (!parsed || !readSignupRecord()) return;
   rememberSignupEvent(signupEventFields(parsed));
   flushSignup();
 });
@@ -2355,19 +2379,8 @@ window.addEventListener("focus", () => {
 });
 
 function sendSignupEvent(fields) {
-  callApi("peristiwa", Object.assign({ state: signupState }, fields)).then((result) => {
-    if (result && result.user) applyLive(result);
-    inboxLoad = "";
-    const linked = result && result.connection && result.connection.linked === true;
-    const note = result && result.connection && typeof result.connection.note === "string" ? result.connection.note : "";
-    if (linked) {
-      clearSignupRecord();
-      showSignupNote("Sambungan WhatsApp disimpan.");
-      return;
-    }
-    if (result && result.ok === true && !note) return;
-    showSignupNote(signupResultNote(result));
-  });
+  const state = signupState;
+  callApi("peristiwa", { ...fields, state }).then((data) => handleSignupResult(state, data));
 }
 
 async function boot() {

@@ -186,13 +186,14 @@ final class PlatformAdminStore
             ? 'AI dihidupkan menggunakan pengetahuan, skop balasan dan had yang telah diluluskan pelanggan.' : 'AI Auto Reply dihentikan.'];
     }
 
-    public function assertTargetPhone(string $publicId,int $connectionId,string $expectedPhone): void
+    public function assertTargetPhone(string $publicId,int $connectionId,string $expectedPhone): int
     {
         $target = $this->business($publicId);
         $query = $this->pdo->prepare('SELECT display_phone FROM whatsapp_connections WHERE business_id=? AND id=? AND disconnected_at IS NULL');
         $query->execute([$target['id'],$connectionId]);
         $phone = $query->fetchColumn();
         if ($phone===false || !hash_equals((string)$phone,$expectedPhone)) { throw new AuthException('Nombor sasaran telah berubah. Muat semula butiran pelanggan.',409); }
+        return (int)$target['id'];
     }
 
     private function aiState(array $business,?array $settings=null): array
@@ -280,6 +281,7 @@ final class PlatformAdminStore
             'webhook_state'=>$c['webhook_state'],'registration_state'=>$c['registration_state'],'messaging_state'=>$c['messaging_state'],
             'readiness'=>$ready?'ready':(!$token||$c['registration_state']==='failed'||$c['operation_status']==='unknown'?'attention':'pending'),
             'reason'=>$reason,'can_refresh'=>$this->metaAvailable&&$active&&$token,
+            'can_subscribe'=>$this->metaAvailable&&$active&&$token&&$c['webhook_state']!=='subscribed',
             'can_activate'=>$this->metaAvailable&&$active&&$token&&!$ready&&$mode==='cloud_api'
                 &&$c['webhook_state']==='subscribed'&&$c['registration_state']!=='failed'&&(bool)$c['signup_completed']
                 &&$c['registration_started_at']===null&&!in_array($c['operation_status'],['checking','registering','unknown'],true),

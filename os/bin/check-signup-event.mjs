@@ -107,13 +107,14 @@ const returned = context.signupQueryResult("?code=AQABCDE123_~.-ok&error_descrip
 check("redirect keeps a usable code and drops the description", returned.code === "AQABCDE123_~.-ok" && returned.error === "");
 check("oauth error is a short reason", context.signupQueryResult("?error_reason=user_denied").error === "user_denied");
 check(
-  "saved connection is the only success note",
-  context.signupResultNote({ ok: true, connection: { linked: true, note: "lama" } }) === "Sambungan WhatsApp disimpan."
+  "only completion of this attempt reports success",
+  context.signupResultNote({ ok: true, attempt: { status: "completed" } }) === "Sambungan WhatsApp disimpan."
 );
 check(
-  "incomplete result is not called success",
-  context.signupResultNote({ ok: true, connection: { linked: false, note: "" } }) === "Hasil Meta belum lengkap. Sambungan tidak disimpan."
-    && context.signupResultNote({ ok: true, connection: { linked: false, note: "Kod ditukar. Menunggu pengesahan nombor daripada Meta." } }) === "Kod ditukar. Menunggu pengesahan nombor daripada Meta."
+  "a previous connection cannot hide a pending or rejected attempt",
+  context.signupResultNote({ ok: true, connection: { linked: true } }) === "Hasil Meta belum lengkap. Sambungan belum disahkan."
+    && context.signupResultNote({ ok: true, connection: { linked: true }, attempt: { status: "pending", note: "Menunggu kod." } }) === "Menunggu kod."
+    && context.signupResultNote({ ok: false, error: "Sesi tamat." }) === "Sesi tamat."
 );
 check(
   "in-app browser failure names Safari",
@@ -191,5 +192,38 @@ storageContext.rememberSignupCode("AQZYXWV987_~.-ok");
 check("code after the server state is exchanged without a second copy", sent.codes.length === 1 && sent.codes[0] === "AQZYXWV987_~.-ok" && sent.events.length === 0);
 storageContext.rememberSignupEvent({ event: "FINISH", waba_id: "123", phone_number_id: "456" });
 check("a later finish is still delivered on the same session", sent.events.length === 1 && sent.events[0] === "FINISH" && sent.codes.length === 1);
+
+// Run the real callback handlers with an already linked number and a late code.
+const eventListeners = {};
+const requests = [];
+const notes = [];
+Object.assign(storageContext, {
+  window: { addEventListener: (name, callback) => { eventListeners[name] = callback; } },
+  document: { addEventListener() {} },
+  applyLive() {},
+  showSignupNote: note => notes.push(note),
+  callApi(action, body) {
+    return new Promise(resolve => requests.push({ action, body, resolve }));
+  }
+});
+const callbacks = source.slice(source.indexOf("function exchangeSignupCode"), source.indexOf("async function boot"));
+runInContext("let inboxLoad = ''; " + context.signupResultNote.toString() + callbacks, storageContext);
+store.clear();
+storageContext.writeSignupRecord({ state, coexistence: true, events: [], codeSent: false });
+storageContext.rememberSignupEvent({ event: "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING" });
+const active = { linked: true, phone: "old" };
+requests[0].resolve({ ok: true, connection: active, attempt: { status: "pending", note: "Menunggu kod." } });
+await new Promise(resolve => setImmediate(resolve));
+check("finish acknowledgement retains the same attempt while an older number is active",
+  storageContext.readSignupRecord()?.state === state && notes.at(-1) === "Menunggu kod.");
+storageContext.rememberSignupCode("synthetic-delayed-code");
+check("late code is exchanged against the original coexistence session",
+  requests[1]?.action === "tukar" && requests[1].body.state === state && requests[1].body.coexistence === true);
+if (requests[1]) requests[1].resolve({ ok: true, attempt: { status: "completed" } });
+await new Promise(resolve => setImmediate(resolve));
+check("only saved attempt clears the record and displays success",
+  storageContext.readSignupRecord() === null && notes.at(-1) === "Sambungan WhatsApp disimpan.");
+storageContext.handleSignupResult(state, { ok: true, attempt: { status: "pending", note: "Late response" } });
+check("out-of-order response cannot overwrite the completed result", notes.at(-1) === "Sambungan WhatsApp disimpan.");
 
 process.exit(failures === 0 ? 0 : 1);

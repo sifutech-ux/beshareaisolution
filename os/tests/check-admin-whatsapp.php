@@ -19,6 +19,7 @@ final class AdminWhatsAppFixtureTransport implements MetaTransport
     public array $phone;
     public array $debug;
     public bool $subscribed = true;
+    public bool $persistSubscription = true;
     public bool $memberPhone = true;
     public string $postOutcome = 'registered';
     public int $posts = 0;
@@ -59,6 +60,10 @@ final class AdminWhatsAppFixtureTransport implements MetaTransport
         if ($method === 'GET' && $path === $this->connection['waba_id'] . '/subscribed_apps') {
             if ($this->afterRead !== null) { ($this->afterRead)(); }
             return ['status' => 200, 'json' => ['data' => $this->subscribed ? [['whatsapp_business_api_data' => ['id' => ADMIN_WA_APP]]] : []]];
+        }
+        if ($method === 'POST' && $path === $this->connection['waba_id'] . '/subscribed_apps') {
+            $this->subscribed = $this->persistSubscription;
+            return ['status'=>200,'json'=>['success'=>true]];
         }
         if ($method === 'POST' && $path === $this->connection['phone_number_id'] . '/register') {
             $this->posts++;
@@ -281,6 +286,50 @@ adminTest('established message proof is not overwritten by conflicting Meta stat
     $result = $service->refresh($admin, $c['public_id'], $c['id']);
     adminAssert($result['error_code'] === 'evidence_conflict' && $transport->posts === 0, 'Contradictory proof is surfaced');
     adminAssert(adminSql($pdo, 'SELECT messaging_state FROM whatsapp_connections WHERE id=?', [$c['id']])->fetchColumn() === 'send_and_receive_verified', 'Prior actual messaging proof is retained');
+});
+
+adminTest('workspace and platform buttons subscribe the displayed connection only', function () use ($fixture, $pdo): void {
+    $c = adminWhatsAppConnection($fixture);
+    adminSql($pdo, "UPDATE whatsapp_connections SET webhook_state='not_subscribed', subscribed_at=NULL, onboarded_at=UTC_TIMESTAMP() WHERE id=?", [$c['id']]);
+    $transport = new AdminWhatsAppFixtureTransport($c);
+    $transport->subscribed = false;
+    $transport->phone['webhook_configuration'] = ['application' => 'https://beshareaisolution.com/webhook/'];
+    $graph = new MetaGraph(ADMIN_WA_APP, 'synthetic-secret', 'v24.0', $transport);
+    $service = new \BesharOs\WhatsAppWebhookSubscription($pdo, $graph, $fixture['seal'], ADMIN_WA_APP);
+    $rates = new \BesharOs\RateLimit(sys_get_temp_dir().'/webhook-test-'.bin2hex(random_bytes(8)), 40, 60);
+    $gateway = new \BesharOs\WhatsAppGateway($pdo, $graph, $fixture['seal'], ADMIN_WA_APP);
+    $tenant = new \BesharOs\AuthHttp($pdo, $rates, $gateway, subscription: $service);
+    $panel = new \BesharOs\PlatformAdminHttp($pdo, $rates, new \BesharOs\PlatformAdminStore($pdo, [], true), subscription: $service);
+    $input = ['connection_id'=>$c['id'], 'expected_phone'=>$c['display_phone'], 'expected_business_public_id'=>$c['public_id']];
+    $post = static function ($api, string $user, array $body, string $workspace='tenantA') use ($fixture) {
+        $session = ['user_id'=>$fixture['users'][$user], 'business_id'=>$fixture[$workspace]['business_id']];
+        $headers = ['x-csrf-token'=>\BesharOs\Csrf::issue($session)];
+        return $api->handle('POST', 'webhook', $session, $body, $headers, '127.0.0.1', 'fixture.invalid')['body'];
+    };
+    adminDenied(fn()=>$post($tenant,'staff',$input),403,'Staff cannot subscribe');
+    adminDenied(fn()=>$post($tenant,'ownerB',array_replace($input,['expected_business_public_id'=>$fixture['tenantB']['public_id']]),'tenantB'),409,'Other workspace cannot use this connection');
+    adminDenied(fn()=>$post($tenant,'ownerA',array_replace($input,['expected_phone'=>'stale'])),409,'Stale phone cannot be subscribed');
+    adminAssert($transport->calls===[],'Rejected requests made no Graph call');
+    $transport->persistSubscription = false;
+    adminDenied(fn()=>$post($tenant,'ownerA',$input),409,'Meta POST alone does not establish a subscription');
+    $transport->persistSubscription = true;
+    $reply = $post($tenant,'ownerA',$input);
+    adminAssert($reply['result']['status']==='subscribed' && $reply['connection']['webhook']==='Dilanggan','Owner sees the verified subscription');
+    adminAssert(!isset($reply['connection']['webhook_connection_id']),'Completed subscription hides workspace action');
+    $edge = $c['waba_id'].'/subscribed_apps';
+    $posts = array_values(array_filter($transport->calls,fn($call)=>$call[0]==='POST'));
+    adminAssert($posts===[['POST',$edge],['POST',$edge]], 'Only WABA subscription was posted');
+    $adminInput = $input + ['public_id'=>$c['public_id'],'confirmed'=>true];
+    adminDenied(fn()=>$post($panel,'ownerA',$adminInput),403,'Customer cannot invoke platform control');
+    adminSql($pdo,"UPDATE whatsapp_connections SET webhook_state='subscribe_failed',onboarded_at=NULL WHERE id=?",[$c['id']]);
+    $transport->phone['webhook_configuration']['phone_number']='https://another.invalid/webhook';
+    adminDenied(fn()=>$post($panel,'platform',$adminInput),409,'Existing foreign callback does not report success');
+    unset($transport->phone['webhook_configuration']['phone_number']);
+    $before = count(array_filter($transport->calls,fn($call)=>$call[0]==='POST'));
+    adminAssert($post($panel,'platform',$adminInput)['result']['status']==='subscribed','Platform admin repairs a Cloud API connection');
+    adminAssert(count(array_filter($transport->calls,fn($call)=>$call[0]==='POST'))===$before,'Already subscribed remotely does not repeat POST');
+    $row=adminSql($pdo,'SELECT webhook_state,registration_state,messaging_state FROM whatsapp_connections WHERE id=?',[$c['id']])->fetch();
+    adminAssert($row['webhook_state']==='subscribed' && $row['registration_state']==='not_registered' && $row['messaging_state']==='unverified','Subscription is independent of registration and message proof');
 });
 
 fwrite(STDOUT, "Admin WhatsApp activation tests completed with synthetic Meta transport only.\n");
