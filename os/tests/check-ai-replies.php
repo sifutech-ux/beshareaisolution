@@ -87,6 +87,7 @@ function fixture(PDO $pdo, TokenSeal $seal, int $now): array
     global $fixtureNumber;
     $number = ++$fixtureNumber;
     $actor = Accounts::register($pdo, 'Owner Test', 'worker' . $number . '@example.test', 'Synthetic-only-passphrase!', 'Synthetic Shop ' . $number);
+    BesharOs\PlatformAccess::audit($pdo,$actor['business_id'],$actor['user_id'],'os_product_access',$actor['business_id'],['state'=>'free','until'=>0]);
     $token = $seal->seal('synthetic-owner-token-' . $number, 2048);
     $date = gmdate('Y-m-d H:i:s', $now);
     $waba = (string) (6100000000000000 + $number);

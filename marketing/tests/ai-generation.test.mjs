@@ -74,7 +74,7 @@ async function workspace(fetchAI) {
     fetch: async (url, options) => {
       requests.push({ url, options })
       if (url.endsWith('/api/marketing/draf')) { aiRequests.push({ url, options }); return fetchAI(url, options, aiRequests.length) }
-      if (options.method === 'GET' && url.endsWith('/api/akaun/saya')) return response({ akaun_id: stored === sessionB ? 'owner-b' : 'owner-a', nama: 'Perniagaan contoh' })
+      if (options.method === 'GET' && url.endsWith('/api/akaun/identiti')) return response({ akaun_id: stored === sessionB ? 'owner-b' : 'owner-a', nama: 'Perniagaan contoh' })
       if (options.method === 'GET' && url.endsWith('/workspace')) return response({ ok: true, campaigns: [campaign], posts: [], sources: [], results: [], connections: [], capabilities: { worker_enabled: true, auto_publish: true } })
       throw Error('Unexpected request: ' + options.method + ' ' + url)
     },

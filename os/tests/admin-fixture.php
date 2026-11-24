@@ -126,6 +126,7 @@ function adminFixture(bool $installAdmin = true): array
         adminSql($pdo, "INSERT INTO business_users (business_id,user_id,role,created_at,updated_at)
             VALUES (?,?,'owner',UTC_TIMESTAMP(),UTC_TIMESTAMP())", [$businessId, $owner]);
         adminSql($pdo, "UPDATE businesses SET status='active' WHERE id=?", [$businessId]);
+        BesharOs\PlatformAccess::audit($pdo,$businessId,$users['platform'],'os_product_access',$businessId,['state'=>'free','until'=>0]);
         $tenants['tenant' . $suffix] = ['business_id' => $businessId, 'public_id' => $publicId,
             'owner_id' => $owner, 'member' => Membership::require($pdo, $owner, $businessId)];
     }

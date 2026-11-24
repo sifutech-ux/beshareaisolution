@@ -67,6 +67,8 @@ class MediaTests(unittest.TestCase):
         conn.cursor().execute('CREATE TABLE pelanggan_akaun (id TEXT PRIMARY KEY,email TEXT NOT NULL)')
         conn.cursor().executemany(f'INSERT INTO pelanggan_akaun VALUES ({ph},{ph})',
                                  [(OWNER, 'a@example.com'), (OTHER, 'b@example.com')])
+        from access_fixture import grant_existing
+        grant_existing(conn, postgres=self.postgres)
         marketing.ensure_marketing_schema(conn, self.postgres)
         conn.commit()
         conn.close()

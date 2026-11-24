@@ -32,6 +32,8 @@ class GroupsTest(unittest.TestCase):
         con.execute('CREATE TABLE pelanggan_akaun (id TEXT PRIMARY KEY,email TEXT NOT NULL)')
         con.executemany('INSERT INTO pelanggan_akaun VALUES (?,?)',
                         [(OWNER, 'a@example.test'), (OTHER, 'b@example.test')])
+        from copilot.tests.access_fixture import grant_existing
+        grant_existing(con, postgres=False)
         groups.ensure_schema(con, False)
         con.commit()
         con.close()

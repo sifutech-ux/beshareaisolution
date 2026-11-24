@@ -45,6 +45,8 @@ class MarketingSocialTests(unittest.TestCase):
         conn = self.connect()
         conn.execute('CREATE TABLE pelanggan_akaun (id TEXT PRIMARY KEY,email TEXT)')
         conn.executemany('INSERT INTO pelanggan_akaun VALUES (?,?)', [(OWNER, 'a@example.test'), (OTHER, 'b@example.test')])
+        from access_fixture import grant_existing
+        grant_existing(conn, postgres=False)
         marketing.ensure_marketing_schema(conn, False)
         social.ensure_social_schema(conn, False)
         conn.execute('INSERT INTO marketing_campaigns VALUES (?,?,?,?,?,?,?)',

@@ -140,6 +140,7 @@ try {
         ]);
         $activate = $pdo->prepare("UPDATE businesses SET status='active' WHERE id=?");
         $activate->execute([$businessId]);
+        BesharOs\PlatformAccess::audit($pdo,$businessId,$ownerId,'os_product_access',$businessId,['state'=>'free','until'=>0]);
     }
     foreach ([2 => 'staff', 4 => 'admin'] as $userId => $role) {
         aiSettingsInsert($pdo, 'business_users', ['business_id' => 1, 'user_id' => $userId, 'role' => $role, 'created_at' => $now, 'updated_at' => $now]);

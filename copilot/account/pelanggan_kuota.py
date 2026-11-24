@@ -422,9 +422,17 @@ def _rezab(conn, postgres, payload, authorization, account_secret, stamp, read_s
         claims = read_session(_bearer(authorization), account_secret, stamp)
         if not claims:
             return _siap(conn, 401, {'ok': False, 'ralat': 'sesi', 'error': 'Sila masuk akaun dahulu.'})
+        from pelanggan_akses import allowed, DENIED
+        ph = '%s' if postgres else '?'
+        copilot = allowed(conn, ph, claims['akaun_id'], 'copilot', stamp)
+        marketing = allowed(conn, ph, claims['akaun_id'], 'marketing', stamp)
+        if not copilot and not marketing:
+            return _siap(conn, *DENIED)
         owner, nama, jualan, peringkat = _konteks_akaun(conn, postgres, claims['akaun_id'])
         if owner is None:
             return _siap(conn, 401, {'ok': False, 'ralat': 'sesi', 'error': 'Sila masuk akaun dahulu.'})
+        if marketing and not copilot:
+            nama, jualan, peringkat = 'BeShare Marketing', 'Kandungan pemasaran', 'jual'
         if not nama:
             return _siap(conn, 422, {'ok': False, 'ralat': 'profil', 'error': 'Lengkapkan profil perniagaan dahulu.'})
     else:

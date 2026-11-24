@@ -101,6 +101,7 @@ try {
             'created_at' => $now, 'updated_at' => $now]);
         $activate = $pdo->prepare("UPDATE businesses SET status='active' WHERE id=?");
         $activate->execute([$businessId]);
+        BesharOs\PlatformAccess::audit($pdo,$businessId,$ownerId,'os_product_access',$businessId,['state'=>'free','until'=>0]);
     }
     knowledgeInsert($pdo, 'business_users', ['business_id' => 1, 'user_id' => 2, 'role' => 'staff', 'created_at' => $now, 'updated_at' => $now]);
     $token = $seal->seal('synthetic-knowledge-fixture-token', 1800);

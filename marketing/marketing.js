@@ -42,6 +42,11 @@
       const response = await fetch((ai ? services.nasihat : services.akaun) + path, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, ...(key ? { 'Idempotency-Key': key } : {}) }, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, credentials: 'omit', cache: 'no-store' })
       const data = await response.json().catch(() => ({}))
       if (!live(epoch, token)) throw new RequestError('Sesi akaun telah berubah. Buka semula ruang kerja.', 499)
+      if (response.status === 402) {
+        resetMemory()
+        location.replace('../akaun/akses.html?produk=marketing' + (data.state === 'suspended' ? '&status=suspended' : ''))
+        throw new RequestError('Akses produk diperlukan.',402,data)
+      }
       if (response.status === 401) { expireSession(token); throw new RequestError('Sesi anda telah tamat. Log masuk semula.', 401, data) }
       if (!response.ok || data.ok === false) throw new RequestError(typeof data.error === 'string' ? data.error : 'Permintaan belum berjaya. Cuba lagi.', response.status, data)
       return data
@@ -113,7 +118,7 @@
     if (!state.ready) gate('Membuka ruang pemasaran anda…', 'Kami sedang menyemak akaun dan memuat rekod anda.')
     $('refresh-workspace').disabled = true
     try {
-      const account = await request('/api/akaun/saya')
+      const account = await request('/api/akaun/identiti')
       if (load !== state.load) return
       if (typeof account.akaun_id !== 'string' || !account.akaun_id) throw Error('Maklumat akaun belum dapat disahkan.')
       const data = await request(API + '/workspace')

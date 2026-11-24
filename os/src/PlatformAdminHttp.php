@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace BesharOs;
 
 use PDO;
+require_once __DIR__.'/AccountBridge.php';
 
 require_once __DIR__ . "/CredentialSession.php";
 
@@ -29,6 +30,22 @@ final class PlatformAdminHttp
         }
         $this->origin($headers,$host,$scheme);
         Csrf::check($session,(string)($headers['x-csrf-token']??''));
+        if (in_array($action,['produk','izin'],true)) {
+            if (!$this->rates->consume('produk|'.$admin['user_id'].'|'.$remote)) { throw new AuthException('Tunggu sebentar sebelum mencuba lagi.',429); }
+            $source = $this->text($input,'source');
+            if (!in_array($source,['os','shared'],true)) { throw new AuthException('Produk tidak sah.',400); }
+            if ($action==='produk') {
+                $q=$this->text($input,'q',''); $page=$this->page($input['page']??1);
+                $data=$source==='os' ? ProductAccess::directory($this->pdo,$q,$page)
+                    : AccountBridge::call(['operation'=>'list','actor'=>$admin['user_id'],'q'=>$q,'page'=>$page]);
+            } else {
+                if (($input['confirmed']??false)!==true) { throw new AuthException('Sahkan pilihan pelanggan dan produk.',400); }
+                $data=$source==='os' ? ProductAccess::change($this->pdo,$admin,$input)
+                    : AccountBridge::call(['operation'=>'change','actor'=>$admin['user_id']]+array_intersect_key($input,
+                        array_flip(['id','product','state','revision','receipt','until'])));
+            }
+            return $this->respond($session,$data);
+        }
         if(!in_array($action,['refresh','activate','webhook','access','ai'],true)){throw new AuthException('Tindakan tidak dikenali.',404);}
         if(($input['confirmed']??false)!==true){throw new AuthException('Sahkan pelanggan dan tindakan yang dipilih.',400);}
         $publicId=$this->text($input,'public_id');

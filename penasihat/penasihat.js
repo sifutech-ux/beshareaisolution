@@ -731,6 +731,12 @@ async function mula() {
       tunjukPintu()
       return
     }
+    if (balas.status === 402) {
+      akaunId = null
+      keadaan = null
+      location.replace('../akaun/akses.html?produk=copilot' + (data.state === 'suspended' ? '&status=suspended' : ''))
+      return
+    }
     if (!balas.ok) throw new Error(typeof data.error === 'string' ? data.error : 'gagal')
     if (!BeshareDraf.idAkaunSah(data.akaun_id) || !BeshareDraf.versiSah(data.mesej_versi)) throw new Error('gagal')
     akaunId = data.akaun_id

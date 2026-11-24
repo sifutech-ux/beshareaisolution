@@ -39,6 +39,8 @@ def call(method, path, data=None, auth='', idem=None, signed=False):
 
 _, login = call('POST', '/api/akaun/daftar', {'email': 'synthetic@example.test', 'password': secrets.token_hex(12)})
 auth = 'Bearer ' + login['token']
+with connect() as fixture:
+    fixture.execute("UPDATE pelanggan_akses SET state='free'")
 call('POST', '/api/akaun/penasihat', {'penasihat': {'nama': 'Kedai Kopi Ujian', 'jualan': 'Kopi untuk pekerja pejabat Ampang',
     'peringkat': 'jual', 'mesej': [{'dari': 'penasihat', 'teks': 'Pratonton ujian. Respons AI di sini ialah contoh sintetik.'}]}}, auth)
 

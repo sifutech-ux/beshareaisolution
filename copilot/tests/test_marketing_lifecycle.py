@@ -72,6 +72,8 @@ class LifecycleCases:
         cur.execute('CREATE TABLE pelanggan_akaun (id TEXT PRIMARY KEY,email TEXT NOT NULL)')
         cur.executemany(f'INSERT INTO pelanggan_akaun VALUES ({ph},{ph})',
                         [(OWNER, 'a@example.test'), (OTHER, 'b@example.test'), ('e' * 32, 'c@example.test')])
+        from access_fixture import grant_existing
+        grant_existing(conn, postgres=self.postgres)
         marketing.ensure_marketing_schema(conn, self.postgres)
         social.ensure_social_schema(conn, self.postgres)
         cur.execute(f'INSERT INTO marketing_campaigns VALUES ({",".join([ph] * 7)})',

@@ -39,10 +39,18 @@ class MejaCases:
     def call(self, method, path, body=None, token='', query=None, kunci=None, origin='https://beshareaisolution.com'):
         raw = b'' if body is None else json.dumps(body).encode()
         header = f'Bearer {token}' if token else ''
-        return akaun.dispatch(
+        status, result = akaun.dispatch(
             method, path, origin, header, raw, self.connect, self.postgres, self.secret, '1.1.1.1',
             now=STAMP, query=query, idempotency_key=kunci,
         )
+        if path == '/api/akaun/daftar' and status == 200:
+            from access_fixture import grant_existing
+            conn = self.connect()
+            try:
+                grant_existing(conn, 'copilot', result['email'], self.postgres)
+            finally:
+                conn.close()
+        return status, result
 
     def daftar(self, email='siti@kedai.my'):
         status, body = self.call('POST', '/api/akaun/daftar', {'email': email, 'password': 'kata-rahsia'})
@@ -510,7 +518,7 @@ class PostgresMejaTests(MejaCases, unittest.TestCase):
         for name in (
             'pelanggan_import', 'pelanggan_angka', 'pelanggan_tugas', 'pelanggan_pelan',
             'copilot_service_nonce', 'copilot_usage_reservation', 'copilot_usage_counter',
-            'copilot_quota_policy', 'pelanggan_akaun',
+            'copilot_quota_policy', 'pelanggan_akses', 'pelanggan_pulih', 'pelanggan_akses_audit', 'pelanggan_akaun',
         ):
             cur.execute(f'DROP TABLE IF EXISTS {name}')
         conn.commit()

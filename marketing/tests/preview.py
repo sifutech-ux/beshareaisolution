@@ -53,6 +53,8 @@ status, LOGIN = dispatch('POST', '/api/akaun/daftar', json.dumps({
 }).encode())
 if status != 200:
     raise SystemExit('Unable to initialize isolated preview account.')
+with connect() as fixture:
+    fixture.execute("UPDATE pelanggan_akses SET state='free'")
 dispatch('POST', '/api/akaun/penasihat', json.dumps({'penasihat': {
     'nama': 'Kopi Aurora Ujian', 'jualan': 'Kopi dan pastri untuk pekerja pejabat',
     'peringkat': 'jual', 'mesej': [{'dari': 'penasihat', 'teks': 'Profil contoh untuk ujian Marketing.'}],

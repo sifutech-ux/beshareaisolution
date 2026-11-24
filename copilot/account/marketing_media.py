@@ -744,6 +744,12 @@ def dispatch_media(method, path, query, origin, authorization, content_type, len
         cur.execute(f'SELECT id FROM pelanggan_akaun WHERE id={meja._ph(postgres)}', (owner,))
         if not cur.fetchone():
             raise MediaError('Sila masuk akaun dahulu.', 401, 'unauthorized')
+        from pelanggan_akaun import SESSION_SECONDS, read_session
+        import pelanggan_akses as access
+        if not access.current(conn, meja._ph(postgres), read_session(_bearer(authorization), secret, stamp), SESSION_SECONDS):
+            raise MediaError('Sila masuk semula.', 401, 'unauthorized')
+        if not access.allowed(conn, meja._ph(postgres), owner, 'marketing', stamp):
+            return access.DENIED
         ensure_media_schema(conn, postgres)
         conn.commit()
         if method == 'PUT':
