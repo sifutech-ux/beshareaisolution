@@ -4,9 +4,8 @@ if (yearEl) {
   yearEl.textContent = String(new Date().getFullYear());
 }
 
-// Gates without a real destination yet should not navigate anywhere.
-document.querySelectorAll('a.gate[href="#"]').forEach((gate) => {
-  gate.addEventListener("click", (event) => {
-    event.preventDefault();
-  });
+// Close the mobile menu when a visitor follows an in-page product link.
+const menu = document.querySelector(".nav__menu");
+menu?.addEventListener("click", (event) => {
+  if (event.target.closest("a")) menu.open = false;
 });

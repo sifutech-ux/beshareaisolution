@@ -53,6 +53,8 @@ function setDaftar(nilai) {
   daftar = nilai
   document.getElementById('mod-daftar').classList.toggle('hidup', nilai)
   document.getElementById('mod-masuk').classList.toggle('hidup', !nilai)
+  document.getElementById('mod-daftar').setAttribute('aria-selected', String(nilai))
+  document.getElementById('mod-masuk').setAttribute('aria-selected', String(!nilai))
   hantar.textContent = nilai ? 'Daftar' : 'Masuk'
   kata.autocomplete = nilai ? 'new-password' : 'current-password'
 }
@@ -103,4 +105,5 @@ document.getElementById('keluar').addEventListener('click', () => {
   tunjukSesi()
 })
 
+setDaftar(new URLSearchParams(location.search).get('mod') === 'daftar')
 tunjukSesi()

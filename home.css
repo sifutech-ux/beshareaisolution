@@ -81,10 +81,10 @@ svg { flex-shrink: 0; }
 .papan { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin-top: 38px; text-align: left; }
 .kad { min-width: 0; display: flex; flex-direction: column; overflow: hidden; overflow: clip; padding: 16px 16px 0; border: 1px solid #c19be449; border-radius: 19px; background: linear-gradient(145deg, #2d2040d9, #151024ed 64%); box-shadow: inset 0 1px 0 #ffffff0f, 0 18px 50px #02010b33; }
 .kad--utama { border-color: #c6a1ef64; background: linear-gradient(145deg, #302045ed, #171126 70%); }
-.kad--studio { background: linear-gradient(145deg, #2b203ced, #191023 70%); }
+.kad--marketing { background: linear-gradient(145deg, #2b203ced, #191023 70%); }
 .pratonton { display: flex; align-items: center; position: relative; height: 190px; padding: 14px; overflow: hidden; border: 1px solid #b893e32e; border-radius: 12px; background: radial-gradient(ellipse at 95% 0, #b160ec5c, transparent 70%), #211333; }
 .pratonton--whatsapp { padding: 10px; background: radial-gradient(ellipse at 80% 10%, #7940cb4d, transparent 75%), #140e24; }
-.pratonton--studio { padding: 10px; background: radial-gradient(ellipse at 80% 0, #c159d142, transparent 65%), #190e28; }
+.pratonton--marketing { padding: 10px; background: radial-gradient(ellipse at 80% 0, #c159d142, transparent 65%), #190e28; }
 .mini-label { margin-left: auto; font-size: 7px; letter-spacing: .09em; color: #d6c3e8; white-space: nowrap; }
 .mini-tugas { width: 100%; padding: 15px 14px 10px; border: 1px solid #c68fee6b; border-radius: 10px; background: linear-gradient(120deg, #493164c4, #261837e0); box-shadow: 0 -3px 15px #c079ed29; }
 .mini-tugas__tajuk { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; padding-bottom: 9px; }
@@ -108,25 +108,11 @@ svg { flex-shrink: 0; }
 .mini-chat__gelembung--balas { align-self: flex-end; border-radius: 6px 6px 1px 6px; background: linear-gradient(110deg, #9954d6, #bc72ee); color: #fff; }
 .mini-chat__taip { display: flex; gap: 3px; padding: 6px 8px; border-radius: 6px; background: #6c53854a; }
 .mini-chat__taip i { width: 3px; height: 3px; border-radius: 50%; background: #c4add9; }
-.mini-studio { width: 100%; height: 100%; display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 8px; padding: 6px; border: 1px solid #b18ad046; border-radius: 9px; background: #140d20; }
-.mini-studio__alat { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 6px; border-radius: 5px; background: #2d1b41; color: #d1a0f0; font-size: 12px; }
-.mini-studio__ruang { min-width: 0; }
-.mini-studio__visual { position: relative; height: 106px; overflow: hidden; border-radius: 6px; background: radial-gradient(ellipse at 75% 20%, #ffb3dd8c, transparent 45%), linear-gradient(155deg, #462182, #ad61cd 46%, #f4b7d1 67%, #4b216e); }
-.mini-studio__label { position: absolute; z-index: 2; top: 6px; left: 7px; font-size: 6px; letter-spacing: .1em; color: #f5e2ff; }
-.mini-studio__bukit { position: absolute; inset: 28% -5% 0; clip-path: polygon(0 80%, 30% 31%, 44% 52%, 66% 8%, 83% 50%, 100% 25%, 100% 100%, 0 100%); background: linear-gradient(#3f1b59, #1c1235); }
-.mini-studio__bukit--jauh { inset: 18% -12% 0; transform: scaleX(-1); background: #773887a6; }
-.mini-studio__kawalan { position: absolute; inset: auto 0 0; display: flex; align-items: center; gap: 7px; height: 23px; padding: 0 8px; background: #130a26c9; }
-.mini-studio__kawalan > span { font-size: 15px; }
-.mini-studio__kawalan i { width: 48%; height: 2px; background: linear-gradient(90deg, #dcadff 30%, #695577 30%); }
-.mini-studio__kawalan small { margin-left: auto; font-size: 6px; color: #cbb7de; }
-.mini-studio__timeline { position: relative; display: flex; gap: 4px; padding: 9px 0 0; }
-.mini-studio__timeline span { flex: 1; height: 23px; border-radius: 3px; border: 1px solid #d0a4ef78; background: linear-gradient(155deg, #412267 20%, #d889b8 52%, #4b2b6d 54%, #241736); }
-.mini-studio__timeline span:nth-child(2n) { background: linear-gradient(25deg, #362151 25%, #8952b2 26%, #cd8dbd 65%, #4e297c); }
-.mini-studio__timeline > i { position: absolute; left: 56%; top: 4px; bottom: -9px; width: 1px; background: #f4e6fc; }
-.mini-studio__timeline > i::before { content: ''; position: absolute; top: 0; left: -3px; border-inline: 3px solid transparent; border-top: 4px solid #f4e6fc; }
-.mini-studio__audio { display: flex; align-items: center; gap: 3px; height: 14px; padding: 5px 3px 0; }
-.mini-studio__audio i { flex: 1; height: 4px; background: #9b69c9; border-radius: 1px; }
-.mini-studio__audio i:nth-child(3n) { height: 8px; }.mini-studio__audio i:nth-child(2n) { height: 6px; }
+.mini-kempen { width: 100%; padding: 12px; border: 1px solid #e0a3d34d; border-radius: 9px; background: linear-gradient(120deg, #402440, #251829); }
+.mini-kempen > div { display: flex; align-items: center; gap: 7px; min-height: 32px; color: #efdbef; font-size: 10px; }
+.mini-kempen > div + div { border-top: 1px solid #eac4e41f; }
+.mini-kempen b { min-width: 28px; color: #ebb3de; font-size: 8px; }
+.mini-kempen i { margin-left: auto; font-size: 8px; font-style: normal; color: #dcc5db; }
 .kad__isi { display: flex; flex: 1; flex-direction: column; padding: 21px 7px 20px; }
 .kad__kepala { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-bottom: 12px; }
 .kad h3 { font-size: clamp(20px, 1.65vw, 23px); font-weight: 700; letter-spacing: -.04em; line-height: 1.25; }
@@ -188,7 +174,8 @@ svg { flex-shrink: 0; }
   .mini-inbox__item i { width: 14px; height: 14px; }
   .mini-inbox__item b { display: none; }
   .mini-chat .mini-label { font-size: 5px; }
-  .mini-studio__visual { height: 92px; }
+  .mini-kempen { padding: 8px; }
+  .mini-kempen i { display: none; }
   .kad__isi { padding-inline: 4px; }
   .kad h3 { font-size: 19px; }
   .kad__status { margin-inline: -12px; padding-inline: 16px; min-height: 95px; }
@@ -280,6 +267,45 @@ svg { flex-shrink: 0; }
   .pentas__bar { font-size: 7px; }
   .pentas__demo > span { display: none; }
   .mini-label { font-size: 6px; }.mini-tugas__baris { font-size: 9px; }
+}
+/* Public offers and account entry points. */
+.bahagian--laluan > .bahagian__ayat { text-align: center; margin-inline: auto; }
+.kad__isi > h3 { margin-bottom: 10px; }
+.kad__isi > p { font-size: 14px; margin-bottom: 16px; }
+.kad__isi .harga, .pakej .harga { margin: auto 0 5px; color: #e3d8ed; font-size: 13px; line-height: 1.2; }
+.harga strong { color: var(--dakwat); font-size: clamp(27px, 2.5vw, 36px); letter-spacing: -.05em; }
+.kad__isi .syarat, .pakej .syarat { font-size: 12px; line-height: 1.65; color: #d5c6df; }
+.kad__isi .syarat { min-height: 4.95em; margin: 0 0 14px; }
+.kad__aksi { display: grid; gap: 3px; align-content: start; border-top: 1px solid var(--garis); padding-top: 16px; }
+.kad__aksi .butang { min-height: 44px; padding: 9px 12px; font-size: 13px; }
+.pautan { display: inline-flex; justify-content: center; align-items: center; gap: 7px; min-height: 44px; color: #e6c8ff; font-size: 13px; font-weight: 600; text-align: center; }
+.kad h3 a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.kad h3 a span { font-size: 0.7em; color: #d6aff6; }
+.pautan:hover, .laluan a:hover h3 { text-decoration: underline; text-underline-offset: 4px; }
+.pakej { display: grid; grid-template-columns: 1.2fr 1fr auto; align-items: center; gap: 26px; padding: 26px; margin-top: 22px; border: 1px solid #c99feb62; border-radius: 18px; background: linear-gradient(110deg, #30203e, #1a132b); text-align: left; }
+.pakej h3 { margin-bottom: 8px; font-size: 22px; letter-spacing: -.04em; }
+.pakej p { color: #d6c9e1; font-size: 14px; line-height: 1.65; }
+.laluan h3 span { color: #d7aafd; }
+.kaki__utama a { min-height: 44px; display: inline-flex; align-items: center; }
+@media (min-width: 860px) {
+  .hero { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); align-items: center; gap: clamp(24px, 4vw, 64px); padding: clamp(66px, 7vw, 112px) max(32px, calc((100vw - 1200px) / 2)) 28px; text-align: left; }
+  .hero h1 { font-size: clamp(52px, 5.25vw, 79px); }
+  .hero .tindakan { justify-content: flex-start; gap: 10px; }
+  .hero .butang { padding-inline: 17px; }
+  .hero .pentas { width: 100%; margin: 0; }
+  .hero .pentas figcaption { text-align: center; }
+  .hero__atmosfera { inset: 4% 0 0; }
+  .hero__orbit { top: 46%; }
+}
+@media (max-width: 859px) {
+  .pakej { grid-template-columns: 1fr 1fr; }
+  .pakej .butang { grid-column: 1 / -1; justify-self: start; }
+}
+@media (max-width: 739px) {
+  .pakej { max-width: 480px; grid-template-columns: 1fr; gap: 16px; padding: 21px; margin-inline: auto; }
+  .kad__isi .syarat { min-height: auto; }
+  .laluan p { margin-left: 0; }
+  .bahagian--laluan .bahagian__ayat { max-width: 460px; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
