@@ -426,6 +426,8 @@ svg { flex-shrink: 0; }
 .demo-radio:checked + label {
   --muka: linear-gradient(112deg, #17443f, #1c2c3b 48%, #342a42);
   --bibir: var(--kaca-bibir);
+  --pantulan: #c9ffed18;
+  --aurora-text: linear-gradient(105deg, #b7f7dc, #c2e7ee 37%, #d6d5ff 66%, #efd6fd);
   color: #fff;
 }
 .demo-radio:checked + label::after {
@@ -542,7 +544,7 @@ svg { flex-shrink: 0; }
   border: 1px solid transparent;
   border-radius: 13px;
   background:
-    radial-gradient(ellipse 70% 125% at 8% -50%, #c9ffed2b, transparent 85%) padding-box,
+    radial-gradient(ellipse 70% 125% at 8% -50%, var(--pantulan, #c9ffed2b), transparent 85%) padding-box,
     var(--muka, var(--kaca-muka)) padding-box,
     var(--bibir, var(--kaca-bibir)) border-box;
   box-shadow: var(--kaca-bayang);
