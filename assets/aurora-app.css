@@ -1,0 +1,141 @@
+/* Shared surface and control finishes for the BeShare workspaces. */
+@media screen and (forced-colors: none) {
+  [data-aurora] {
+    --aurora-face: linear-gradient(115deg, #20574e, #213c49 44%, #49375e);
+    --aurora-rim: linear-gradient(155deg, #91cfc4, #547f84 18%, #303546 52%, #6a567c 88%, #46384f);
+    --aurora-soft-face: linear-gradient(112deg, #17282d, #191e2d 48%, #282133);
+    --aurora-soft-rim: linear-gradient(155deg, #5d7778, #354751 20%, #2b2d3c 54%, #483c53);
+    --aurora-soft-ink: #e8ebf3;
+    --aurora-selected: linear-gradient(112deg, #17443f, #1c2c3b 48%, #342a42);
+    --aurora-accent: #a5f2d8;
+    --aurora-panel: linear-gradient(120deg, #152a30, #191a2b 55%, #271e35);
+    --aurora-depth: 0 1px 2px #07071245, 1px 5px 12px -5px #03030c80;
+    --aurora-light-face: linear-gradient(112deg, #edf6f3, #f6f7fa 50%, #f6f0f9);
+    --aurora-light-rim: linear-gradient(155deg, #8bada3, #c0cdd0 35%, #ccbfd5);
+    --aurora-light-selected: linear-gradient(110deg, #d8eee7, #eaf0f4 50%, #eee6f4);
+  }
+
+  :is([data-tema="cerah"], [data-theme="cerah"]) [data-aurora] {
+    --aurora-soft-face: var(--aurora-light-face);
+    --aurora-soft-rim: var(--aurora-light-rim);
+    --aurora-selected: var(--aurora-light-selected);
+    --aurora-soft-ink: #242c35;
+    --aurora-accent: #126450;
+    --aurora-panel: var(--aurora-light-face);
+    --aurora-depth: 0 2px 5px #21253312;
+  }
+  @media (prefers-color-scheme: light) {
+    [data-tema="sistem"] [data-aurora] {
+      --aurora-soft-face: var(--aurora-light-face);
+      --aurora-soft-rim: var(--aurora-light-rim);
+      --aurora-selected: var(--aurora-light-selected);
+      --aurora-soft-ink: #242c35;
+      --aurora-accent: #126450;
+      --aurora-panel: var(--aurora-light-face);
+      --aurora-depth: 0 2px 5px #21253312;
+    }
+  }
+
+  /* Each product keeps its own layout and native control states. */
+  [data-aurora="copilot"] { --hero: var(--aurora-panel); }
+  [data-aurora="marketing"] {
+    --bg: #0c0c19;
+    --surface: #151625;
+    --surface-2: #1a1c2c;
+    --line: #aaa1c32e;
+  }
+  [data-aurora="marketing"] .sidebar,
+  [data-aurora="owner"] .sidebar { background: #100f1e; }
+  [data-aurora="marketing"] :is(.gate-panel, .overview-hero),
+  [data-aurora="owner"] .page-header,
+  [data-aurora="connect"] main,
+  [data-aurora="account"] .kad,
+  .os-app[data-aurora] .os-auth-card { background: var(--aurora-panel); }
+  .os-app[data-aurora] .os-welcome {
+    background: linear-gradient(120deg, #183239, #1b1c30 55%, #30243e);
+  }
+  [data-aurora="account"] { --bg: #0b0b19; --muted: #c3bdcf; --accent: #bcdbed; }
+  .os-landing[data-aurora] .os-landing-copy h1 > span,
+  .os-app[data-aurora] .os-auth-story h2 > span {
+    color: var(--aurora-accent);
+  }
+  @supports (background-clip: text) {
+    html:not([data-theme="cerah"]) [data-aurora="os"] :is(.os-landing-copy h1, .os-auth-story h2) > span {
+      background: linear-gradient(105deg, #8ff1c9, #a6d6ef 45%, #dfbaff);
+      background-clip: text;
+      color: transparent;
+    }
+  }
+
+  /* Use the homepage material on actions. Quiet actions opt into a lower-contrast face. */
+  body[data-aurora] :is(.butang-utama, .butang-senyap, .suara-pintu, .suara-utama,
+      .button.primary, .button.light, .button.secondary, .button.quiet,
+      .button-primary, .button-quiet, .btn, .akaun .utama, .mod button,
+      .akaun button[type="submit"], .account):where(:not(.kc-remove, .button-danger, [data-act="remove-member"])),
+  .meja[data-aurora] :is(#hantar, #borang-terus, #borang-siap) {
+    color: var(--control-ink, #f6fffe);
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background:
+      radial-gradient(ellipse 70% 125% at 8% -50%, #c9ffed18, transparent 85%) padding-box,
+      var(--control-face, var(--aurora-face)) padding-box,
+      var(--control-rim, var(--aurora-rim)) border-box;
+    box-shadow: var(--aurora-depth);
+  }
+
+  [data-aurora] :is(.butang-senyap, .button.secondary, .button.quiet, .button-quiet,
+      .btn--ghost, .mod button, .account) {
+    --control-face: var(--aurora-soft-face);
+    --control-rim: var(--aurora-soft-rim);
+    --control-ink: var(--aurora-soft-ink);
+  }
+
+  /* Set the marker on the background so compact navigation and inbox rows keep their hit areas. */
+  body[data-aurora] :is(.senarai-sisi button, .kaki button, .nav a, .os-bottom-nav a,
+      .os-mobile-menu nav a)[aria-current="page"],
+  body[data-aurora] :is(.nav-item.is-active, .thread-item.is-on, .chips .btn.is-on,
+      .filters button[aria-pressed="true"], .mod button.hidup) {
+    color: var(--aurora-soft-ink);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background:
+      linear-gradient(var(--aurora-accent), var(--aurora-accent)) left center / 3px 17px no-repeat padding-box,
+      var(--aurora-selected) padding-box, var(--aurora-soft-rim) border-box;
+    box-shadow: none;
+  }
+  [data-aurora] :is(.senarai-sisi, .kaki, .nav, .os-bottom-nav) [aria-current="page"] svg {
+    color: var(--aurora-accent);
+  }
+  .meja[data-aurora] .senarai-sisi [aria-current="page"]::after { content: none; }
+  .meja[data-aurora] .suara-pintu__ikon {
+    color: #d0ffec;
+    background: #ffffff0c;
+    border-color: #c2f9ec47;
+    box-shadow: none;
+  }
+  .meja[data-aurora] .suara-pintu__nota { color: #e3e7ee; }
+  [data-aurora] :is(a, button, summary):focus-visible {
+    outline: 3px solid var(--aurora-accent);
+    outline-offset: 3px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    body[data-aurora] :is(.butang-utama, .suara-pintu, .suara-utama, .button.primary,
+        .button.light, .button-primary, .btn:not(.btn--ghost)):hover:not(:disabled) {
+      filter: brightness(1.06);
+      transform: translateY(-1px);
+      border-color: transparent;
+      box-shadow: var(--aurora-depth);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body[data-aurora] :is(a, button):hover:not(:disabled) { transform: none; }
+  }
+}
+
+@media (forced-colors: active) {
+  [data-aurora] :is([aria-current="page"], .thread-item.is-on, .chips .is-on,
+      .nav-item.is-active, .mod button.hidup) {
+    border: 2px solid Highlight;
+  }
+}
