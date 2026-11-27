@@ -1,0 +1,81 @@
+/* BeShare Aurora V2: approved artwork, shared across the public site and apps.
+ * `dark` is the white wordmark for a dark surface; `light` is for a light one.
+ * Load after each application's stylesheet. The wrapper's aria-label names the
+ * brand; paired decorative images use alt="" and aria-hidden="true".
+ */
+.bs-brand {
+  --bs-brand-dark-display: block;
+  --bs-brand-light-display: none;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  gap: 0;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.bs-brand > img.bs-brand__logo {
+  width: var(--bs-brand-width, 240px);
+  max-width: 100%;
+  height: auto;
+  flex: 0 1 auto;
+  object-fit: contain;
+  border-radius: 0;
+  filter: none;
+}
+
+.bs-brand > .bs-brand__logo--dark {
+  display: var(--bs-brand-dark-display);
+}
+
+.bs-brand > .bs-brand__logo--light {
+  display: var(--bs-brand-light-display);
+}
+
+/* Explicit application themes. */
+:where([data-tema="cerah"], [data-theme="cerah"]) .bs-brand {
+  --bs-brand-dark-display: none;
+  --bs-brand-light-display: block;
+}
+
+:where([data-tema="gelap"], [data-theme="gelap"]) .bs-brand {
+  --bs-brand-dark-display: block;
+  --bs-brand-light-display: none;
+}
+
+@media (prefers-color-scheme: light) {
+  :where([data-tema="sistem"], [data-theme="sistem"]) .bs-brand {
+    --bs-brand-dark-display: none;
+    --bs-brand-light-display: block;
+  }
+}
+
+/* A fixed surface (e.g. a dark footer within a light app) wins over its theme. */
+.bs-brand[data-brand-surface="light"] {
+  --bs-brand-dark-display: none;
+  --bs-brand-light-display: block;
+}
+
+.bs-brand[data-brand-surface="dark"] {
+  --bs-brand-dark-display: block;
+  --bs-brand-light-display: none;
+}
+
+img.bs-brand__icon {
+  display: block;
+  width: var(--bs-brand-icon-size, 48px);
+  height: var(--bs-brand-icon-size, 48px);
+  max-width: 100%;
+  object-fit: contain;
+  flex: 0 0 auto;
+  border-radius: 0;
+  filter: none;
+}
+
+a.bs-brand:focus-visible {
+  outline: 2px solid #a855f7;
+  outline-offset: 6px;
+  border-radius: 4px;
+}

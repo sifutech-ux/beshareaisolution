@@ -1,4 +1,7 @@
 @charset "UTF-8";
+/* Product wordmarks share their sizing and theme rules with the workspace. */
+.marketing-policy .policy-brand.bs-brand{--bs-brand-width:220px;gap:0}
+@media(max-width:520px){.marketing-policy .policy-brand.bs-brand{--bs-brand-width:172px}}
 .marketing-policy{color-scheme:dark;--policy-bg:#0b101c;--policy-surface:#111a2a;--policy-text:#edf1fa;--policy-muted:#a8b5cc;--policy-line:#2c374d;--policy-violet:#c0afff;--policy-mint:#8be5ce;margin:0;background:radial-gradient(ellipse at 85% 0,rgba(114,81,189,.14),transparent 42%),var(--policy-bg);color:var(--policy-text);font:16px/1.75 Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
 .marketing-policy *{box-sizing:border-box}
 .marketing-policy a{color:var(--policy-violet);text-decoration-thickness:1px;text-underline-offset:4px;overflow-wrap:anywhere}

@@ -8,8 +8,9 @@
       name="description"
       content="Meja penasihat perniagaan BeShare. Susun minggu ini dalam Bahasa Melayu, pada telefon atau desktop."
     />
-    <title>Business Copilot — BeShare AI Solution</title>
-    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <title>BeShare Business Copilot — BeShare AI Solution</title>
+    <link rel="icon" type="image/svg+xml" href="../assets/brand/aurora-v2/beshare-business-copilot-favicon.svg" />
+    <link rel="apple-touch-icon" href="../assets/brand/aurora-v2/beshare-business-copilot-apple-touch-icon.png" />
     <script>
       try {
         var temaAwal = localStorage.getItem('beshare-tema') || 'sistem'
@@ -19,10 +20,11 @@
       } catch (e) {}
     </script>
     <link rel="stylesheet" href="../styles.css?v=20260929" />
-    <link rel="stylesheet" href="penasihat.css?v=20261112aurora1" />
+    <link rel="stylesheet" href="penasihat.css?v=20261127-aurora-v2" />
     <link rel="stylesheet" href="bijak.css?v=20261113voice2" />
     <link rel="stylesheet" href="hasil.css?v=20261114a" />
     <link rel="stylesheet" href="../assets/aurora-app.css?v=20261125-1" />
+    <link rel="stylesheet" href="../assets/brand.css?v=20261127-aurora-v2" />
   </head>
   <body data-aurora="copilot" class="meja" data-skrin="muat">
     <a class="lompat" href="#kandungan">Langkau ke kandungan</a>
@@ -30,9 +32,9 @@
 
     <div class="bingkai">
       <aside class="sisi" aria-label="Navigasi desktop">
-        <a class="jenama" href="../">
-          <img class="jenama__tanda" src="../favicon.svg" alt="" width="36" height="36" />
-          <span class="jenama__ayat"><strong>BeShare AI</strong><small>Business Copilot</small></span>
+        <a class="jenama bs-brand" href="../" aria-label="BeShare Business Copilot — laman utama BeShare">
+          <img class="bs-brand__logo bs-brand__logo--dark" src="../assets/brand/aurora-v2/beshare-business-copilot-logo-dark.svg" alt="" aria-hidden="true" width="734" height="219" />
+          <img class="bs-brand__logo bs-brand__logo--light" src="../assets/brand/aurora-v2/beshare-business-copilot-logo-light.svg" alt="" aria-hidden="true" width="734" height="219" />
         </a>
         <p class="sisi__nama" id="nama-sisi" hidden></p>
         <p class="sisi__label" aria-hidden="true">RUANG KERJA</p>
@@ -56,9 +58,9 @@
 
       <div class="ruang">
         <header class="palang">
-          <a class="palang-jenama" href="../">
-            <img src="../favicon.svg" alt="" width="28" height="28" />
-            <span>BeShare AI</span>
+          <a class="palang-jenama bs-brand" href="../" aria-label="BeShare Business Copilot — laman utama BeShare">
+            <img class="bs-brand__icon" src="../assets/brand/aurora-v2/beshare-business-copilot-icon.svg" alt="" aria-hidden="true" width="34" height="34" />
+            <span aria-hidden="true"><strong>BeShare</strong><small>Business Copilot</small></span>
           </a>
           <div class="palang__laluan"><span class="palang__produk">Business Copilot</span><p class="palang__tajuk" id="tajuk-skrin">Membuka</p></div>
           <button type="button" class="tema-pantas" id="tema-pantas" aria-pressed="false" aria-label="Tukar tema">Tema</button>
@@ -73,12 +75,14 @@
           </div>
 
           <section class="layar layar-muat" data-layar="muat" aria-busy="true">
+            <img class="bs-brand__icon copilot-gate-icon" src="../assets/brand/aurora-v2/beshare-business-copilot-icon.svg" alt="" aria-hidden="true" width="64" height="64" />
             <p class="kosong__tajuk">Membuka meja anda…</p>
             <p>Menyemak akaun BeShare pada peranti ini.</p>
           </section>
 
           <section class="layar pintu" data-layar="pintu">
-            <p class="eyebrow">Akaun BeShare</p>
+            <img class="bs-brand__icon copilot-gate-icon" src="../assets/brand/aurora-v2/beshare-business-copilot-icon.svg" alt="" aria-hidden="true" width="64" height="64" />
+            <p class="eyebrow">BeShare Business Copilot</p>
             <h1>Masuk untuk membuka meja</h1>
             <p class="lead">Perniagaan dan perbualan penasihat disimpan pada akaun anda. Tema kekal pada telefon ini. Draf pelan tidak berpindah ke akaun lain.</p>
             <p><a href="../">Gerbang</a></p>
@@ -210,7 +214,7 @@
 
           <section class="layar sembang" data-layar="nasihat" id="sembang">
             <div class="ringkas">
-              <img class="ringkas-jenama" src="../favicon.svg" alt="" width="28" height="28" />
+              <img class="ringkas-jenama bs-brand__icon" src="../assets/brand/aurora-v2/beshare-business-copilot-icon.svg" alt="" aria-hidden="true" width="32" height="32" />
               <div class="ringkas-teks">
                 <p class="penasihat-tanda">Penasihat</p>
                 <p id="ringkas"></p>
