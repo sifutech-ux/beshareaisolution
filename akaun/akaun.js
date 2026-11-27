@@ -8,6 +8,12 @@ const DASHBOARD = typeof BeshareKembali !== 'undefined'
   : '../penasihat/#utama'
 
 if (DASHBOARD === '../marketing/') {
+  const asetJenama = '../assets/brand/aurora-v2/beshare-ai-marketing'
+  document.getElementById('akaun-jenama').setAttribute('aria-label', 'BeShare AI Marketing — laman utama')
+  document.getElementById('akaun-logo-dark').src = `${asetJenama}-logo-dark.svg`
+  document.getElementById('akaun-logo-light').src = `${asetJenama}-logo-light.svg`
+  document.getElementById('akaun-favicon').href = `${asetJenama}-favicon.svg`
+  document.getElementById('akaun-apple-icon').href = `${asetJenama}-apple-touch-icon.png`
   document.title = 'Log masuk — BeShare AI Marketing'
   document.getElementById('akaun-tajuk').textContent = 'Akaun BeShare AI Marketing'
   document.getElementById('akaun-penerangan').textContent = 'Masuk atau daftar menggunakan akaun BeShare yang sama. Anda akan terus ke ruang Marketing.'

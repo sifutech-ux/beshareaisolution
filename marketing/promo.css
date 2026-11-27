@@ -34,3 +34,6 @@
 .promo-public a {color:#245b54}
 .promo-public [hidden],.promo-workspace [hidden] {display:none!important}
 @media(max-width:760px){.promo-public #promotion,.promo-fields {grid-template-columns:1fr}}
+
+.promo-public .promo-provider { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
+.promo-public .promo-provider .bs-brand { --bs-brand-width: 180px; }

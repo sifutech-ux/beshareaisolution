@@ -99,14 +99,17 @@ function simpan_qr_jika_ada(): string
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Dashboard WhatsApp AI — +60 11-5432 0018</title>
-  <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="../../assets/brand/aurora-v2/beshare-ai-os-favicon.svg">
+  <link rel="apple-touch-icon" href="../../assets/brand/aurora-v2/beshare-ai-os-apple-touch-icon.png">
   <link rel="stylesheet" href="../../styles.css">
   <link rel="stylesheet" href="../landing.css">
   <link rel="stylesheet" href="../../admin/admin.css">
+  <link rel="stylesheet" href="../../assets/brand.css?v=20261127-aurora-v2">
 </head>
 <body>
   <div class="bg-glow" aria-hidden="true"></div>
   <main class="page">
+    <a class="bs-brand" href="/whatsapp/meja/" aria-label="BeShare AI OS — Dashboard WhatsApp" style="--bs-brand-width:220px; margin-bottom:1.5rem;"><img class="bs-brand__logo bs-brand__logo--dark" src="../../assets/brand/aurora-v2/beshare-ai-os-logo-dark.svg" alt="" aria-hidden="true"><img class="bs-brand__logo bs-brand__logo--light" src="../../assets/brand/aurora-v2/beshare-ai-os-logo-light.svg" alt="" aria-hidden="true"></a>
     <p class="pill">WhatsApp AI</p>
     <div class="kepala-admin">
       <h1>Dashboard +60 11-5432 0018</h1>

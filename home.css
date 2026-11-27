@@ -37,7 +37,9 @@ svg { flex-shrink: 0; }
   .nav { background: linear-gradient(115deg, #211734b3, #100d22c9 70%); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
 }
 .jenama { display: inline-flex; align-items: center; gap: 11px; min-height: 44px; font-size: 21px; font-weight: 750; letter-spacing: -.055em; white-space: nowrap; }
-.jenama__tanda { filter: drop-shadow(0 0 12px #a252f83d); }
+.jenama.bs-brand { --bs-brand-width: 220px; }
+.kad h3 .bs-brand { --bs-brand-width: 260px; }
+.laluan__ikon { margin-bottom: 14px; }
 .nav__links { display: flex; align-items: center; gap: 16px; }
 .nav__links a, .nav__panel a { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 12px; font-size: 13px; font-weight: 500; border-radius: 10px; }
 .nav__links .nav__masuk { min-width: 84px; margin-left: 12px; border: 1px solid #c1a2ea70; background: #b77fff05; }
@@ -203,10 +205,14 @@ svg { flex-shrink: 0; }
   .kad__isi > p { font-size: 12px; }
   .kad__pergi { font-size: 11px; }
 }
+@media (max-width: 959px) {
+  .nav__links { display: none; }
+  .nav__menu { display: block; }
+}
 @media (max-width: 739px) {
   .nav { padding: 8px 13px; width: calc(100% - 28px); border-radius: 15px; }
   .jenama { font-size: 19px; gap: 8px; }
-  .jenama__tanda { width: 27px; height: 27px; }
+  .nav .jenama.bs-brand { --bs-brand-width: min(200px, calc(100vw - 148px)); }
   .hero { padding: 54px 20px 0; }
   .ekosistem-nama { font-size: 9px; letter-spacing: .16em; }
   .hero h1 { margin-top: 18px; font-size: clamp(36px, 7.8vw, 55px); line-height: 1.1; letter-spacing: -.055em; }

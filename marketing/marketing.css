@@ -37,3 +37,30 @@ input,select,textarea{display:block;width:100%;border:1px solid #39465c;backgrou
 .ad-simulation legend { padding:0 .4rem; font-weight:650; }
 .ad-simulation p { overflow-wrap:anywhere; }
 #ads-orders-form { display:grid; gap:.75rem; }
+
+/* Approved Aurora identity across the desktop rail and mobile header. */
+.sidebar .brand.bs-brand { --bs-brand-width: 186px; width: 100%; padding: 0 0 30px; justify-content: center; }
+.sidebar .brand > .brand-symbol { display: none; }
+.topbar .marketing-mobile-brand { display: none; }
+.gate-panel .gate-symbol { width: 64px; height: 64px; background: none; border: 0; border-radius: 0; }
+.gate-symbol .bs-brand__icon { --bs-brand-icon-size: 64px; }
+@media (max-width: 900px) {
+  .sidebar .brand.bs-brand { padding-bottom: 28px; }
+  .sidebar .brand.bs-brand > .bs-brand__logo { display: none; }
+  .sidebar .brand.bs-brand > .brand-symbol { --bs-brand-icon-size: 38px; display: block; }
+}
+@media (max-width: 680px) {
+  .sidebar .brand.bs-brand { display: none; }
+  .topbar { gap: 12px; }
+  .topbar .marketing-mobile-brand { --bs-brand-width: 142px; display: inline-flex; flex: 0 0 auto; }
+  .topbar .breadcrumb { display: none; }
+  .topbar-actions { min-width: 0; }
+  .topbar .connection-label { display: block; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar .connection-label i { margin-right: 6px; }
+  .topbar .icon-button { flex: 0 0 auto; }
+}
+@media (max-width: 380px) {
+  .topbar { padding-inline: 16px; }
+  .topbar .marketing-mobile-brand { --bs-brand-width: 128px; }
+  .topbar .connection-label { max-width: 90px; }
+}

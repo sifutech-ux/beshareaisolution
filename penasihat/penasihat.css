@@ -1073,3 +1073,15 @@ html { background: var(--latar); }
   .meja button { border: 1px solid ButtonText; }
   .meja button[aria-current="page"] { outline: 2px solid Highlight; }
 }
+
+/* Approved Aurora identity; theme variants are handled by assets/brand.css. */
+.meja .jenama.bs-brand { --bs-brand-width: 188px; width: 100%; gap: 0; }
+.meja .palang-jenama.bs-brand { --bs-brand-icon-size: 34px; gap: 9px; }
+.palang-jenama > span { display: flex; flex-direction: column; gap: 3px; line-height: 1.1; }
+.palang-jenama strong { font-size: 14px; font-weight: 750; }
+.palang-jenama small { color: var(--senyap); font-size: 9px; font-weight: 550; }
+.copilot-gate-icon { --bs-brand-icon-size: 64px; margin-bottom: 20px; }
+.ringkas-jenama.bs-brand__icon { --bs-brand-icon-size: 32px; }
+@media (min-width: 960px) {
+  .meja .palang-jenama.bs-brand { display: none; }
+}

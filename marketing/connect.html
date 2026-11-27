@@ -7,6 +7,8 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-HowOUnxU8N37Ng9YpJqh3tpLD6rO/CjK7SK5uq+YjGY='; style-src 'self' 'unsafe-inline'; connect-src 'self' https://akaun.beshareaisolution.com https://akaun-staging.beshareaisolution.com http://127.0.0.1:8767; img-src 'self' data:; base-uri 'none'; form-action 'self'">
   <script>(function(){const p=new URLSearchParams(location.search),e=p.get('error'),c=p.get('error_code');const failure=c==='1349245'?'tester_required':e==='access_denied'?'cancelled':['temporarily_unavailable','server_error'].includes(e)?'temporary':p.has('error')||p.has('error_code')||p.has('error_message')?'provider':'';window.BeshareOAuthReturn={code:failure?'':p.get('code')||'',state:failure?'':p.get('state')||'',failure,denied:Boolean(failure)};history.replaceState(null,'',location.pathname);})();</script>
   <title>Sambungan akaun · BeShare AI Marketing</title>
+  <link rel="icon" href="../assets/brand/aurora-v2/beshare-ai-marketing-favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../assets/brand/aurora-v2/beshare-ai-marketing-apple-touch-icon.png">
   <style>
     :root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b0c17;color:#f2f2fb}
     *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 80% 0,rgba(122,83,255,.17),transparent 48%),#0b0c17;padding:36px 24px}
@@ -16,9 +18,15 @@
   <script src="../akaun-asal.js" defer></script>
   <script src="connect.js?v=facebook-ads1" defer></script>
   <link rel="stylesheet" href="../assets/aurora-app.css?v=20261125-1">
+  <link rel="stylesheet" href="../assets/brand.css?v=20261127-aurora-v2">
 </head>
 <body data-aurora="connect">
-  <header><a class="brand" href="/marketing/">BeShare <span>AI</span></a><span>MARKETING</span></header>
+  <header>
+    <a class="brand bs-brand" href="/marketing/" data-brand-surface="dark" aria-label="BeShare AI Marketing — kembali ke ruang pemasaran">
+      <img class="bs-brand__logo bs-brand__logo--dark" src="../assets/brand/aurora-v2/beshare-ai-marketing-logo-dark.svg" width="734" height="219" alt="" aria-hidden="true">
+      <img class="bs-brand__logo bs-brand__logo--light" src="../assets/brand/aurora-v2/beshare-ai-marketing-logo-light.svg" width="734" height="219" alt="" aria-hidden="true">
+    </a>
+  </header>
   <main>
     <div class="eyebrow">Sambungan rasmi platform</div>
     <h1 id="title">Sambungkan akaun anda.</h1>
